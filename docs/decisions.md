@@ -185,3 +185,25 @@ own reasoning about Sonar, applied to a runtime instead of a scanner.
 is a property of the code and its tests, not of the runtime, and the store is
 keyed on file digests no PHP version changes. Running it on both legs would
 prove the same thing twice and have two runs writing one store.
+
+## The analyser is pinned to the versions composer.json declares
+
+The first run of the release workflow found something neither local gate could:
+`bin/mule` passed static analysis on the 8.4 leg and failed it on the 8.5 one,
+for the same bytes — `Variable $argv might not be defined.`
+
+Two separate problems, and both are fixed rather than ignored.
+
+**`phpstan.neon` now pins `phpVersion` to `min: 80400, max: 80500`**, the whole
+range `composer.json` declares, so the gate checks the code against every
+version a consumer may run it on and gives the same verdict wherever the
+analyser itself is running. An analysis whose result depends on the host is not
+a gate, and it is the reason the matrix had two answers.
+
+**And `bin/mule` reads `$argv ?? []`.** The pin did not reproduce the finding
+locally, which is the tell: the complaint was never about the language version
+but about `register_argc_argv` in the ini of the runtime the analyser was
+executing on. The CLI SAPI always defines `$argv`, so the coalesce changes
+nothing at run time — it removes a verdict that depended on an ini setting
+nobody sets deliberately. It costs a dead branch in the composition root, which
+is outside both gates, rather than a suppression inside them.

@@ -40,4 +40,8 @@ $application = new Application(
 	new StreamOutput(STDERR),
 );
 
-exit($application->run(array_values(array_slice($argv, 1)), $directory));
+// `$argv ?? []` rather than `$argv`: the CLI always defines it, but whether a
+// static analyser believes that depends on the `register_argc_argv` setting of
+// whichever runtime the analyser itself happens to be running on — which turned
+// one matrix leg red and the other green for the same bytes.
+exit($application->run(array_values(array_slice($argv ?? [], 1)), $directory));
