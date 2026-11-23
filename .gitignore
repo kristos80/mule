@@ -1,0 +1,10 @@
+/vendor/
+/composer.lock
+/.phpunit.cache/
+/.idea/
+/infection.log
+.DS_Store
+
+# The store is committed on purpose: a content-hash verdict is not
+# machine-local state, so the next machine inherits the work instead of
+# re-proving it. That is the whole point of .mule/verified.json.

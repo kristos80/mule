@@ -1,0 +1,226 @@
+<?php
+declare(strict_types=1);
+
+namespace Kristos80\Mule\Tests\Support;
+
+use Kristos80\Mule\External\FilesystemInterface;
+use RuntimeException;
+
+/**
+ * A filesystem in an array, failing where the real one fails.
+ *
+ * **This is what makes the unit suite deterministic.** There is no temporary
+ * directory, no permission to arrange, nothing to clean up and nothing to skip
+ * when the suite runs as root — a test states the bytes mule can see and
+ * asserts the decisions it makes about them.
+ *
+ * **Entries come back in the order they were written**, deliberately. The real
+ * filesystem's order is not something a test can choose, so any ordering mule
+ * depends on has to be imposed by mule, where an assertion can catch it going
+ * missing.
+ */
+final class InMemoryFilesystem implements FilesystemInterface {
+
+	/** @var array<string, string> Path to contents. */
+	private array $files = [];
+
+	/** @var array<string, true> Path to nothing; a set of directories. */
+	private array $directories = ["/" => TRUE];
+
+	/** @var list<string> Every path anything has asked about, in order. */
+	private array $probes = [];
+
+	/**
+	 * Seeds a file, creating the directories above it.
+	 *
+	 * @param string $path
+	 * @param string $contents
+	 * @return self
+	 */
+	public function given(string $path, string $contents): self {
+		$this->files[$path] = $contents;
+
+		for($directory = dirname($path); $directory !== "/" && $directory !== "."; $directory = dirname($directory)) {
+			$this->directories[$directory] = TRUE;
+		}
+
+		return $this;
+	}
+
+	/**
+	 * Seeds an empty directory.
+	 *
+	 * @param string $path
+	 * @return self
+	 */
+	public function givenDirectory(string $path): self {
+		$this->directories[$path] = TRUE;
+
+		return $this;
+	}
+
+	/**
+	 * What a file holds now, for an assertion.
+	 *
+	 * @param string $path
+	 * @return string|null
+	 */
+	public function contentsOf(string $path): ?string {
+		return $this->files[$path] ?? NULL;
+	}
+
+	/**
+	 * Every path this filesystem holds: directories first, then files, each in
+	 * the order it was written. Not sorted, and not an order anything in `src/`
+	 * may lean on.
+	 *
+	 * @return list<string>
+	 */
+	public function paths(): array {
+		return [...array_keys($this->directories), ...array_keys($this->files)];
+	}
+
+	/**
+	 * @param string $path
+	 * @return bool
+	 */
+	public function exists(string $path): bool {
+		$this->probes[] = $path;
+
+		return isset($this->files[$path]) || isset($this->directories[$path]);
+	}
+
+	/**
+	 * Every path anything has asked about, in order — which is how a test
+	 * states the walk a lookup makes rather than only the answer it reaches.
+	 *
+	 * @return list<string>
+	 */
+	public function probes(): array {
+		return $this->probes;
+	}
+
+	/**
+	 * @param string $path
+	 * @return bool
+	 */
+	public function isDirectory(string $path): bool {
+		return isset($this->directories[$path]);
+	}
+
+	/**
+	 * @param string $path
+	 * @return string
+	 */
+	public function read(string $path): string {
+		return $this->files[$path] ?? throw new RuntimeException("Cannot read {$path}.");
+	}
+
+	/**
+	 * @param string $path
+	 * @param string $contents
+	 * @return void
+	 */
+	public function write(string $path, string $contents): void {
+		if(!isset($this->directories[dirname($path)])) {
+			throw new RuntimeException("Cannot write {$path}.");
+		}
+
+		$this->files[$path] = $contents;
+	}
+
+	/**
+	 * @param string $from
+	 * @param string $to
+	 * @return void
+	 */
+	public function rename(string $from, string $to): void {
+		$this->files[$to] = $this->read($from);
+
+		unset($this->files[$from]);
+	}
+
+	/**
+	 * @param string $path
+	 * @return void
+	 */
+	public function delete(string $path): void {
+		if(!isset($this->files[$path])) {
+			throw new RuntimeException("Cannot remove the file {$path}.");
+		}
+
+		unset($this->files[$path]);
+	}
+
+	/**
+	 * @param string $path
+	 * @return void
+	 */
+	public function createDirectory(string $path): void {
+		if($this->exists($path)) {
+			throw new RuntimeException("Cannot create the directory {$path}.");
+		}
+
+		$this->directories[$path] = TRUE;
+	}
+
+	/**
+	 * @param string $path
+	 * @return void
+	 */
+	public function createDirectoryExclusively(string $path): void {
+		$this->createDirectory($path);
+	}
+
+	/**
+	 * @param string $path
+	 * @return void
+	 */
+	public function deleteDirectory(string $path): void {
+		if(!isset($this->directories[$path]) || $this->entriesUnder($path) !== []) {
+			throw new RuntimeException("Cannot remove the directory {$path}.");
+		}
+
+		unset($this->directories[$path]);
+	}
+
+	/**
+	 * @param string $directory
+	 * @return list<string>
+	 */
+	public function entriesUnder(string $directory): array {
+		$prefix = "{$directory}/";
+
+		return array_values(array_filter(
+			$this->paths(),
+			static fn(string $path): bool => str_starts_with($path, $prefix),
+		));
+	}
+
+	/**
+	 * @param string $path
+	 * @return string
+	 */
+	public function digest(string $path): string {
+		return hash("sha256", $this->read($path));
+	}
+
+	/**
+	 * @param string $path
+	 * @return string
+	 */
+	public function resolve(string $path): string {
+		if(!$this->exists($path)) {
+			throw new RuntimeException("Cannot resolve {$path}: no such directory.");
+		}
+
+		return $path;
+	}
+
+	/**
+	 * @return string
+	 */
+	public function temporaryDirectory(): string {
+		return "/tmp";
+	}
+}

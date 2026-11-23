@@ -1,0 +1,26 @@
+{
+	"$schema": "https://raw.githubusercontent.com/infection/infection/0.32.0/resources/schema.json",
+	"source": {
+		"directories": ["src"],
+		// The same five files phpunit.xml excludes from coverage: the external
+		// layer is one statement per method, so coverage never reaches it and
+		// every mutant in it would score as uncovered. Naming them in both
+		// places keeps the two lists visibly in step.
+		"excludes": [
+			"External/ComposerClasses.php",
+			"External/PhpFilesystem.php",
+			"External/PhpRandom.php",
+			"External/ShellProcesses.php",
+			"External/StreamOutput.php"
+		]
+	},
+	// @default leaves out three profiles. @identical (== to ===) is added
+	// because src/ has no loose comparison today, so it is free and catches one
+	// added later. @equal (!== to !=) stays out: under strict types its mutants
+	// are almost all equivalent, and an unkillable mutant makes a 100 % gate
+	// unpassable — which is the only thing that would force a suppression.
+	"mutators": {
+		"@default": true,
+		"@identical": true
+	}
+}
