@@ -45,7 +45,12 @@ trait TemporaryTree {
 		foreach($entries as $entry) {
 			$path = $entry instanceof SplFileInfo ? $entry->getPathname() : "";
 
-			is_dir($path) ? rmdir($path) : unlink($path);
+			// A symlink to a directory is `is_dir()`, because that question
+			// follows the link, and unlinking it is the only way to remove it:
+			// rmdir() on one is ENOTDIR on Linux, which then leaves the parent
+			// not empty. Darwin's rmdir tolerates it, so this only ever failed
+			// in CI.
+			is_dir($path) && !is_link($path) ? rmdir($path) : unlink($path);
 		}
 
 		rmdir($this->tree);
