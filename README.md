@@ -1,5 +1,14 @@
 # mule
 
+![status: work in progress](https://img.shields.io/badge/status-work%20in%20progress-orange)
+
+> [!WARNING]
+> **Work in progress.** The command line, the `mule.json` keys and the store
+> format may change without a major version while this notice is here. `v1.0.0`
+> exists because the release flow needs a first version to count from, not
+> because the shape is settled — if you depend on this, pin an exact version and
+> expect to read the changelog.
+
 **Mutation testing, only where it can still tell you something.**
 
 A mutation gate is the most informative test you can run and the slowest. On a

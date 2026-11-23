@@ -1,6 +1,6 @@
 {
 	"name": "kristos80/mule",
-	"description": "A committed, content-hashed verdict cache for PHP mutation testing: mutate only the files whose score can no longer be trusted.",
+	"description": "WIP. A committed, content-hashed verdict cache for PHP mutation testing: mutate only the files whose score can no longer be trusted.",
 	"type": "library",
 	"license": "MIT",
 	"keywords": [
