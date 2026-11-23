@@ -156,3 +156,32 @@ For the same reason **CI deletes `mule.json`** before running the gate: that
 file holds this machine's `herd coverage` wrapper, and deleting it exercises
 mule's inference rather than carrying a second copy of the configuration that
 could drift from the first.
+
+## The release flow is one workflow file
+
+`release.yml` holds both jobs: `gates` on pull requests and on pushes to
+`master`, `release` on a master push once the gates have passed. It replaced a
+separate `ci.yml`, which would have meant either the same five gate steps
+written twice — the drift this repository avoids everywhere else — or a release
+that could be cut while the gate was red.
+
+Modelled on `kristos80/hook`, with two deliberate differences.
+
+**No `version` field in `composer.json`.** hook's release rewrites one with
+`jq` on every release, and its own notes call that a wart worth deciding about:
+`composer validate --strict` warns against the field for a published package,
+because Packagist reads the tag. Nothing here writes it, so the plugin list is
+one entry shorter and the manifest validates strictly.
+
+**PHP 8.5 is an advisory matrix leg** (`continue-on-error`), and 8.4 blocks.
+mule declares `php: ^8.4`, so the newer runtime is one consumers will use and
+the leg is worth having — but no lock file is committed, so CI resolves the
+newest dependencies inside the declared constraints on every run, and
+`phpunit.xml` fails on deprecations. A dev dependency that starts emitting one
+on 8.5 would otherwise hold up a release with no commit of ours. This is hook's
+own reasoning about Sonar, applied to a runtime instead of a scanner.
+
+**The mutation gate and the store check run on one leg only.** A mutation score
+is a property of the code and its tests, not of the runtime, and the store is
+keyed on file digests no PHP version changes. Running it on both legs would
+prove the same thing twice and have two runs writing one store.

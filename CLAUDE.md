@@ -75,6 +75,30 @@ wrapper this machine needs for a coverage driver, and Infection's options.
 **CI deletes `mule.json`** and runs on the inferred defaults — which is also how
 the inference path gets exercised.
 
+## Releases
+
+`.github/workflows/release.yml` is the whole pipeline. The `gates` job runs on
+pull requests and on pushes to `master`; the `release` job runs only on a push
+to `master` and only after the gates pass.
+
+**The commit message is what cuts a version.** semantic-release reads the
+conventional commits since the last tag: `fix:` is a patch, `feat:` a minor, a
+`BREAKING CHANGE:` footer or `feat!:` a major. Anything else — `ci:`, `chore:`,
+`docs:`, `refactor:`, `test:`, `perf:` — releases nothing, which is the right
+answer for a change consumers cannot see. A release writes `CHANGELOG.md`, tags
+`vX.Y.Z`, publishes the GitHub release, and commits the changelog back with
+`[skip ci]` so it does not retrigger the workflow.
+
+**Packagist takes the version from the tag**, through its GitHub integration.
+Nothing in the workflow talks to Packagist, and `composer.json` carries no
+`version` field — `composer validate --strict` warns against one, and a field a
+release has to rewrite is a second copy of something the tag already says.
+
+**A change under `src/` or `tests/` has to carry the store with it.** The gates
+run `php bin/mule full` and then `git diff --exit-code .mule/verified.json`, so
+run `composer test:mutate:new` and commit `.mule/verified.json` in the same
+commit. A stale store fails the gate, and a failed gate cuts no release.
+
 ## Layout
 
 ```

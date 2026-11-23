@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.4', '8.5']
+
+    name: Gates on PHP ${{ matrix.php }}
+
+    # 8.5 is advisory, for the same reason Sonar is advisory in kristos80/hook:
+    # mule declares php ^8.4, so consumers may well run 8.5 and the leg is worth
+    # having — but no lock file is committed, so a dev dependency that starts
+    # emitting a deprecation on the newer runtime would turn this red with no
+    # commit of ours, and that must not hold up a release. 8.4 blocks.
+    continue-on-error: ${{ matrix.php == '8.5' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: pcov
+          tools: composer:v2
+
+      - run: composer install --no-interaction --no-progress
+
+      - name: Static analysis
+        run: composer analyse
+
+      - name: Unit suite
+        run: composer test
+
+      - name: Integration suite
+        run: composer test:integration
+
+      # Not composer test:coverage: that one wraps phpunit in `herd coverage`,
+      # which is the local coverage driver. pcov is already enabled here, so the
+      # runner is called directly and the same gate applied.
+      - name: Coverage, gated at 100 %
+        run: |
+          ./vendor/bin/phpunit --coverage-clover=.phpunit.cache/clover.xml --coverage-text
+          composer test:coverage:gate
+
+      # mule.json exists for the `herd coverage` wrapper and Infection's
+      # options, neither of which applies here. Removing it runs the gate on
+      # mule's own inference — ./vendor/bin/phpunit for coverage,
+      # ./vendor/bin/infection for the engine — which is one more thing proved.
+      #
+      # One leg only: a mutation score is a property of the code and its tests,
+      # not of the runtime, and the committed store is keyed on file digests
+      # that no PHP version changes. Running it twice would prove nothing twice
+      # and could write two stores.
+      - name: Mutation gate, gated at MSI 100 %
+        if: matrix.php == '8.4'
+        run: |
+          rm mule.json
+          php bin/mule full
+
+      # The store is committed, so a verdict banked on a laptop is inherited
+      # here. If this run banked something new, the committed store was stale.
+      - name: The committed store was already complete
+        if: matrix.php == '8.4'
+        run: git diff --exit-code .mule/verified.json
+
+  release:
+    runs-on: ubuntu-latest
+    needs: gates
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Reads the conventional commits since the last tag, decides the version,
+      # writes CHANGELOG.md, tags, and publishes the GitHub release. Packagist
+      # picks the tag up through its GitHub integration; nothing here talks to
+      # it directly.
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
