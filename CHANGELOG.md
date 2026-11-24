@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/kristos80/mule/compare/v1.2.0...v1.3.0) (2026-11-24)
+
+
+### Features
+
+* answer a run with nothing to do without generating coverage ([331ffc7](https://github.com/kristos80/mule/commit/331ffc74c9a43f0434bed0e96e41cb8c368d0b0f))
+
 # [1.2.0](https://github.com/kristos80/mule/compare/v1.1.0...v1.2.0) (2026-11-24)
 
 
