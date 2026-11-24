@@ -13,7 +13,6 @@
          cacheDirectory=".phpunit.cache"
          colors="true"
          executionOrder="random"
-         requireCoverageMetadata="true"
          failOnRisky="true"
          failOnWarning="true"
          failOnNotice="true"

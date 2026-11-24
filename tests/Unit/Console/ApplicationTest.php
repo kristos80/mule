@@ -11,10 +11,8 @@ use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
 use Kristos80\Mule\Tests\Support\MappedClasses;
 use Kristos80\Mule\Tests\Support\RecordingOutput;
 use Kristos80\Mule\Tests\Support\ThrowingProcesses;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-#[CoversClass(Application::class)]
 final class ApplicationTest extends TestCase {
 
 	private InMemoryFilesystem $filesystem;

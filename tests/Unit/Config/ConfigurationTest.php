@@ -6,11 +6,9 @@ namespace Kristos80\Mule\Tests\Unit\Config;
 use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-#[CoversClass(Configuration::class)]
 final class ConfigurationTest extends TestCase {
 
 	private InMemoryFilesystem $filesystem;

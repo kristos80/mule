@@ -240,6 +240,37 @@ status is still 1 either way: what changed is what the human reads. And because
 `Failure` *is* a `RuntimeException`, every existing test that expected one kept
 passing untouched.
 
+## No covers metadata, because the cache keys on what the report says
+
+`#[CoversClass]` is gone from every test here, and `requireCoverageMetadata`
+with it. The reason is not style: a coverage report credits a test with what it
+*declares*, and mule's key is built from that credit.
+
+Measured before the change, on one test: `GateTest` credited with **1** file
+with the attribute, **14** without it — the same test, the same assertions.
+Across the suite it was 1.00 files per test class, maximum 1, which is what an
+attributed report looks like.
+
+What those thirteen hidden files cost is a real hole: editing `Verdicts.php`
+left `Gate.php` verified, although `GateTest` runs straight through `Verdicts`,
+so a `Gate` mutant could start surviving with nothing marked stale. `mule new`
+would pass where `mule full` failed.
+
+There is no way to have both. PHPUnit respects the attribute unconditionally —
+`requireCoverageMetadata="false"` changes nothing, verified by experiment — and
+`#[UsesClass]` does not help either: `php-code-coverage`'s
+`applyCoversAndUsesFilter()` keeps only `linesToBeCovered` and passes
+`linesToBeUsed` to the unintentionally-covered check alone. The remaining routes
+— copying the test tree and stripping the attributes, or a second instrumented
+pass — break `__DIR__`-relative tests or cost a whole extra suite run.
+
+**The price paid for it:** attribution was also what made a method with no test
+of its own show up as uncovered — that is how `Summary::crashed()` was caught.
+With complete attribution, a method exercised from any test counts as covered,
+so that check is now a human one. Worth it: a cache that quietly answers
+"verified" about a file whose behaviour has changed is a worse failure than a
+method whose test lives in the wrong file.
+
 ## A method is only covered by its own class's test
 
 Adding `Summary::crashed()` above dropped the coverage gate to 266 of 267
@@ -254,6 +285,11 @@ lie.
 Worth knowing because the failure is confusing rather than obvious: a canary
 string proved the method really did run before the actual cause turned up. The
 fix is always the same — give the new method a case in its own class's test.
+
+**No longer true as written**, since the entry above removed covers metadata
+altogether: a method exercised from anywhere now counts as covered, so this
+particular gap would pass both gates today. The habit it describes is still the
+right one; it is simply no longer enforced.
 
 ## The analyser is pinned to the versions composer.json declares
 

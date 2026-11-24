@@ -9,10 +9,8 @@ use Kristos80\Mule\Cache\Verdicts;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\FixedRandom;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-#[CoversClass(Store::class)]
 final class StoreTest extends TestCase {
 
 	private const string FILE = "/project/.mule/verified.json";

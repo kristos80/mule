@@ -9,7 +9,6 @@ use Kristos80\Mule\External\PhpRandom;
 use Kristos80\Mule\External\ShellProcesses;
 use Kristos80\Mule\External\StreamOutput;
 use Kristos80\Mule\Project;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -17,10 +16,6 @@ use RuntimeException;
  * The other four wrappers against the real thing: real child processes, a real
  * stream, the real CSPRNG, and this project's own Composer autoloader.
  */
-#[CoversClass(ShellProcesses::class)]
-#[CoversClass(StreamOutput::class)]
-#[CoversClass(PhpRandom::class)]
-#[CoversClass(ComposerClasses::class)]
 final class ExternalTest extends TestCase {
 
 	use TemporaryTree;

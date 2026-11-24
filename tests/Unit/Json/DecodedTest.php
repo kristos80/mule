@@ -4,11 +4,9 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Json;
 
 use Kristos80\Mule\Json\Decoded;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-#[CoversClass(Decoded::class)]
 final class DecodedTest extends TestCase {
 
 	public function testReadsAStringItIsGiven(): void {

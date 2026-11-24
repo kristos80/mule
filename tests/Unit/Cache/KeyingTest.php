@@ -9,11 +9,9 @@ use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\CoverageXml;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
 use Kristos80\Mule\Tests\Support\MappedClasses;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-#[CoversClass(Keying::class)]
 final class KeyingTest extends TestCase {
 
 	private const string SOURCE = "<?php class Key {}";

@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Integration;
 
-use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -17,7 +16,6 @@ use PHPUnit\Framework\TestCase;
  * was asked — which is the one thing a cache must be watched for: whether the
  * second run asks at all.
  */
-#[CoversNothing]
 final class MuleTest extends TestCase {
 
 	use TemporaryTree;

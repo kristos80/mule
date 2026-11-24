@@ -15,7 +15,6 @@ use Kristos80\Mule\Tests\Support\FixedRandom;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
 use Kristos80\Mule\Tests\Support\MappedClasses;
 use Kristos80\Mule\Tests\Support\RecordingOutput;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -25,7 +24,6 @@ use PHPUnit\Framework\TestCase;
  * command to engine command line to the bytes left in the store. Nothing is
  * stubbed except the five things that would otherwise touch the machine.
  */
-#[CoversClass(Gate::class)]
 final class GateTest extends TestCase {
 
 	private const string RUN = "/tmp/mule.cafe1234";

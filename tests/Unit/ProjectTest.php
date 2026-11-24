@@ -5,11 +5,9 @@ namespace Kristos80\Mule\Tests\Unit;
 
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-#[CoversClass(Project::class)]
 final class ProjectTest extends TestCase {
 
 	public function testFindsTheProjectADirectoryIs(): void {

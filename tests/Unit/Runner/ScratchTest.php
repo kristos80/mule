@@ -7,11 +7,9 @@ use Kristos80\Mule\Runner\Run;
 use Kristos80\Mule\Runner\Scratch;
 use Kristos80\Mule\Tests\Support\FixedRandom;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-#[CoversClass(Scratch::class)]
 final class ScratchTest extends TestCase {
 
 	public function testTakesADirectoryNamedAfterATokenNothingCanGuess(): void {

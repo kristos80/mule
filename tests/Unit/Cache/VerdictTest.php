@@ -4,10 +4,8 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Verdict;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-#[CoversClass(Verdict::class)]
 final class VerdictTest extends TestCase {
 
 	public function testMatchesAVerdictOverTheSameSourceAndTheSameTests(): void {

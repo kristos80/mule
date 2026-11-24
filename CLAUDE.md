@@ -56,11 +56,15 @@ in-memory fakes of the five interfaces.
   the top of `Application` is reported as a fault in mule rather than a mistake
   in the project being gated, so never throw a bare `RuntimeException` from
   `src/`.
-- **A new method needs a case in its own class's test.** Coverage is attributed
-  by `#[CoversClass]`, so exercising a method from another class's test credits
-  nothing: the line reads as uncovered, and the mutation gate then counts its
-  mutants as uncovered too. Exercising it from both is fine; exercising it only
-  from elsewhere fails the gates for a reason that looks like a lie.
+- **No covers metadata.** No `#[CoversClass]`, no `#[CoversNothing]`. The
+  coverage report is what mule keys itself from, and declaring attribution tells
+  PHPUnit to credit a test with one class while hiding everything else it ran
+  through — which is precisely the connection the cache needs to see. The cost,
+  accepted knowingly: a method exercised only from another class's test now
+  counts as covered, so the gates no longer catch a method with no test of its
+  own. That became a review matter the day the attributes went, and it is worth
+  remembering that it was the gates that caught `Summary::crashed()` the last
+  time. Give a new method a case in its own class's test anyway.
 - **Unit tests never touch the disk, never `chmod`, never skip.** A test that
   skips when the suite runs as root (as CI does) silently measures a different
   line set than the same gate on this machine.

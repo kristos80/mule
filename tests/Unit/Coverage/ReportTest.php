@@ -6,11 +6,9 @@ namespace Kristos80\Mule\Tests\Unit\Coverage;
 use Dom\DOMException;
 use Kristos80\Mule\Coverage\Report;
 use Kristos80\Mule\Tests\Support\CoverageXml;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-#[CoversClass(Report::class)]
 final class ReportTest extends TestCase {
 
 	public function testReadsTheSourceRootTheReportNames(): void {

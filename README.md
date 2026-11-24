@@ -190,6 +190,40 @@ clean under `--min-msi=100 --min-covered-msi=100`. Gate below 100 and a banked
 verdict means "scored at least what you asked for", which is a weaker claim than
 this cache's design assumes.
 
+### The key is only as complete as your coverage attribution
+
+This one is worth reading before you trust `mule new`, because it is the limit
+of the whole idea rather than a rough edge.
+
+Mule learns which tests cover a file from the coverage report, and **a report
+only says what your tests declare**. If a test carries `#[CoversClass]`, PHPUnit
+credits it with that class and nothing else — even though the test may execute
+half your codebase on the way through. Measured in this repository before the
+attributes were removed: `GateTest` was credited with **1** file; the identical
+test with the attribute deleted was credited with **14**.
+
+The consequence is precise. Editing `Verdicts.php` makes `Verdicts.php` stale,
+and leaves `Gate.php` verified — but `GateTest` runs *through* `Verdicts`, so a
+`Gate` mutant that used to die may now survive. **`mule new` can pass where
+`mule full` would fail**, and no amount of care inside mule can see it: the
+connection is absent from the only data it is given.
+
+There is no way to ask PHPUnit for an unrestricted report when the attributes
+are there — no flag, and `#[UsesClass]` does not help, because
+`php-code-coverage` keeps only the lines you declared as *covered* and uses the
+*used* list solely for its strictness check.
+
+So it is a choice about your test suite, not about mule:
+
+- **Declare covers metadata** and narrowing is fast and slightly optimistic. Run
+  `mule full` before anything that matters.
+- **Declare none** and the report records what each test genuinely touches, so
+  the key is complete. Invalidation widens — a file goes stale whenever anything
+  its tests run through changes — and that is the honest cost of the stronger
+  claim.
+
+**Mule's own suite declares none**, for exactly this reason.
+
 ## How it is built
 
 Determinism is the aim, and it is structural: **every I/O call in this

@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Integration;
 
-use PHPUnit\Framework\Attributes\CoversNothing;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -22,7 +21,6 @@ use PHPUnit\Framework\TestCase;
  * eight processes collide reliably, and every one of the two hundred entries has
  * to survive.
  */
-#[CoversNothing]
 final class BankTest extends TestCase {
 
 	use TemporaryTree;

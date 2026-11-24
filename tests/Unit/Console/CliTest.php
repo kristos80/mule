@@ -5,11 +5,9 @@ namespace Kristos80\Mule\Tests\Unit\Console;
 
 use Kristos80\Mule\Console\Cli;
 use Kristos80\Mule\Console\Verb;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-#[CoversClass(Cli::class)]
 final class CliTest extends TestCase {
 
 	public function testReadsEveryVerbMuleHas(): void {

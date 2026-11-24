@@ -4,10 +4,8 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Console;
 
 use Kristos80\Mule\Console\Summary;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-#[CoversClass(Summary::class)]
 final class SummaryTest extends TestCase {
 
 	public function testSaysHowMuchOfTheProjectTheStoreVouchesFor(): void {

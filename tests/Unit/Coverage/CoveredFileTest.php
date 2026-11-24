@@ -5,11 +5,9 @@ namespace Kristos80\Mule\Tests\Unit\Coverage;
 
 use Kristos80\Mule\Coverage\CoveredFile;
 use Kristos80\Mule\Tests\Support\CoverageXml;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-#[CoversClass(CoveredFile::class)]
 final class CoveredFileTest extends TestCase {
 
 	public function testNamesTheSourceFileTheReportIsAbout(): void {

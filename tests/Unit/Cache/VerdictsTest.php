@@ -5,11 +5,9 @@ namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Verdict;
 use Kristos80\Mule\Cache\Verdicts;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
-#[CoversClass(Verdicts::class)]
 final class VerdictsTest extends TestCase {
 
 	public function testCountsWhatItHolds(): void {

@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Integration;
 
 use Kristos80\Mule\External\PhpFilesystem;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -15,7 +14,6 @@ use RuntimeException;
  * there is in it to be wrong — the decisions made with the answers are the unit
  * suite's business, over an array.
  */
-#[CoversClass(PhpFilesystem::class)]
 final class PhpFilesystemTest extends TestCase {
 
 	use TemporaryTree;

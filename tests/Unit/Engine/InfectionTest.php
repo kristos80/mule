@@ -5,10 +5,8 @@ namespace Kristos80\Mule\Tests\Unit\Engine;
 
 use Kristos80\Mule\Engine\Infection;
 use Kristos80\Mule\Runner\Run;
-use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
-#[CoversClass(Infection::class)]
 final class InfectionTest extends TestCase {
 
 	public function testMutatesTheWholeProjectAgainstTheCoverageTheRunGenerated(): void {
