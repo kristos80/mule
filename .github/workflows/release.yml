@@ -73,6 +73,43 @@ jobs:
         if: matrix.php == '8.4'
         run: git diff --exit-code .mule/verified.json
 
+  sonar:
+    runs-on: ubuntu-latest
+
+    name: Sonar
+
+    # Advisory, and deliberately not something `release` depends on. Sonar is a
+    # second opinion on top of the gates, and kristos80/hook records what it
+    # costs to treat it as more than that: an expired SONAR_TOKEN returned 403
+    # before a single file was analysed and blocked a release whose own gates
+    # were all green.
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Sonar reads history to work out what counts as new code.
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: "8.4"
+          coverage: pcov
+          tools: composer:v2
+
+      - run: composer install --no-interaction --no-progress
+
+      # The unit suite, which is the same run the coverage gate measures and
+      # the same one mule keys itself from. The integration suite produces no
+      # coverage by design.
+      - name: Coverage for Sonar
+        run: ./vendor/bin/phpunit --coverage-clover=coverage.xml
+
+      - name: Scan
+        uses: SonarSource/sonarqube-scan-action@70bad232163b09d998ea0707ee80c0ec80798c16 # v8.5.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
   release:
     runs-on: ubuntu-latest
     needs: gates

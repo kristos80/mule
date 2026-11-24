@@ -189,6 +189,35 @@ is a property of the code and its tests, not of the runtime, and the store is
 keyed on file digests no PHP version changes. Running it on both legs would
 prove the same thing twice and have two runs writing one store.
 
+## Sonar is a second opinion, analysed from CI so that it can see coverage
+
+SonarCloud analyses this repository publicly. Two things about how, both
+learned the hard way rather than read in a manual.
+
+**Automatic analysis cannot produce coverage.** It reads the repository
+server-side and never runs the suite, so the coverage metric simply does not
+exist in that mode — the badge renders "Measure has not been found". That is
+the whole reason `release.yml` has a `sonar` job: it runs the unit suite with
+pcov, writes `coverage.xml`, and scans. The job is `continue-on-error` and
+`release` does not depend on it, because `kristos80/hook` records an expired
+`SONAR_TOKEN` returning 403 before a single file was analysed and blocking a
+release whose own gates were green. The gates gate; Sonar comments.
+
+**And automatic analysis ignores `sonar.issue.ignore.*`.** The first version of
+`sonar-project.properties` silenced five rules that contradict this project's
+style, and silenced nothing at all: the next analysis reported them exactly as
+before. The findings did later go to zero, but not because of that file and not
+because of anything done in the web interface — the project's PHP profile is
+the built-in **Sonar way core** (97 rules), and none of the five are active in
+it, `php:S112` included. So the clean board is SonarCloud's default, not this
+repository's doing, and it would come back the day the project moved to the
+full "Sonar way". The ignore block stays for that day, when a scanner will
+honour it.
+
+Worth being precise about one consequence: the thirty-five generic-exception
+findings that prompted `src/Failure.php` were not active in the profile either.
+The class earns its place on the argument below rather than on Sonar's.
+
 ## One exception type, so a bug does not read like a misconfiguration
 
 `src/Failure.php` is a `final class Failure extends RuntimeException` with
