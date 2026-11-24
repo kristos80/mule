@@ -59,6 +59,8 @@ final class ProjectTest extends TestCase {
 
 			self::fail("A tree with no composer.json anywhere above it is not a project.");
 		} catch(RuntimeException) {
+			// Expected, and asserted on elsewhere. What this test is about is
+			// the walk the failure took, which is read off the filesystem below.
 		}
 
 		self::assertSame([

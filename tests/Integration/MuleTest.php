@@ -143,7 +143,9 @@ final class MuleTest extends TestCase {
 	 * @return int
 	 */
 	private function engineRuns(): int {
-		return count(file_exists($this->path("engine.log")) ? file($this->path("engine.log")) ?: [] : []);
+		$lines = file_exists($this->path("engine.log")) ? file($this->path("engine.log")) : [];
+
+		return count($lines === FALSE ? [] : $lines);
 	}
 
 	/**
