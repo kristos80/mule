@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/kristos80/mule/compare/v1.3.0...v1.4.0) (2026-11-24)
+
+
+### Features
+
+* run coverage over only the tests that could matter ([fe29199](https://github.com/kristos80/mule/commit/fe291991d8e5d533a4f506ef3e0f28fdf44cc768))
+
 # [1.3.0](https://github.com/kristos80/mule/compare/v1.2.0...v1.3.0) (2026-11-24)
 
 
