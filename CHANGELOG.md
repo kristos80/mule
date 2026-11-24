@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/kristos80/mule/compare/v1.0.2...v1.1.0) (2026-11-24)
+
+
+### Features
+
+* never bank a file the tests do not reach all of, and say where they stop ([dad04b4](https://github.com/kristos80/mule/commit/dad04b4a7dddbc377bbf0efc5e4a4e4570fb30fc))
+
 ## [1.0.2](https://github.com/kristos80/mule/compare/v1.0.1...v1.0.2) (2026-11-24)
 
 
