@@ -24,10 +24,20 @@ use Kristos80\Mule\Project;
  *
  * **The file is replaced, never edited.** The merged store is written beside the
  * old one and moved over it, so a reader sees one or the other and a crash
- * leaves a scratch file rather than half a store. Two runs finishing in the
- * same instant means the later one's file wins and the earlier one's new
- * entries are lost — which costs that run's work and nothing else, since a
- * missing entry is simply re-proven next time.
+ * leaves a scratch file rather than half a store.
+ *
+ * **And the read, the merge and the replace happen under one lock**, because
+ * replacing a file atomically is not the same as merging into it safely: two
+ * runs that both read the store before either wrote it would each merge onto
+ * the bytes they read, and the second rename would silently drop the first
+ * one's entries. Running the gate in two sessions at once is a habit worth
+ * supporting — one for the class being worked on, one proving the repository —
+ * and the cost of losing a verdict is a file re-mutated for no reason.
+ *
+ * **The lock is a file of its own, in the system temporary directory** — see
+ * {@see self::lockFor()} for why it is neither the store nor anything beside
+ * it. Nothing in a repository has to be ignored, which is what makes this
+ * invisible to the projects that commit the store.
  */
 final readonly class Store {
 
@@ -67,6 +77,26 @@ final readonly class Store {
 	public function bank(Verdicts $current, array $paths): int {
 		$banked = $current->only($paths);
 		$file = $this->project->absolute(self::PATH);
+
+		return $this->filesystem->underLock($this->lockFor($file), fn(): int => $this->merge($banked, $file));
+	}
+
+	/**
+	 * The critical section: the directory if it is not there yet, then what is
+	 * on disk plus what this run proved, written beside the store and moved over
+	 * it.
+	 *
+	 * **Creating the directory is inside the lock because it is itself a race.**
+	 * Two runs on a fresh checkout both find no `.mule`, both create it, and the
+	 * loser is handed an error about a directory that now exists — which is how
+	 * an integration test with eight workers failed before the lock covered
+	 * this too.
+	 *
+	 * @param Verdicts $banked
+	 * @param string $file
+	 * @return int
+	 */
+	private function merge(Verdicts $banked, string $file): int {
 		$directory = dirname($file);
 
 		if(!$this->filesystem->exists($directory)) {
@@ -79,5 +109,28 @@ final readonly class Store {
 		$this->filesystem->rename($scratch, $file);
 
 		return $banked->count();
+	}
+
+	/**
+	 * Where the lock for a store lives, which is **not** in the store's own
+	 * directory.
+	 *
+	 * Two reasons, and either alone would settle it. The directory may not exist
+	 * yet, and creating it has to happen *under* the lock, so the lock cannot
+	 * need it. And `flock()` holds an inode rather than a name, so a lock on
+	 * anything this method replaces by rename would leave the next process
+	 * locking the new inode and walking into a section the first is still in.
+	 *
+	 * The system temporary directory always exists, and keying the name on the
+	 * store's absolute path keeps two checkouts on one machine from blocking
+	 * each other while keeping two runs of the same one honest. Nothing has to
+	 * clean it up: an empty lock file costs nothing and removing it would
+	 * reintroduce exactly the inode race it exists to avoid.
+	 *
+	 * @param string $file
+	 * @return string
+	 */
+	private function lockFor(string $file): string {
+		return $this->filesystem->temporaryDirectory() . "/mule-" . hash("sha256", $file) . ".lock";
 	}
 }

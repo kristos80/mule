@@ -84,6 +84,39 @@ final class StoreTest extends TestCase {
 	}
 
 	/**
+	 * The lock is outside the repository, named for the store it protects.
+	 * Locking the store itself would hold an inode the very next statement
+	 * replaces by rename — a lock the next process does not see — and locking
+	 * anything in `.mule` would need a directory this run may have to create.
+	 *
+	 * @return void
+	 */
+	public function testTakesItsLockOutsideTheProjectNamedForTheStore(): void {
+		$this->store()->bank(self::verdicts(["src/A.php"]), ["src/A.php"]);
+
+		self::assertSame(["/tmp/mule-" . hash("sha256", self::FILE) . ".lock"], $this->filesystem->locks());
+	}
+
+	/**
+	 * The point of the lock, and the half a rename cannot give: the store is
+	 * *read* inside the critical section, so two runs cannot both merge onto the
+	 * bytes they read before either wrote.
+	 *
+	 * @return void
+	 */
+	public function testMergesAndReplacesWhileHoldingIt(): void {
+		$this->filesystem->given(self::FILE, self::verdicts(["src/Old.php"])->toJson());
+
+		$this->store()->bank(self::verdicts(["src/A.php"]), ["src/A.php"]);
+
+		self::assertSame([
+			"read /project/.mule/verified.json",
+			"write /project/.mule/verified.json.cafe1234",
+			"rename /project/.mule/verified.json.cafe1234 to /project/.mule/verified.json",
+		], $this->filesystem->callsUnderLock());
+	}
+
+	/**
 	 * @return Store
 	 */
 	private function store(): Store {

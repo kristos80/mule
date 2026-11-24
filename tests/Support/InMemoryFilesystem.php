@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Support;
 
+use Closure;
 use Kristos80\Mule\External\FilesystemInterface;
 use RuntimeException;
 
@@ -29,6 +30,14 @@ final class InMemoryFilesystem implements FilesystemInterface {
 
 	/** @var list<string> Every path anything has asked about, in order. */
 	private array $probes = [];
+
+	/** @var list<string> Every path a lock has been taken on, in order. */
+	private array $locks = [];
+
+	/** @var list<string> Every call that touched bytes while a lock was held, in order. */
+	private array $callsUnderLock = [];
+
+	private int $held = 0;
 
 	/**
 	 * Seeds a file, creating the directories above it.
@@ -113,6 +122,8 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	 * @return string
 	 */
 	public function read(string $path): string {
+		$this->record("read {$path}");
+
 		return $this->files[$path] ?? throw new RuntimeException("Cannot read {$path}.");
 	}
 
@@ -122,6 +133,8 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	 * @return void
 	 */
 	public function write(string $path, string $contents): void {
+		$this->record("write {$path}");
+
 		if(!isset($this->directories[dirname($path)])) {
 			throw new RuntimeException("Cannot write {$path}.");
 		}
@@ -135,7 +148,9 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	 * @return void
 	 */
 	public function rename(string $from, string $to): void {
-		$this->files[$to] = $this->read($from);
+		$this->record("rename {$from} to {$to}");
+
+		$this->files[$to] = $this->files[$from] ?? throw new RuntimeException("Cannot move {$from} to {$to}.");
 
 		unset($this->files[$from]);
 	}
@@ -222,5 +237,58 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	 */
 	public function temporaryDirectory(): string {
 		return "/tmp";
+	}
+
+	/**
+	 * Runs the critical section, recording that a lock was asked for and what
+	 * was written while it was held. There is nothing to serialise — the unit
+	 * suite is one process — so what a test can assert here is that the lock was
+	 * taken on the right path and that the rewrite happened inside it. Whether
+	 * the lock excludes anything is a question about the real filesystem, and is
+	 * answered in `tests/Integration`.
+	 *
+	 * @template T
+	 * @param string $path
+	 * @param Closure(): T $critical
+	 * @return T
+	 */
+	public function underLock(string $path, Closure $critical): mixed {
+		$this->locks[] = $path;
+		$this->held++;
+
+		$result = $critical();
+
+		$this->held--;
+
+		return $result;
+	}
+
+	/**
+	 * Every path a lock has been taken on, for an assertion.
+	 *
+	 * @return list<string>
+	 */
+	public function locks(): array {
+		return $this->locks;
+	}
+
+	/**
+	 * Every call that read or replaced bytes while a lock was held, in order,
+	 * for an assertion. What a critical section *is* is the sequence inside it.
+	 *
+	 * @return list<string>
+	 */
+	public function callsUnderLock(): array {
+		return $this->callsUnderLock;
+	}
+
+	/**
+	 * @param string $call
+	 * @return void
+	 */
+	private function record(string $call): void {
+		if($this->held > 0) {
+			$this->callsUnderLock[] = $call;
+		}
 	}
 }

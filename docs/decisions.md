@@ -108,11 +108,14 @@ reader sees one file or the other and a crash leaves a scratch file rather than
 half a store.
 
 The old implementation held an exclusive lock and merged under it, which no
-wrapper can express in a statement. Two runs finishing in the same instant now
-means the later one's file wins and the earlier one's new entries are lost —
-which costs that run's work and nothing else, because a missing entry is simply
-re-proven next time. That is the failure mode this cache is built around
-everywhere else, too.
+wrapper can express in a statement — so for one release two runs finishing in
+the same instant meant the later one's file won and the earlier one's new
+entries were lost. That was costing a run's work and nothing else, because a
+missing entry is simply re-proven next time. **It is no longer the behaviour**:
+the lock came back once it was clear a wrapper can express it after all, as a
+closure. See "The merge happens under a lock, and the lock is not in the
+repository" below; the replace-rather-edit decision here is unchanged and is
+what makes the two halves separate.
 
 ## The walk up to `composer.json` is counted out in advance
 
@@ -253,3 +256,49 @@ entries changed digest, and the next full run re-proved them. The benefit is tha
 a store written by mule now matches one written from normalised paths — which is
 what let that project adopt it with its 613 banked verdicts intact, at **610 of
 610 verified, 0 stale**.
+
+## The merge happens under a lock, and the lock is not in the repository
+
+The objection that dropped the lock was that holding one spans statements, and
+`src/External` holds no decisions. **`underLock(string $path, Closure $critical)`
+answers it**: the wrapper opens the file, takes the lock, calls what it was
+handed, releases and returns — four calls, an assignment and two failure guards,
+with every decision still in `Store`. One method rather than three, because a
+lock taken and released by separate calls is one a caller can forget to release.
+
+**Replacing a file atomically is not the same as merging into it safely**, which
+is the distinction the first version missed. A rename gives a reader the old
+store or the new one and never half of one. It says nothing about two runs that
+both *read* the store before either wrote: each merges onto the bytes it read,
+and the second rename drops the first one's entries. Both properties are wanted,
+so both are here — the lock around the section, the rename inside it.
+
+**The lock lives in the system temporary directory**, named
+`mule-{sha256 of the store's absolute path}.lock`, and neither reason for that
+is a preference:
+
+- **`flock()` holds an inode, not a name.** A lock on the store itself is
+  released-in-effect the moment this method renames a different file over it:
+  the next process locks the *new* inode and walks straight into a section the
+  first is still inside. Any lock file that lives beside the store and is
+  replaced has the same hole; one nothing ever replaces does not.
+- **The store's directory may not exist yet, and creating it is itself a race.**
+  `bank()` used to check for `.mule` and create it *outside* any lock, so two
+  runs on a fresh checkout both found it missing, both called `mkdir`, and the
+  loser was handed `Cannot create the directory …` and died. So the creation had
+  to move inside the critical section — which means the lock cannot be a file
+  inside the directory being created.
+
+Keying the name on the store's absolute path keeps two checkouts on one machine
+out of each other's way while keeping two runs of the same one honest, and the
+file is never removed: deleting it would reintroduce the inode race it exists to
+avoid, and an empty file costs nothing. Nothing in a consuming repository has to
+be ignored, which is the part that matters to a project that commits its store.
+
+**It is proved by eight processes, not by an argument.**
+`tests/Integration/BankTest` runs eight workers banking twenty-five verdicts
+each against one store and requires all two hundred to survive. The number is
+chosen so the test has teeth: one bank apiece would pass by luck. Measured with
+the lock bypassed, **35 of 200 entries survived**; with it, 200. The `mkdir`
+race above was found by that same test on its first run, having existed since
+`bank()` was written.

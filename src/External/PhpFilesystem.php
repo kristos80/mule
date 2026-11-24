@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\External;
 
+use Closure;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -159,5 +160,36 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 	 */
 	public function temporaryDirectory(): string {
 		return sys_get_temp_dir();
+	}
+
+	/**
+	 * `c` rather than `w`, so an existing lock file keeps its bytes — it has
+	 * none, and truncating it would be a write to a file another process is
+	 * holding. The handle is not closed on the way out of a throw, which is the
+	 * one thing here that is left to PHP: a released handle releases its lock,
+	 * and the only caller is a program about to exit.
+	 *
+	 * @template T
+	 * @param string $path
+	 * @param Closure(): T $critical
+	 * @return T
+	 */
+	public function underLock(string $path, Closure $critical): mixed {
+		$handle = @fopen($path, "c");
+
+		if($handle === FALSE) {
+			throw new RuntimeException("Cannot open {$path} to lock it.");
+		}
+
+		if(!flock($handle, LOCK_EX)) {
+			throw new RuntimeException("Cannot take an exclusive lock on {$path}.");
+		}
+
+		$result = $critical();
+
+		flock($handle, LOCK_UN);
+		fclose($handle);
+
+		return $result;
 	}
 }

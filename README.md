@@ -78,6 +78,13 @@ machine-local state: the same bytes give the same answer on the next machine, so
 CI inherits the work your laptop proved, and your laptop inherits CI's. One
 entry per line, sorted by path, so a rebase conflict is mechanical.
 
+The merge is done **under a lock, with the store read inside it**, so running
+the gate in two sessions at once cannot lose either one's verdicts — proved by
+eight processes banking two hundred entries between them. The lock file sits in
+your system temporary directory, not in the repository, so there is nothing to
+ignore. The store itself is still replaced by rename rather than edited in
+place: a reader sees one version or the other, never half of one.
+
 Pest ships mutation testing with two caches of its own, and neither substitutes
 for this. One caches *generated mutations* keyed on file content — the cheap,
 parse-time half. The other caches results, and its only consumers reorder tests

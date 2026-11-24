@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\External;
 
+use Closure;
+
 /**
  * Every filesystem call mule makes, one method per primitive.
  *
@@ -135,4 +137,20 @@ interface FilesystemInterface {
 	 * @return string
 	 */
 	public function temporaryDirectory(): string;
+
+	/**
+	 * Runs something with an exclusive lock held on a path, creating the file if
+	 * it is not there and waiting for whoever holds it.
+	 *
+	 * **The closure is what makes this one method rather than three.** A lock
+	 * taken and released by separate calls would let a caller forget the second,
+	 * and nothing in a wrapper may decide — so the critical section is handed in
+	 * and the deciding stays in the tested class it came from.
+	 *
+	 * @template T
+	 * @param string $path The file to lock, which is never the file being rewritten.
+	 * @param Closure(): T $critical
+	 * @return T
+	 */
+	public function underLock(string $path, Closure $critical): mixed;
 }
