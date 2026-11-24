@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/kristos80/mule/compare/v1.1.0...v1.2.0) (2026-11-24)
+
+
+### Features
+
+* key a file on everything its tests run, not a digest of their names ([9d9e92a](https://github.com/kristos80/mule/commit/9d9e92ab841361cc1c5f6d3ef6ca944878b8ae54))
+
 # [1.1.0](https://github.com/kristos80/mule/compare/v1.0.2...v1.1.0) (2026-11-24)
 
 
