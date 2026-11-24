@@ -109,6 +109,48 @@ final readonly class Decoded {
 	}
 
 	/**
+	 * A key that must be there, as a whole number.
+	 *
+	 * @param string $key
+	 * @return int
+	 */
+	public function number(string $key): int {
+		$value = $this->values[$key] ?? NULL;
+
+		if(!is_int($value)) {
+			throw new Failure("The {$key} in {$this->subject} must be a whole number.");
+		}
+
+		return $value;
+	}
+
+	/**
+	 * A key that need not be there, as a list of objects; absent reads as
+	 * empty.
+	 *
+	 * @param string $key
+	 * @return list<self>
+	 */
+	public function objects(string $key): array {
+		$value = $this->values[$key] ?? [];
+		$objects = [];
+
+		if(!is_array($value)) {
+			throw new Failure("The {$key} in {$this->subject} must be a list of objects.");
+		}
+
+		foreach($value as $item) {
+			if(!is_object($item)) {
+				throw new Failure("The {$key} in {$this->subject} must be a list of objects.");
+			}
+
+			$objects[] = new self(self::propertiesOf($item), "{$this->subject} {$key}");
+		}
+
+		return $objects;
+	}
+
+	/**
 	 * A nested object, or an empty one where the key is absent.
 	 *
 	 * **Absent reads as empty on purpose.** The store is written by mule and

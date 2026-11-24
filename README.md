@@ -93,7 +93,15 @@ test run used.
 
 ## The store is committed, and that is what engine caches cannot do
 
-`.mule/verified.json` belongs in your repository. A content-hash verdict is not
+`.mule/verified.json` belongs in your repository, and holds four sections: the
+files proven, the files the tests do not reach all of, what each test runs, and
+a digest for everything else the project autoloads — the last being how a later
+run can be sure nothing has *appeared* as well as that nothing has changed.
+Only what the project owns is recorded: the autoloader knows a prefix per
+installed dependency, and a store with `vendor/` in it would be invalidated by
+every `composer install` and differ on every machine.
+
+It belongs in your repository. A content-hash verdict is not
 machine-local state: the same bytes give the same answer on the next machine, so
 CI inherits the work your laptop proved, and your laptop inherits CI's. One
 entry per line, sorted by path, so a rebase conflict is mechanical.
@@ -141,10 +149,18 @@ Commit `.mule/verified.json`.
 | `mule full` | The gate over the whole project. Banks every file. |
 | `mule status` | What the store claims, mutating nothing. |
 
-All three generate coverage, every time: an engine refuses to run without it, it
-is the cheap half, and it is what lets the keys be read from a fresh
-covering-test set rather than a stored one. **Coverage is the floor on run
-time**, and no verb avoids it.
+**A run that has nothing to do generates no coverage at all.** The store
+records a digest for every file the project autoloads, so "has anything moved"
+is a few hundred hashes rather than a test suite: on this package, `mule new`
+with nothing changed is **0.05 s against the 2.4 s** its coverage run costs, and
+the gap grows with the suite.
+
+Anything else — a file edited, a file appearing, a file the tests do not reach
+all of — and coverage runs as before, because deciding *what* is stale is one
+question and proving the rest is another. Mule refuses the shortcut whenever
+the store no longer describes the tree in front of it: a recorded file missing,
+a file nobody recorded appearing, or one of the files it watches rather than
+proves having moved.
 
 There is deliberately no passthrough verb for ad-hoc runs. Mutating a diff of
 changed *lines*, or a single class, proves nothing about the files holding them —

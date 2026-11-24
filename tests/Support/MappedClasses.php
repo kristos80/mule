@@ -13,9 +13,11 @@ final class MappedClasses implements ClassesInterface {
 
 	/**
 	 * @param array<string, string> $files Class name to absolute path.
+	 * @param list<string> $directories Absolute paths the project autoloads.
 	 */
 	public function __construct(
 		private array $files = [],
+		private array $directories = [],
 	) {}
 
 	/**
@@ -24,5 +26,12 @@ final class MappedClasses implements ClassesInterface {
 	 */
 	public function fileOf(string $class): string|false {
 		return $this->files[ltrim($class, "\\")] ?? FALSE;
+	}
+
+	/**
+	 * @return list<string>
+	 */
+	public function directories(): array {
+		return $this->directories;
 	}
 }

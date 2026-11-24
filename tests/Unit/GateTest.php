@@ -3,8 +3,10 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Unit;
 
+use Kristos80\Mule\Cache\Freshness;
 use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Store;
+use Kristos80\Mule\Cache\Universe;
 use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Engine\Infection;
 use Kristos80\Mule\Gate;
@@ -96,7 +98,7 @@ final class GateTest extends TestCase {
 		self::assertStringContainsString("mule: 0 of 2 files verified, 2 stale.", $this->output->text());
 	}
 
-	public function testMutatesNothingWhenTheStoreVouchesForEveryFile(): void {
+	public function testStartsNothingAtAllWhenTheStoreVouchesForEveryFile(): void {
 		$this->gate()->full();
 		$this->output = new RecordingOutput();
 		$this->processes = new CoveringProcesses($this->filesystem, [
@@ -106,7 +108,34 @@ final class GateTest extends TestCase {
 
 		self::assertSame(0, $this->gate()->narrowed());
 
-		self::assertSame(1, $this->processes->count());
+		// Not one process: no coverage run, no engine. The store answered.
+		self::assertSame(0, $this->processes->count());
+		self::assertSame(
+			"mule: 2 of 2 files verified, 0 stale.\nmule: nothing to mutate, every file is verified against its own tests.",
+			$this->output->text(),
+		);
+	}
+
+	/**
+	 * Changing something mule watches rather than proves — its own config, a
+	 * file excluded from coverage — means the store can no longer speak for
+	 * the tree, so coverage runs. It may then find nothing stale after all,
+	 * and says so rather than mutating for the sake of it.
+	 *
+	 * @return void
+	 */
+	public function testRunsCoverageButMutatesNothingWhenOnlyAWatchedFileChanged(): void {
+		$this->gate()->full();
+		$this->filesystem->given("/project/composer.json", '{"name": "acme/thing"}');
+		$this->output = new RecordingOutput();
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		]);
+
+		self::assertSame(0, $this->gate()->narrowed());
+
+		self::assertSame(1, $this->processes->count(), "coverage should have run, and only coverage.");
 		self::assertSame(
 			"mule: 2 of 2 files verified, 0 stale.\nmule: nothing to mutate, every file is verified against its own tests.",
 			$this->output->text(),
@@ -239,7 +268,7 @@ final class GateTest extends TestCase {
 		self::assertSame(0, $this->gate()->status());
 
 		self::assertSame("mule: 2 of 2 files verified, 0 stale.", $this->output->text());
-		self::assertSame(3, $this->processes->count());
+		self::assertSame(2, $this->processes->count(), "status generated coverage it did not need.");
 	}
 
 	public function testGivesUpOnStatusWhenCoverageFails(): void {
@@ -254,6 +283,20 @@ final class GateTest extends TestCase {
 		$this->gate()->full();
 		$this->gate()->status();
 
+		self::assertFalse($this->filesystem->exists(self::RUN));
+	}
+
+	public function testLeavesNoScratchDirectoryBehindWhenStatusHasToMeasure(): void {
+		$this->gate()->full();
+		$this->filesystem->given("/project/composer.json", '{"name": "acme/thing"}');
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		]);
+
+		self::assertSame(0, $this->gate()->status());
+
+		self::assertSame(1, $this->processes->count(), "status should have had to generate coverage.");
 		self::assertFalse($this->filesystem->exists(self::RUN));
 	}
 
@@ -293,12 +336,14 @@ final class GateTest extends TestCase {
 		$classes = new MappedClasses([
 			"Acme\\Tests\\KeyTest" => "/project/tests/KeyTest.php",
 			"Acme\\Tests\\GateTest" => "/project/tests/GateTest.php",
-		]);
+		], ["/project/src", "/project/tests"]);
+		$universe = new Universe($project, $this->filesystem, $classes);
 
 		return new Gate(
 			$project,
 			Configuration::load($project, $this->filesystem),
-			new Keying($project, $this->filesystem, $classes),
+			new Keying($project, $this->filesystem, $classes, $universe),
+			new Freshness($project, $this->filesystem, $universe),
 			new Store($project, $this->filesystem, $random),
 			new Infection("infection"),
 			new Scratch($this->filesystem, $random),

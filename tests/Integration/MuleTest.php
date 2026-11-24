@@ -48,15 +48,19 @@ final class MuleTest extends TestCase {
 	public function testRecordsTheSourceItProvedAndTheTestThatRunsIt(): void {
 		$this->mule("full");
 
-		self::assertSame(
-			"{\n\t\"verified\": {\n"
-			. "\t\t\"src/A.php\": {\"digest\":\"" . hash("sha256", self::SOURCE) . "\"}\n"
-			. "\t},\n\t\"tests\": {\n"
-			. "\t\t\"tests/ATest.php\": {\"source\":\"" . hash_file("sha256", $this->path("tests/ATest.php"))
-			. "\",\"touches\":[\"src/A.php\"]}\n"
-			. "\t}\n}\n",
-			file_get_contents($this->path(".mule/verified.json")),
-		);
+		$store = json_decode((string) file_get_contents($this->path(".mule/verified.json")), TRUE);
+
+		self::assertIsArray($store);
+		self::assertSame(["src/A.php" => ["digest" => hash("sha256", self::SOURCE)]], $store["verified"]);
+		self::assertSame([
+			"tests/ATest.php" => [
+				"source" => hash_file("sha256", $this->path("tests/ATest.php")),
+				"touches" => ["src/A.php"],
+			],
+		], $store["tests"]);
+		self::assertSame([], $store["unproven"]);
+		self::assertIsArray($store["watched"]);
+		self::assertArrayHasKey("composer.json", $store["watched"]);
 	}
 
 	public function testAsksTheEngineForNothingWhenTheStoreVouchesForEveryFile(): void {

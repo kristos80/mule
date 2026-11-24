@@ -3,11 +3,13 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule;
 
+use Kristos80\Mule\Cache\Freshness;
 use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Reading;
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Console\Summary;
+use Kristos80\Mule\Coverage\Unreached;
 use Kristos80\Mule\Engine\Infection;
 use Kristos80\Mule\External\OutputInterface;
 use Kristos80\Mule\External\ProcessesInterface;
@@ -39,6 +41,7 @@ final readonly class Gate {
 	 * @param Project $project
 	 * @param Configuration $configuration
 	 * @param Keying $keying
+	 * @param Freshness $freshness
 	 * @param Store $store
 	 * @param Infection $engine
 	 * @param Scratch $scratch
@@ -49,6 +52,7 @@ final readonly class Gate {
 		private Project $project,
 		private Configuration $configuration,
 		private Keying $keying,
+		private Freshness $freshness,
 		private Store $store,
 		private Infection $engine,
 		private Scratch $scratch,
@@ -71,7 +75,7 @@ final readonly class Gate {
 	 * @return int
 	 */
 	public function narrowed(): int {
-		return $this->gated(TRUE);
+		return $this->settled() ?? $this->gated(TRUE);
 	}
 
 	/**
@@ -80,6 +84,58 @@ final readonly class Gate {
 	 * @return int
 	 */
 	public function status(): int {
+		return $this->recalled() ?? $this->measured();
+	}
+
+	/**
+	 * A narrowed run with nothing to do, answered from the store alone.
+	 *
+	 * **No coverage, no engine, nothing started.** The store records what each
+	 * test runs and the digest of everything the project autoloads, so when
+	 * none of it has moved there is nothing a fresh report could say that the
+	 * stored one does not — and generating one to be told so is the cost this
+	 * cache exists to remove.
+	 *
+	 * @return int|null NULL where the store cannot answer, and the run proceeds.
+	 */
+	private function settled(): ?int {
+		$standing = $this->freshness->of($this->store->read());
+
+		if(!$standing->isSettled()) {
+			return NULL;
+		}
+
+		$this->announce($standing->total, 0, []);
+		$this->output->line(Summary::nothingToMutate());
+
+		return 0;
+	}
+
+	/**
+	 * What the store claims, when it still describes the tree.
+	 *
+	 * Reported even where there is work outstanding, because the gaps are part
+	 * of what it claims: a file nothing reaches all of is still where the tests
+	 * last stopped, and saying so costs no coverage run.
+	 *
+	 * @return int|null
+	 */
+	private function recalled(): ?int {
+		$standing = $this->freshness->of($this->store->read());
+
+		if(!$standing->isCurrent()) {
+			return NULL;
+		}
+
+		$this->announce($standing->total, 0, $standing->gaps);
+
+		return 0;
+	}
+
+	/**
+	 * @return int
+	 */
+	private function measured(): int {
 		$run = $this->scratch->create();
 
 		try {
@@ -166,15 +222,28 @@ final readonly class Gate {
 		$unproven = $reading->unproven();
 		$unfinished = [...$stale, ...$unproven];
 
-		$this->output->line(Summary::verified($reading->count(), count($stale), count($unproven)));
-
-		foreach(Summary::unreached($reading->gaps) as $line) {
-			$this->output->line($line);
-		}
+		$this->announce($reading->count(), count($stale), $reading->gaps);
 
 		sort($unfinished);
 
 		return $unfinished;
+	}
+
+	/**
+	 * The two things every verb says: how much is vouched for, and where the
+	 * tests stop in whatever is not.
+	 *
+	 * @param int $total
+	 * @param int $stale
+	 * @param array<string, list<Unreached>> $gaps
+	 * @return void
+	 */
+	private function announce(int $total, int $stale, array $gaps): void {
+		$this->output->line(Summary::verified($total, $stale, count($gaps)));
+
+		foreach(Summary::unreached($gaps) as $line) {
+			$this->output->line($line);
+		}
 	}
 
 	/**

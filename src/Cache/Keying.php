@@ -16,14 +16,31 @@ use Kristos80\Mule\Project;
 final readonly class Keying {
 
 	/**
+	 * What the project declares, watched because changing it changes what a
+	 * run would find.
+	 *
+	 * **`mule.json` is deliberately not here.** It is the one file whose whole
+	 * purpose is to differ between machines — a coverage driver wrapper on a
+	 * laptop, nothing on CI, which is why CI deletes it — so watching it would
+	 * make the committed store unusable on the very machine it exists to help.
+	 * The cost, which is the right way round: changing the coverage command or
+	 * the engine's options does not invalidate anything, so run `mule full`
+	 * after changing one.
+	 *
+	 */
+	private const string CONFIGURATION = "composer.json";
+
+	/**
 	 * @param Project $project
 	 * @param FilesystemInterface $filesystem
 	 * @param ClassesInterface $classes
+	 * @param Universe $universe
 	 */
 	public function __construct(
 		private Project $project,
 		private FilesystemInterface $filesystem,
 		private ClassesInterface $classes,
+		private Universe $universe,
 	) {}
 
 	/**
@@ -56,7 +73,53 @@ final readonly class Keying {
 			$gaps[$path] = $file->unreached;
 		}
 
-		return new Reading(Snapshot::of($verified, $this->touched($runs)), $gaps);
+		$tests = $this->touched($runs);
+		$unproven = $this->unproven($gaps);
+		$known = [...$verified, ...$tests, ...$unproven];
+
+		return new Reading(Snapshot::of($verified, $tests, $unproven, $this->watched($known)), $gaps);
+	}
+
+	/**
+	 * The files the tests do not reach all of, with the digest they were
+	 * measured against.
+	 *
+	 * @param array<string, list<\Kristos80\Mule\Coverage\Unreached>> $gaps
+	 * @return array<string, Unproven>
+	 */
+	private function unproven(array $gaps): array {
+		$unproven = [];
+
+		foreach($gaps as $path => $unreached) {
+			$unproven[$path] = new Unproven($this->filesystem->digest($this->project->absolute($path)), $unreached);
+		}
+
+		return $unproven;
+	}
+
+	/**
+	 * Everything else whose bytes could change what a later run would find:
+	 * every file the project autoloads that the report never mentioned — an
+	 * interface, a file excluded from coverage, a test nothing has run yet —
+	 * and mule's own configuration.
+	 *
+	 * **Without this a later run could not tell "nothing has changed" from
+	 * "nothing I happen to know about has changed".** A file that appears is
+	 * exactly the case a digest of known files cannot see.
+	 *
+	 * @param array<string, mixed> $known Everything already recorded elsewhere.
+	 * @return array<string, string>
+	 */
+	private function watched(array $known): array {
+		$watched = [];
+
+		foreach([...$this->universe->paths(), self::CONFIGURATION] as $path) {
+			if(!isset($known[$path]) && $this->filesystem->exists($this->project->absolute($path))) {
+				$watched[$path] = $this->filesystem->digest($this->project->absolute($path));
+			}
+		}
+
+		return $watched;
 	}
 
 	/**

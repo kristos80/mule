@@ -141,6 +141,18 @@ final readonly class Project {
 	}
 
 	/**
+	 * Whether a path is inside the project at all, asked rather than risked:
+	 * a prefix declared to Composer can point outside the tree, and mule would
+	 * rather skip such a file than refuse to run.
+	 *
+	 * @param string $absolute
+	 * @return bool
+	 */
+	public function contains(string $absolute): bool {
+		return str_starts_with(self::applied($absolute), "{$this->root}/");
+	}
+
+	/**
 	 * A recorded path back on this machine.
 	 *
 	 * @param string $relative

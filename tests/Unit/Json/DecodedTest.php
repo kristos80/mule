@@ -50,6 +50,68 @@ final class DecodedTest extends TestCase {
 		self::assertSame([], Decoded::of("{}", "the mule store")->entries());
 	}
 
+	public function testReadsAWholeNumber(): void {
+		self::assertSame(9, Decoded::of('{"lines": 9}', "the mule store")->number("lines"));
+	}
+
+	public function testRejectsANumberThatIsNotOne(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("The lines in the mule store must be a whole number.");
+
+		Decoded::of('{"lines": "9"}', "the mule store")->number("lines");
+	}
+
+	public function testRejectsAMissingNumber(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("The lines in the mule store must be a whole number.");
+
+		Decoded::of("{}", "the mule store")->number("lines");
+	}
+
+	public function testReadsANestedObject(): void {
+		$nested = Decoded::of('{"verified": {"digest": "aa"}}', "the mule store")->object("verified");
+
+		self::assertSame("aa", $nested->string("digest"));
+	}
+
+	public function testReadsAnAbsentSectionAsEmpty(): void {
+		self::assertSame([], Decoded::of("{}", "the mule store")->object("verified")->entries());
+	}
+
+	public function testRejectsASectionThatIsNotAnObject(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("The verified in the mule store must be an object.");
+
+		Decoded::of('{"verified": "aa"}', "the mule store")->object("verified");
+	}
+
+	public function testReadsAListOfObjects(): void {
+		$objects = Decoded::of('{"unreached": [{"name": "one"}, {"name": "two"}]}', "the mule store")
+			->objects("unreached");
+
+		self::assertCount(2, $objects);
+		self::assertSame("one", $objects[0]->string("name"));
+		self::assertSame("two", $objects[1]->string("name"));
+	}
+
+	public function testReadsAnAbsentListOfObjectsAsEmpty(): void {
+		self::assertSame([], Decoded::of("{}", "the mule store")->objects("unreached"));
+	}
+
+	public function testRejectsAListOfObjectsThatIsNotAList(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("The unreached in the mule store must be a list of objects.");
+
+		Decoded::of('{"unreached": "one"}', "the mule store")->objects("unreached");
+	}
+
+	public function testRejectsAListHoldingSomethingThatIsNotAnObject(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("The unreached in the mule store must be a list of objects.");
+
+		Decoded::of('{"unreached": [{"name": "one"}, "two"]}', "the mule store")->objects("unreached");
+	}
+
 	public function testRejectsBytesThatAreNotJson(): void {
 		$this->expectException(RuntimeException::class);
 		$this->expectExceptionMessage("Cannot read mule.json: mule needs it to be a JSON object.");

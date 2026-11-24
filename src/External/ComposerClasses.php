@@ -32,4 +32,11 @@ final readonly class ComposerClasses implements ClassesInterface {
 	public function fileOf(string $class): string|false {
 		return $this->loader->findFile($class);
 	}
+
+	/**
+	 * @return list<string>
+	 */
+	public function directories(): array {
+		return array_merge(...array_values($this->loader->getPrefixesPsr4()));
+	}
 }

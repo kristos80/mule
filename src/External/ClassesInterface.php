@@ -33,4 +33,16 @@ interface ClassesInterface {
 	 * @return string|false
 	 */
 	public function fileOf(string $class): string|false;
+
+	/**
+	 * Every directory the project autoloads, source and test alike.
+	 *
+	 * **This is how mule learns what files exist without being told.** Deciding
+	 * that nothing has changed means being sure nothing has *appeared* either,
+	 * and the project has already declared where its code lives — to the same
+	 * object that answers {@see self::fileOf()}, so the two cannot disagree.
+	 *
+	 * @return list<string> Absolute paths, in no particular order.
+	 */
+	public function directories(): array;
 }

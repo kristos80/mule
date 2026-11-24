@@ -240,6 +240,42 @@ status is still 1 either way: what changed is what the human reads. And because
 `Failure` *is* a `RuntimeException`, every existing test that expected one kept
 passing untouched.
 
+## Staleness is answered by hashing, and coverage only runs when it must
+
+Deciding what is stale used to require generating a coverage report, which
+made the cheap question depend on the expensive answer: every run paid the
+whole suite to be told it had nothing to do. Now the store records a digest for
+every file the project autoloads, so the question is a few hundred hashes.
+
+**Measured here: `mule new` with nothing changed is 0.05 s against the 2.4 s its
+coverage run costs.** Hashing the universe is ~13 ms for 56 files, so a
+thousand-file repository pays about a quarter of a second to skip a minute.
+
+`Freshness` refuses rather than guesses. It answers only when the store still
+describes the tree: nothing it recorded has vanished, nothing it never recorded
+has appeared, every watched file still hashes the same, and so does every file
+it could not prove. Any of those and the answer is "run coverage" — the only
+case it answers for itself is the one it can be certain of. Which is also why
+what each test runs may be read from the store rather than re-measured: it is
+only ever read where nothing that test could run has moved.
+
+Two things found while building it, both of which would have been quiet bugs:
+
+- **`getPrefixesPsr4()` returns every registered prefix, dependencies
+  included.** The first working version recorded 1,500 digests, most of them
+  `vendor/`. A store like that is invalidated by any `composer install` and
+  differs between machines — it would have destroyed the one property the
+  committed store exists for. `Universe` keeps only what the project owns:
+  inside the root, outside `vendor/`.
+- **`mule.json` is not watched**, although it changes what a run does. It is
+  the one file whose purpose is to differ between machines — the `herd
+  coverage` wrapper here, nothing on CI, which is why CI deletes it — so
+  watching it would make the committed store unusable on CI. Verified that the
+  alternative does not work: a coverage driver enabled by `herd coverage` does
+  **not** survive into a grandchild process, so the wrapper cannot move outside
+  the command mule runs. The cost is stated in the code: change the coverage
+  command and nothing is invalidated, so run `mule full` after.
+
 ## The store records what each test runs, not a digest of it
 
 The store used to keep, per source file, a digest over the files covering it.

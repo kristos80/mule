@@ -125,6 +125,19 @@ final class ProjectTest extends TestCase {
 		self::project()->relative("/project-other/src/Key.php");
 	}
 
+	public function testHoldsAPathInsideItself(): void {
+		self::assertTrue(self::project()->contains("/project/src/Cache/Key.php"));
+	}
+
+	public function testDoesNotHoldAPathOutsideItself(): void {
+		self::assertFalse(self::project()->contains("/elsewhere/Key.php"));
+		self::assertFalse(self::project()->contains("/project-other/src/Key.php"));
+	}
+
+	public function testDoesNotHoldAPathThatClimbsBackOutOfIt(): void {
+		self::assertFalse(self::project()->contains("/project/vendor/composer/../../../elsewhere/Key.php"));
+	}
+
 	public function testAbsolutisesARecordedPath(): void {
 		self::assertSame("/project/src/Cache/Key.php", self::project()->absolute("src/Cache/Key.php"));
 	}

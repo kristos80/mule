@@ -117,7 +117,8 @@ commit. A stale store fails the gate, and a failed gate cuts no release.
 ```
 bin/mule                  composition root: autoload, the five wrappers, exit
 src/
-  Cache/                  Snapshot, Touched, Reading, Keying, Store
+  Cache/                  Snapshot, Touched, Unproven, Reading, Keying,
+                          Freshness, Standing, Universe, Store
   Config/                 Configuration
   Console/                Application, Cli, Verb, Summary
   Coverage/               Report, CoveredFile, Unreached — parsers over bytes, never paths

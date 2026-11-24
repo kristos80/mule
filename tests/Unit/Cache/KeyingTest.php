@@ -5,6 +5,7 @@ namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Reading;
+use Kristos80\Mule\Cache\Universe;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\CoverageXml;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
@@ -160,6 +161,67 @@ final class KeyingTest extends TestCase {
 		self::assertSame(1, $this->reading()->count());
 	}
 
+	public function testWatchesEveryAutoloadedFileTheReportNeverMentioned(): void {
+		$this->filesystem->given("/project/src/Excluded.php", "<?php class Excluded {}");
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+
+		// Exactly these: what the project declares, plus every autoloaded file
+		// the report never mentioned — a file excluded from coverage, and a
+		// test that ran nothing. Not the proven file, and not its test.
+		self::assertSame(
+			["composer.json", "src/Excluded.php", "tests/GateTest.php"],
+			array_keys($this->decoded()["watched"]),
+		);
+	}
+
+	/**
+	 * mule.json is the one file meant to differ between machines, so watching
+	 * it would make a committed store unusable wherever it differs.
+	 *
+	 * @return void
+	 */
+	public function testDoesNotWatchItsOwnConfiguration(): void {
+		$this->filesystem->given("/project/mule.json", '{"options": []}');
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+
+		self::assertArrayNotHasKey("mule.json", $this->decoded()["watched"]);
+	}
+
+	public function testRecordsWhereTheTestsStopAgainstTheBytesItMeasured(): void {
+		$this->givenPartialReport();
+
+		$unproven = $this->decoded()["unproven"];
+
+		self::assertArrayHasKey("src/Cache/Key.php", $unproven);
+		self::assertSame([
+			"digest" => hash("sha256", self::SOURCE),
+			"unreached" => [["name" => "one", "from" => 12, "to" => 19, "lines" => 3]],
+		], $unproven["src/Cache/Key.php"]);
+	}
+
+	public function testRecordsEveryGapRatherThanTheFirst(): void {
+		$this->filesystem->given("/project/src/Second.php", "<?php class Second {}");
+		$this->givenPartialReport();
+		$this->filesystem->given("/run/coverage-xml/Second.php.xml", CoverageXml::partialFile(
+			"Second.php",
+			"/",
+			[],
+			2,
+			0,
+			[["name" => "two", "start" => 3, "end" => 6, "executable" => 2, "executed" => 0]],
+		));
+
+		$unproven = $this->decoded()["unproven"];
+
+		self::assertSame(["src/Cache/Key.php", "src/Second.php"], array_keys($unproven));
+	}
+
+	public function testDoesNotAlsoWatchAFileItCouldNotProve(): void {
+		$this->givenPartialReport();
+
+		self::assertArrayNotHasKey("src/Cache/Key.php", $this->decoded()["watched"]);
+	}
+
 	public function testRejectsACoveringTestTheAutoloaderCannotPlace(): void {
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Other\\Thing::testOne"]);
 
@@ -204,16 +266,17 @@ final class KeyingTest extends TestCase {
 		$classes = new MappedClasses([
 			"Acme\\Tests\\KeyTest" => "/project/tests/KeyTest.php",
 			"Acme\\Tests\\GateTest" => "/project/tests/GateTest.php",
-		]);
+		], ["/project/src", "/project/tests"]);
+		$universe = new Universe($project, $this->filesystem, $classes);
 
-		return (new Keying($project, $this->filesystem, $classes))->of("/run/coverage-xml");
+		return (new Keying($project, $this->filesystem, $classes, $universe))->of("/run/coverage-xml");
 	}
 
 	/**
 	 * The snapshot read back out of the JSON it writes, which is the shape the
 	 * store keeps and therefore the one worth asserting.
 	 *
-	 * @return array{verified: array<mixed>, tests: array<mixed>}
+	 * @return array{verified: array<mixed>, tests: array<mixed>, unproven: array<mixed>, watched: array<mixed>}
 	 */
 	private function decoded(): array {
 		$decoded = json_decode($this->reading()->snapshot->toJson(), TRUE);
@@ -221,8 +284,15 @@ final class KeyingTest extends TestCase {
 		self::assertIsArray($decoded);
 		self::assertIsArray($decoded["verified"]);
 		self::assertIsArray($decoded["tests"]);
+		self::assertIsArray($decoded["unproven"]);
+		self::assertIsArray($decoded["watched"]);
 
-		return ["verified" => $decoded["verified"], "tests" => $decoded["tests"]];
+		return [
+			"verified" => $decoded["verified"],
+			"tests" => $decoded["tests"],
+			"unproven" => $decoded["unproven"],
+			"watched" => $decoded["watched"],
+		];
 	}
 
 	/**

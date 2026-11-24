@@ -5,6 +5,8 @@ namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Touched;
+use Kristos80\Mule\Cache\Unproven;
+use Kristos80\Mule\Coverage\Unreached;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
@@ -159,10 +161,10 @@ final class SnapshotTest extends TestCase {
 			"{\n\t\"verified\": {\n"
 			. "\t\t\"src/A.php\": {\"digest\":\"aa\"},\n"
 			. "\t\t\"src/B.php\": {\"digest\":\"bb\"}\n"
-			. "\t},\n\t\"tests\": {\n"
+			. "\t},\n\t\"unproven\": {},\n\t\"tests\": {\n"
 			. "\t\t\"tests/ATest.php\": {\"source\":\"tt\",\"touches\":[\"src/A.php\"]},\n"
 			. "\t\t\"tests/BTest.php\": {\"source\":\"uu\",\"touches\":[\"src/B.php\"]}\n"
-			. "\t}\n}\n",
+			. "\t},\n\t\"watched\": {}\n}\n",
 			$snapshot->toJson(),
 		);
 	}
@@ -184,7 +186,70 @@ final class SnapshotTest extends TestCase {
 	}
 
 	public function testWritesAnEmptySnapshotAsEmptySections(): void {
-		self::assertSame("{\n\t\"verified\": {},\n\t\"tests\": {}\n}\n", Snapshot::of([], [])->toJson());
+		self::assertSame(
+			"{\n\t\"verified\": {},\n\t\"unproven\": {},\n\t\"tests\": {},\n\t\"watched\": {}\n}\n",
+			Snapshot::of([], [])->toJson(),
+		);
+	}
+
+	public function testWritesWhatItWatchesAndWhereTheTestsStop(): void {
+		$snapshot = Snapshot::of(
+			[],
+			[],
+			["src/B.php" => new Unproven("bb", [new Unreached("one", 4, 9, 2)])],
+			["composer.json" => "cc"],
+		);
+
+		self::assertSame(
+			"{\n\t\"verified\": {},\n\t\"unproven\": {\n"
+			. "\t\t\"src/B.php\": {\"digest\":\"bb\",\"unreached\":[{\"name\":\"one\",\"from\":4,\"to\":9,\"lines\":2}]}\n"
+			. "\t},\n\t\"tests\": {},\n\t\"watched\": {\n"
+			. "\t\t\"composer.json\": {\"digest\":\"cc\"}\n"
+			. "\t}\n}\n",
+			$snapshot->toJson(),
+		);
+	}
+
+	public function testSortsTheGapsAndTheWatchedFilesTooWhateverOrderTheyArrivedIn(): void {
+		$snapshot = Snapshot::of([], [], [
+			"src/Z.php" => new Unproven("zz", [new Unreached("two", 1, 2, 1)]),
+			"src/A.php" => new Unproven("aa", [new Unreached("one", 3, 4, 1)]),
+		], ["mule.json" => "mm", "composer.json" => "cc"]);
+
+		self::assertSame(["src/A.php", "src/Z.php"], array_keys($snapshot->gaps()));
+		self::assertSame(["src/A.php", "src/Z.php"], array_keys($snapshot->unprovenDigests()));
+		self::assertSame(["composer.json", "mule.json"], array_keys($snapshot->watched()));
+		self::assertSame(
+			["composer.json" => "cc", "mule.json" => "mm", "src/A.php" => "aa", "src/Z.php" => "zz"],
+			$snapshot->digests(),
+		);
+	}
+
+	public function testReadsBackEveryGapRatherThanTheFirst(): void {
+		$snapshot = Snapshot::of([], [], [
+			"src/A.php" => new Unproven("aa", [new Unreached("one", 3, 4, 1)]),
+			"src/Z.php" => new Unproven("zz", [new Unreached("two", 1, 2, 1)]),
+		], []);
+
+		self::assertSame(["src/A.php", "src/Z.php"], array_keys(Snapshot::fromJson($snapshot->toJson())->gaps()));
+	}
+
+	public function testReadsBackTheGapsAndTheWatchedFiles(): void {
+		$snapshot = Snapshot::of(
+			["src/A.php" => "aa"],
+			[],
+			["src/B.php" => new Unproven("bb", [new Unreached("one", 4, 9, 2)])],
+			["composer.json" => "cc"],
+		);
+
+		$read = Snapshot::fromJson($snapshot->toJson());
+
+		self::assertSame($snapshot->toJson(), $read->toJson());
+		self::assertSame("one() lines 4-9, 2 unreached", $read->gaps()["src/B.php"][0]->described());
+		self::assertSame(
+			["composer.json" => "cc", "src/A.php" => "aa", "src/B.php" => "bb"],
+			$read->digests(),
+		);
 	}
 
 	public function testReadsBackWhatItWrote(): void {

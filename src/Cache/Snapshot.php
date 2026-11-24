@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Cache;
 
+use Kristos80\Mule\Coverage\Unreached;
 use Kristos80\Mule\Failure;
 use Kristos80\Mule\Json\Decoded;
 
@@ -24,22 +25,103 @@ final readonly class Snapshot {
 	/**
 	 * @param array<string, string> $verified Project-relative source path to its digest, sorted.
 	 * @param array<string, Touched> $tests Project-relative test path to what it is and runs, sorted.
+	 * @param array<string, Unproven> $unproven Source paths the tests do not reach all of, sorted.
+	 * @param array<string, string> $watched Everything else the project autoloads, and its own config, sorted.
 	 */
 	private function __construct(
 		private array $verified,
 		private array $tests,
+		private array $unproven,
+		private array $watched,
 	) {}
 
 	/**
 	 * @param array<string, string> $verified
 	 * @param array<string, Touched> $tests
+	 * @param array<string, Unproven> $unproven
+	 * @param array<string, string> $watched
 	 * @return self
 	 */
-	public static function of(array $verified, array $tests): self {
+	public static function of(array $verified, array $tests, array $unproven = [], array $watched = []): self {
 		ksort($verified);
 		ksort($tests);
+		ksort($unproven);
+		ksort($watched);
 
-		return new self($verified, $tests);
+		return new self($verified, $tests, $unproven, $watched);
+	}
+
+	/**
+	 * Everything this snapshot has a digest for, whatever section it sits in:
+	 * what a later run has to re-hash to know that nothing has moved.
+	 *
+	 * @return array<string, string>
+	 */
+	public function digests(): array {
+		$digests = $this->watched;
+
+		foreach($this->verified as $path => $digest) {
+			$digests[$path] = $digest;
+		}
+
+		foreach($this->unproven as $path => $entry) {
+			$digests[$path] = $entry->digest;
+		}
+
+		foreach($this->tests as $path => $test) {
+			$digests[$path] = $test->source;
+		}
+
+		return $digests;
+	}
+
+	/**
+	 * The files the tests do not reach all of, and where they stop.
+	 *
+	 * @return array<string, list<\Kristos80\Mule\Coverage\Unreached>>
+	 */
+	public function gaps(): array {
+		$gaps = [];
+
+		foreach($this->unproven as $path => $entry) {
+			$gaps[$path] = $entry->unreached;
+		}
+
+		return $gaps;
+	}
+
+	/**
+	 * The digest each unproven file was measured against.
+	 *
+	 * @return array<string, string>
+	 */
+	public function unprovenDigests(): array {
+		$digests = [];
+
+		foreach($this->unproven as $path => $entry) {
+			$digests[$path] = $entry->digest;
+		}
+
+		return $digests;
+	}
+
+	/**
+	 * Everything the project autoloads that the report never mentioned, and
+	 * mule's own configuration, with their digests.
+	 *
+	 * @return array<string, string>
+	 */
+	public function watched(): array {
+		return $this->watched;
+	}
+
+	/**
+	 * Every test recorded, with what it runs.
+	 *
+	 * @return array<string, Touched>
+	 */
+	public function tests(): array {
+		return $this->tests;
 	}
 
 	/**
@@ -56,6 +138,7 @@ final readonly class Snapshot {
 		$store = Decoded::of($json, "the mule store");
 		$verified = [];
 		$tests = [];
+		$watched = [];
 
 		foreach($store->object("verified")->entries() as $path => $entry) {
 			$verified[$path] = $entry->string("digest");
@@ -65,7 +148,38 @@ final readonly class Snapshot {
 			$tests[$path] = new Touched($entry->string("source"), $entry->strings("touches"));
 		}
 
-		return self::of($verified, $tests);
+		foreach($store->object("watched")->entries() as $path => $entry) {
+			$watched[$path] = $entry->string("digest");
+		}
+
+		return self::of($verified, $tests, self::unprovenIn($store), $watched);
+	}
+
+	/**
+	 * The unproven section, read back.
+	 *
+	 * @param Decoded $store
+	 * @return array<string, Unproven>
+	 */
+	private static function unprovenIn(Decoded $store): array {
+		$unproven = [];
+
+		foreach($store->object("unproven")->entries() as $path => $entry) {
+			$unreached = [];
+
+			foreach($entry->objects("unreached") as $gap) {
+				$unreached[] = new Unreached(
+					$gap->string("name"),
+					$gap->number("from"),
+					$gap->number("to"),
+					$gap->number("lines"),
+				);
+			}
+
+			$unproven[$path] = new Unproven($entry->string("digest"), $unreached);
+		}
+
+		return $unproven;
 	}
 
 	/**
@@ -134,7 +248,12 @@ final readonly class Snapshot {
 	 * @return self
 	 */
 	public function merged(self $other): self {
-		return self::of([...$this->verified, ...$other->verified], [...$this->tests, ...$other->tests]);
+		return self::of(
+			[...$this->verified, ...$other->verified],
+			[...$this->tests, ...$other->tests],
+			$other->unproven,
+			$other->watched,
+		);
 	}
 
 	/**
@@ -154,7 +273,7 @@ final readonly class Snapshot {
 			$wanted[] = $path;
 		}
 
-		return self::of($verified, $this->testsRunning(array_flip($wanted)));
+		return self::of($verified, $this->testsRunning(array_flip($wanted)), $this->unproven, $this->watched);
 	}
 
 	/**
@@ -166,6 +285,8 @@ final readonly class Snapshot {
 	public function toJson(): string {
 		$verified = [];
 		$tests = [];
+		$unproven = [];
+		$watched = [];
 
 		foreach($this->verified as $path => $digest) {
 			$verified[] = "\t\t" . self::encoded($path) . ": " . self::encoded(["digest" => $digest]);
@@ -176,7 +297,18 @@ final readonly class Snapshot {
 				. self::encoded(["source" => $test->source, "touches" => $test->touches]);
 		}
 
-		return "{\n\t\"verified\": {" . self::block($verified) . "},\n\t\"tests\": {" . self::block($tests) . "}\n}\n";
+		foreach($this->unproven as $path => $entry) {
+			$unproven[] = "\t\t" . self::encoded($path) . ": " . self::encoded($entry->toArray());
+		}
+
+		foreach($this->watched as $path => $digest) {
+			$watched[] = "\t\t" . self::encoded($path) . ": " . self::encoded(["digest" => $digest]);
+		}
+
+		return "{\n\t\"verified\": {" . self::block($verified)
+			. "},\n\t\"unproven\": {" . self::block($unproven)
+			. "},\n\t\"tests\": {" . self::block($tests)
+			. "},\n\t\"watched\": {" . self::block($watched) . "}\n}\n";
 	}
 
 	/**
@@ -275,7 +407,7 @@ final readonly class Snapshot {
 	 * a store full of `src\/Cache` is for a machine to read and this one is for
 	 * a person resolving a conflict in it.
 	 *
-	 * @param string|array<string, string|list<string>> $value
+	 * @param string|array<string, mixed> $value
 	 * @return string
 	 */
 	private static function encoded(string|array $value): string {
