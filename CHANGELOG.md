@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/kristos80/mule/compare/v1.4.0...v1.4.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* watch the engine's configuration, and bank nothing that moved mid-run ([3911004](https://github.com/kristos80/mule/commit/3911004b6c7fabeeb29c62a856c7af82848a56ee))
+
 # [1.4.0](https://github.com/kristos80/mule/compare/v1.3.0...v1.4.0) (2026-11-24)
 
 
