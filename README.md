@@ -11,6 +11,14 @@
 
 **Mutation testing, only where it can still tell you something.**
 
+---
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kristos80_mule&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=kristos80_mule)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=kristos80_mule&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=kristos80_mule)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=kristos80_mule&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=kristos80_mule)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=kristos80_mule&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=kristos80_mule)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=kristos80_mule&metric=reliability_rating)](https://sonarcloud.io/summary/new_code?id=kristos80_mule)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=kristos80_mule&metric=bugs)](https://sonarcloud.io/summary/new_code?id=kristos80_mule)
+
 A mutation gate is the most informative test you can run and the slowest. On a
 real suite it costs several times what coverage costs, because every mutant
 boots the tests that cover it — so re-proving the whole repository to change one
