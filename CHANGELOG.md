@@ -1,3 +1,10 @@
+## [1.4.2](https://github.com/kristos80/mule/compare/v1.4.1...v1.4.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* unprove every verdict when the gate's configuration changes ([2c3e71d](https://github.com/kristos80/mule/commit/2c3e71d3ea23fee0bcd93d8eff371536399f7e86))
+
 ## [1.4.1](https://github.com/kristos80/mule/compare/v1.4.0...v1.4.1) (2026-11-24)
 
 
