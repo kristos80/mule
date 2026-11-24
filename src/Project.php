@@ -73,23 +73,72 @@ final readonly class Project {
 	/**
 	 * An absolute path as the store records it.
 	 *
-	 * **The path is taken as given rather than resolved.** Every absolute path
-	 * mule relativises comes from a coverage report, which PHPUnit has already
-	 * written resolved, and the root was resolved when it was found — so a
-	 * symlink that made the two disagree is reported here instead of silently
-	 * keying a file twice.
+	 * **`.` and `..` segments are applied, and nothing else is resolved.** Not
+	 * every path reaching here comes from a coverage report: half of each key is
+	 * a digest over the paths of the test files covering a source file, and
+	 * those come from the project's Composer autoloader, which answers with the
+	 * directory as its own generated configuration spells it — a psr-4 prefix
+	 * mapped to `tests` comes back as `{root}/vendor/composer/../../tests/Unit/FooTest.php`.
+	 * It names the right file, so the digest of its contents was never in doubt,
+	 * but the path is part of the key: left as given it records a store no other
+	 * reading of the same repository can be compared with, and one that
+	 * invalidates itself wholesale the day the vendor directory moves.
+	 *
+	 * **Applying them is lexical, so a symlink still disagrees out loud.** The
+	 * root was symlink-resolved when it was found and a coverage report's paths
+	 * are written resolved, so one that is not is still reported here rather
+	 * than keying the same file twice. It is also what makes the containment
+	 * guard mean what it says, since `{root}/vendor/composer/../../../elsewhere`
+	 * starts with the root as a string while naming a file outside it.
 	 *
 	 * @param string $absolute
 	 * @return string
 	 */
 	public function relative(string $absolute): string {
+		$path = self::applied($absolute);
 		$prefix = "{$this->root}/";
 
-		if(!str_starts_with($absolute, $prefix)) {
-			throw new RuntimeException("{$absolute} is outside the project root {$this->root}, so mule cannot record it.");
+		if(!str_starts_with($path, $prefix)) {
+			throw new RuntimeException("{$path} is outside the project root {$this->root}, so mule cannot record it.");
 		}
 
-		return substr($absolute, strlen($prefix));
+		return substr($path, strlen($prefix));
+	}
+
+	/**
+	 * An absolute path with every `.` and `..` segment applied.
+	 *
+	 * @param string $absolute
+	 * @return string
+	 */
+	private static function applied(string $absolute): string {
+		$segments = [];
+
+		foreach(explode("/", $absolute) as $segment) {
+			$segments = self::segment($segments, $segment);
+		}
+
+		return "/" . implode("/", $segments);
+	}
+
+	/**
+	 * One segment applied to the path built out of the ones before it.
+	 *
+	 * A `..` with nothing to its left is dropped rather than kept: the path is
+	 * absolute, so there is nothing above its first segment to climb to.
+	 *
+	 * @param list<string> $segments
+	 * @param string $segment
+	 * @return list<string>
+	 */
+	private static function segment(array $segments, string $segment): array {
+		if($segment === "..") {
+			array_pop($segments);
+
+			return $segments;
+		}
+
+		return $segment === "" || $segment === "." ? $segments : [...$segments, $segment];
 	}
 
 	/**

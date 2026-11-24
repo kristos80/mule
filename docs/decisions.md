@@ -207,3 +207,49 @@ executing on. The CLI SAPI always defines `$argv`, so the coalesce changes
 nothing at run time — it removes a verdict that depended on an ini setting
 nobody sets deliberately. It costs a dead branch in the composition root, which
 is outside both gates, rather than a suppression inside them.
+
+## A covering test's path is normalised before it reaches a key
+
+Found by installing mule into the repository its design came from: the first run
+reported **404 of that project's 610 files stale** against a store its own
+previous implementation called entirely fresh. Diagnosed by computing both
+keyings from one shared coverage report — source digests agreed on all 610, test
+digests differed on 404.
+
+**`ClassLoader::findFile()` answers with the directory as Composer's own
+generated configuration spells it.** A psr-4 prefix mapped to `tests` comes back
+as `{root}/vendor/composer/../../tests/Unit/FooTest.php`. The file is the right
+one, so no content digest was ever wrong — but `Keying::coveringDigest()` hashes
+`"{path}:{digest}"` lines, so **the path string is itself half of what the key
+commits to**. Left as given, a store records paths no other reading of the same
+repository can be compared with, and invalidates itself wholesale the day
+`COMPOSER_VENDOR_DIR` moves.
+
+`Project::relative()`'s docblock is where the assumption was written down, and it
+was half true: *"every absolute path mule relativises comes from a coverage
+report, which PHPUnit has already written resolved"*. Source paths do. Covering
+test paths come from the autoloader, which is the one source that does not
+answer resolved — and the containment guard could not catch it, because the root
+prefix genuinely is there and `str_starts_with` passed.
+
+**The fix applies `.` and `..` lexically, in `Project`, before the containment
+check.** Three things decided it:
+
+- **Not `realpath()` in `ComposerClasses::fileOf()`.** The external layer holds
+  no decisions, and `$file === FALSE ? FALSE : realpath($file)` is a ternary
+  there. Keeping the fix in a tested class also keeps it provable without a disk.
+- **Lexical rather than resolved, so the documented symlink property survives.**
+  The root is symlink-resolved and a report's paths are written resolved, so one
+  that is not should still be *reported* rather than silently keying one file
+  twice. Collapsing `..` does not resolve a symlink, so that still holds.
+- **It strengthens the containment guard**, which is the part worth keeping in
+  mind: `{root}/vendor/composer/../../../elsewhere` starts with the root *as a
+  string* while naming a file outside it. Before this, such a path was recorded;
+  now it is refused, and the message names the applied path, which is the file
+  actually meant.
+
+The cost is one store-wide invalidation, once: 16 of this repository's own 22
+entries changed digest, and the next full run re-proved them. The benefit is that
+a store written by mule now matches one written from normalised paths — which is
+what let that project adopt it with its 613 banked verdicts intact, at **610 of
+610 verified, 0 stale**.

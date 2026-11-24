@@ -74,6 +74,43 @@ final class ProjectTest extends TestCase {
 		self::assertSame("src/Cache/Key.php", self::project()->relative("/project/src/Cache/Key.php"));
 	}
 
+	/**
+	 * The case this exists for: a path as Composer's autoloader spells it. Asked
+	 * where a psr-4 test class lives, it answers out of its own generated
+	 * configuration — `{root}/vendor/composer/../../tests/…` for a prefix mapped
+	 * to `tests` — and that answer is half of every key in the store.
+	 *
+	 * @return void
+	 */
+	public function testRelativisesAPathTheWayItsWriterSpelledIt(): void {
+		self::assertSame(
+			"tests/Unit/Cache/KeyTest.php",
+			self::project()->relative("/project/vendor/composer/../../tests/Unit/Cache/KeyTest.php"),
+		);
+	}
+
+	public function testRelativisesAPathWithADotSegmentInIt(): void {
+		self::assertSame("src/Cache/Key.php", self::project()->relative("/project/./src/Cache/Key.php"));
+	}
+
+	public function testDropsAClimbAboveTheTopOfTheTree(): void {
+		self::assertSame("src/Cache/Key.php", self::project()->relative("/../project/src/Cache/Key.php"));
+	}
+
+	/**
+	 * A path that starts with the root as a *string* while naming a file outside
+	 * it, which is what the containment guard is for and what it could not see
+	 * while the segments were left as given.
+	 *
+	 * @return void
+	 */
+	public function testRejectsAPathThatClimbsOutOfTheProject(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("/elsewhere/Key.php is outside the project root /project, so mule cannot record it.");
+
+		self::project()->relative("/project/vendor/composer/../../../elsewhere/Key.php");
+	}
+
 	public function testRejectsAPathOutsideTheProject(): void {
 		$this->expectException(RuntimeException::class);
 		$this->expectExceptionMessage("/elsewhere/Key.php is outside the project root /project, so mule cannot record it.");
