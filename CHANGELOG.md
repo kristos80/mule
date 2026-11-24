@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/kristos80/mule/compare/v1.0.1...v1.0.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* say whether a failure is the project's fault or mule's ([529e3ed](https://github.com/kristos80/mule/commit/529e3ede6e3ff4e61049a6c85074fa7cb62bad6a))
+
 ## [1.0.1](https://github.com/kristos80/mule/compare/v1.0.0...v1.0.1) (2026-11-24)
 
 
