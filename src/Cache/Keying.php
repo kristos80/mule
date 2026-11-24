@@ -27,24 +27,34 @@ final readonly class Keying {
 	) {}
 
 	/**
-	 * Every covered file's verdict, read from one coverage report.
+	 * What one coverage report says about every file in it: a verdict where
+	 * the tests reach the whole file, and the gap where they do not.
 	 *
 	 * @param string $coverageXml The report directory.
-	 * @return Verdicts
+	 * @return Reading
 	 */
-	public function of(string $coverageXml): Verdicts {
+	public function of(string $coverageXml): Reading {
 		$root = Report::sourceRoot($this->filesystem->read("{$coverageXml}/index.xml"));
 		$verdicts = [];
+		$gaps = [];
 
 		foreach(Report::reports($this->filesystem->entriesUnder($coverageXml)) as $report) {
 			$file = CoveredFile::of($this->filesystem->read($report), $root, $report);
-			$verdicts[$this->project->relative($file->path)] = new Verdict(
+			$path = $this->project->relative($file->path);
+
+			if(!$file->isFullyCovered()) {
+				$gaps[$path] = $file->unreached;
+
+				continue;
+			}
+
+			$verdicts[$path] = new Verdict(
 				$this->filesystem->digest($file->path),
 				$this->coveringDigest($file),
 			);
 		}
 
-		return Verdicts::of($verdicts);
+		return new Reading(Verdicts::of($verdicts), $gaps);
 	}
 
 	/**

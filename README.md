@@ -185,6 +185,22 @@ worse than one that forgets.
 an assertion killed, and the record freezes whichever answer the clock happened
 to give that run.
 
+**A file the tests do not reach all of is never banked.** Mule drives the engine
+from the coverage report, and an engine works from that report's traces — so a
+line nothing runs produces no mutant, and no mutant can fail a gate. A clean
+exit therefore says nothing whatever about the parts of a file your tests do not
+enter, and recording one would be recording a claim nobody checked. Those files
+are re-mutated on every run and reported instead, with the methods named:
+
+```
+mule: 24 of 25 files verified, 0 stale, 1 not covered in full.
+mule: not banked until the tests reach them:
+  src/Cache/Keying.php — testFileOf() lines 94-104, 3 unreached
+```
+
+Mule does not *gate* on coverage — that is your coverage gate's job. It reports
+what the report it is already holding happens to say.
+
 **It trusts your gate, not your intent.** Mule banks a file when the engine exits
 clean under `--min-msi=100 --min-covered-msi=100`. Gate below 100 and a banked
 verdict means "scored at least what you asked for", which is a weaker claim than

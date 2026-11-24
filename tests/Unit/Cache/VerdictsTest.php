@@ -54,6 +54,22 @@ final class VerdictsTest extends TestCase {
 		self::assertSame([], $current->staleAgainst(self::given(["src/A.php", "src/Gone.php"])));
 	}
 
+	public function testNamesWhichOfThePathsGivenItHoldsAVerdictFor(): void {
+		$verdicts = self::given(["src/A.php", "src/B.php", "src/C.php"]);
+
+		self::assertSame(["src/A.php", "src/C.php"], $verdicts->knownOf(["src/A.php", "src/Gone.php", "src/C.php"]));
+	}
+
+	public function testKeepsThePathsInTheOrderItWasGivenThem(): void {
+		$verdicts = self::given(["src/A.php", "src/B.php"]);
+
+		self::assertSame(["src/B.php", "src/A.php"], $verdicts->knownOf(["src/B.php", "src/A.php"]));
+	}
+
+	public function testNamesNoneOfThemWhenItHoldsNoneOfThem(): void {
+		self::assertSame([], self::given(["src/A.php"])->knownOf(["src/Gone.php"]));
+	}
+
 	public function testWritesAnotherSetOverItsOwn(): void {
 		$banked = Verdicts::of(["src/A.php" => new Verdict("new", "new")]);
 		$merged = self::given(["src/A.php", "src/B.php"])->merged($banked);

@@ -82,7 +82,10 @@ final class GateTest extends TestCase {
 		$this->gate()->full();
 
 		self::assertSame(["src/Gate.php", "src/Key.php"], $this->stored());
-		self::assertSame("mule: 2 file(s) recorded at the full score in .mule/verified.json.", $this->output->text());
+		self::assertSame(
+			"mule: 0 of 2 files verified, 2 stale.\nmule: 2 file(s) recorded at the full score in .mule/verified.json.",
+			$this->output->text(),
+		);
 	}
 
 	public function testNarrowsToEveryFileWhenTheStoreVouchesForNothing(): void {
@@ -139,6 +142,76 @@ final class GateTest extends TestCase {
 		self::assertSame(["src/Gate.php", "src/Key.php"], $this->stored());
 	}
 
+	public function testRefusesToBankAFileTheTestsDoNotReachAllOf(): void {
+		$this->givenKeyIsHalfCovered();
+
+		self::assertSame(0, $this->gate()->full());
+
+		self::assertSame(["src/Gate.php"], $this->stored());
+	}
+
+	public function testSaysWhereTheTestsStopInAFileItWillNotBank(): void {
+		$this->givenKeyIsHalfCovered();
+
+		$this->gate()->full();
+
+		self::assertStringContainsString("mule: 0 of 2 files verified, 1 stale, 1 not covered in full.", $this->output->text());
+		self::assertStringContainsString("mule: not banked until the tests reach them:", $this->output->text());
+		self::assertStringContainsString("  src/Key.php — one() lines 12-19, 3 unreached", $this->output->text());
+	}
+
+	public function testKeepsMutatingAFileItCannotBankHoweverOftenItRuns(): void {
+		$this->givenKeyIsHalfCovered();
+		$this->gate()->full();
+
+		$this->gate()->narrowed();
+
+		self::assertSame("--filter=src/Key.php", $this->processes->command(3)[5] ?? "");
+		self::assertStringContainsString("mule: 1 of 2 files verified, 0 stale, 1 not covered in full.", $this->output->text());
+	}
+
+	public function testHasSomethingToMutateWhileAnythingIsNotCoveredInFull(): void {
+		$this->givenKeyIsHalfCovered();
+		$this->gate()->full();
+		$this->output = new RecordingOutput();
+
+		$this->gate()->narrowed();
+
+		self::assertStringNotContainsString("nothing to mutate", $this->output->text());
+	}
+
+	public function testHandsTheEngineItsScopeSortedWhicheverWayItWasFound(): void {
+		$this->gate()->full();
+		$this->filesystem->given("/project/src/Key.php", "<?php class Key { public function one() {} }");
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		], "/project/src", [], [
+			"Gate.php" => ["executable" => 2, "executed" => 1, "methods" => []],
+		]);
+
+		$this->gate()->narrowed();
+
+		// Stale finds Key.php, unproven finds Gate.php, and the engine is told
+		// about them in path order rather than in the order they turned up.
+		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->processes->command(1)[5] ?? "");
+	}
+
+	public function testBanksOnlyTheProvenFilesOfANarrowedScope(): void {
+		$this->gate()->full();
+		$this->filesystem->given("/project/src/Key.php", "<?php class Key { public function one() {} }");
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		], "/project/src", [], [
+			"Gate.php" => ["executable" => 2, "executed" => 1, "methods" => []],
+		]);
+
+		$this->gate()->narrowed();
+
+		self::assertStringContainsString("mule: 1 file(s) recorded at the full score", $this->output->text());
+	}
+
 	public function testGivesUpWhenCoverageFailsAndBanksNothing(): void {
 		$this->processes = new CoveringProcesses($this->filesystem, [], "/project/src", [2]);
 
@@ -190,6 +263,25 @@ final class GateTest extends TestCase {
 		$this->gate()->full();
 
 		self::assertFalse($this->filesystem->exists(self::RUN));
+	}
+
+	/**
+	 * Re-states the coverage run so that `Key.php` comes back with a method
+	 * the tests do not enter.
+	 *
+	 * @return void
+	 */
+	private function givenKeyIsHalfCovered(): void {
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		], "/project/src", [], [
+			"Key.php" => [
+				"executable" => 4,
+				"executed" => 1,
+				"methods" => [["name" => "one", "start" => 12, "end" => 19, "executable" => 3, "executed" => 0]],
+			],
+		]);
 	}
 
 	/**

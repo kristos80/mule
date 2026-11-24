@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Console;
 
+use Kristos80\Mule\Coverage\Unreached;
+
 /**
  * Every line mule prints.
  *
@@ -17,14 +19,53 @@ final readonly class Summary {
 	/**
 	 * What the store vouches for.
 	 *
-	 * @param int $total
-	 * @param int $stale
+	 * @param int $total Every file the coverage report knows about.
+	 * @param int $stale Proven before, but not against what is there now.
+	 * @param int $unproven Not covered in full, so never bankable.
 	 * @return string
 	 */
-	public static function verified(int $total, int $stale): string {
-		$verified = $total - $stale;
+	public static function verified(int $total, int $stale, int $unproven): string {
+		$verified = $total - $stale - $unproven;
+		$uncovered = $unproven === 0 ? "" : ", {$unproven} not covered in full";
 
-		return "mule: {$verified} of {$total} files verified, {$stale} stale.";
+		return "mule: {$verified} of {$total} files verified, {$stale} stale{$uncovered}.";
+	}
+
+	/**
+	 * Where the tests stop, for the files that cannot be banked because of it.
+	 *
+	 * **Said out loud rather than left to be inferred.** A file that is not
+	 * covered in full is re-mutated on every run and never recorded, so
+	 * without this it would sit in the stale count for good with no reason
+	 * attached to it.
+	 *
+	 * @param array<string, list<Unreached>> $gaps Project-relative path to its unreached ranges.
+	 * @return list<string> One line, then one per file; empty when there is no gap.
+	 */
+	public static function unreached(array $gaps): array {
+		if($gaps === []) {
+			return [];
+		}
+
+		$lines = ["mule: not banked until the tests reach them:"];
+
+		ksort($gaps);
+
+		foreach($gaps as $path => $unreached) {
+			$lines[] = "  {$path} — " . self::described($unreached);
+		}
+
+		return $lines;
+	}
+
+	/**
+	 * @param list<Unreached> $unreached
+	 * @return string
+	 */
+	private static function described(array $unreached): string {
+		return $unreached === []
+			? "the report gives no method ranges"
+			: implode("; ", array_map(static fn(Unreached $one): string => $one->described(), $unreached));
 	}
 
 	/**

@@ -89,6 +89,25 @@ final readonly class Verdicts {
 	}
 
 	/**
+	 * Of the paths given, the ones this set holds a verdict for, in the order
+	 * they were given.
+	 *
+	 * @param list<string> $paths
+	 * @return list<string>
+	 */
+	public function knownOf(array $paths): array {
+		$known = [];
+
+		foreach($paths as $path) {
+			if(isset($this->verdicts[$path])) {
+				$known[] = $path;
+			}
+		}
+
+		return $known;
+	}
+
+	/**
 	 * This set with another's entries written over it.
 	 *
 	 * @param self $other

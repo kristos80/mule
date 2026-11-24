@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Keying;
-use Kristos80\Mule\Cache\Verdicts;
+use Kristos80\Mule\Cache\Reading;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\CoverageXml;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
@@ -87,11 +87,11 @@ final class KeyingTest extends TestCase {
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
 		$this->givenReport("Project.php", "Project.php", "/", ["Acme\\Tests\\GateTest::testOne"]);
 
-		self::assertSame(["src/Cache/Key.php", "src/Project.php"], $this->verdicts()->paths());
+		self::assertSame(["src/Cache/Key.php", "src/Project.php"], $this->reading()->verdicts->paths());
 	}
 
 	public function testKeysNothingFromAReportHoldingNoFiles(): void {
-		self::assertSame(0, $this->verdicts()->count());
+		self::assertSame(0, $this->reading()->count());
 	}
 
 	public function testReadsACoveringTestNamedWithoutAMethod(): void {
@@ -103,13 +103,64 @@ final class KeyingTest extends TestCase {
 		);
 	}
 
+	public function testKeepsAFileTheTestsDoNotReachAllOfOutOfTheVerdicts(): void {
+		$this->filesystem->given("/run/coverage-xml/Cache/Key.php.xml", CoverageXml::partialFile(
+			"Key.php",
+			"/Cache",
+			["Acme\\Tests\\KeyTest::testOne"],
+			4,
+			1,
+			[["name" => "one", "start" => 12, "end" => 19, "executable" => 3, "executed" => 0]],
+		));
+
+		$reading = $this->reading();
+
+		self::assertSame([], $reading->verdicts->paths());
+		self::assertSame(["src/Cache/Key.php"], $reading->unproven());
+		self::assertSame(
+			"one() lines 12-19, 3 unreached",
+			$reading->gaps["src/Cache/Key.php"][0]->described(),
+		);
+	}
+
+	public function testCarriesOnPastAFileItCannotProve(): void {
+		$this->filesystem->given("/project/src/Project.php", "<?php class Project {}");
+		$this->filesystem->given("/run/coverage-xml/Cache/Key.php.xml", CoverageXml::partialFile(
+			"Key.php",
+			"/Cache",
+			["Acme\\Tests\\KeyTest::testOne"],
+			4,
+			1,
+			[],
+		));
+		$this->givenReport("Project.php", "Project.php", "/", ["Acme\\Tests\\GateTest::testOne"]);
+
+		$reading = $this->reading();
+
+		self::assertSame(["src/Cache/Key.php"], $reading->unproven());
+		self::assertSame(["src/Project.php"], $reading->verdicts->paths());
+	}
+
+	public function testStillCountsAFileItCannotProve(): void {
+		$this->filesystem->given("/run/coverage-xml/Cache/Key.php.xml", CoverageXml::partialFile(
+			"Key.php",
+			"/Cache",
+			["Acme\\Tests\\KeyTest::testOne"],
+			4,
+			1,
+			[],
+		));
+
+		self::assertSame(1, $this->reading()->count());
+	}
+
 	public function testRejectsACoveringTestTheAutoloaderCannotPlace(): void {
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Other\\Thing::testOne"]);
 
 		$this->expectException(RuntimeException::class);
 		$this->expectExceptionMessage("The project's autoloader cannot place the covering test Other\\Thing, so mule cannot find its file.");
 
-		$this->verdicts();
+		$this->reading();
 	}
 
 	/**
@@ -124,9 +175,9 @@ final class KeyingTest extends TestCase {
 	}
 
 	/**
-	 * @return Verdicts
+	 * @return Reading
 	 */
-	private function verdicts(): Verdicts {
+	private function reading(): Reading {
 		$project = Project::containing("/project", $this->filesystem);
 		$classes = new MappedClasses([
 			"Acme\\Tests\\KeyTest" => "/project/tests/KeyTest.php",
@@ -161,7 +212,7 @@ final class KeyingTest extends TestCase {
 	 * @return string
 	 */
 	private function digestOf(string $path, string $half): string {
-		$decoded = json_decode($this->verdicts()->toJson(), TRUE);
+		$decoded = json_decode($this->reading()->verdicts->toJson(), TRUE);
 
 		self::assertIsArray($decoded);
 		self::assertArrayHasKey($path, $decoded);

@@ -247,6 +247,12 @@ final class MuleTest extends TestCase {
 				<?xml version="1.0"?>
 				<phpunit xmlns="https://schema.phpunit.de/coverage/1.0">
 					<file name="A.php" path="/">
+						<totals>
+							<lines executable="1" executed="1"/>
+							<methods>
+								<method name="one" start="5" end="5" executable="1" executed="1"/>
+							</methods>
+						</totals>
 						<coverage>
 							<line nr="5"><covered by="Fixture\Tests\ATest::testOne"/></line>
 						</coverage>

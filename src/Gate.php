@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace Kristos80\Mule;
 
 use Kristos80\Mule\Cache\Keying;
+use Kristos80\Mule\Cache\Reading;
 use Kristos80\Mule\Cache\Store;
-use Kristos80\Mule\Cache\Verdicts;
 use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Console\Summary;
 use Kristos80\Mule\Engine\Infection;
@@ -113,8 +113,9 @@ final readonly class Gate {
 				return $coverage;
 			}
 
-			$current = $this->keying->of($run->coverageXml());
-			$scope = $narrowed ? $this->report($current) : NULL;
+			$reading = $this->keying->of($run->coverageXml());
+			$unfinished = $this->report($reading);
+			$scope = $narrowed ? $unfinished : NULL;
 
 			if($scope === []) {
 				$this->output->line(Summary::nothingToMutate());
@@ -128,7 +129,7 @@ final readonly class Gate {
 				return $status;
 			}
 
-			$banked = $this->store->bank($current, $scope ?? $current->paths());
+			$banked = $this->store->bank($reading->verdicts, $this->bankable($reading, $scope));
 
 			$this->output->line(Summary::banked($banked, Store::PATH));
 
@@ -157,14 +158,37 @@ final readonly class Gate {
 	/**
 	 * Says how much of the project the store vouches for, and answers the rest.
 	 *
-	 * @param Verdicts $current
-	 * @return list<string> The files whose verdict cannot be trusted.
+	 * @param Reading $reading
+	 * @return list<string> Everything that still needs the engine: stale, plus never bankable.
 	 */
-	private function report(Verdicts $current): array {
-		$stale = $current->staleAgainst($this->store->read());
+	private function report(Reading $reading): array {
+		$stale = $reading->verdicts->staleAgainst($this->store->read());
+		$unproven = $reading->unproven();
+		$unfinished = [...$stale, ...$unproven];
 
-		$this->output->line(Summary::verified($current->count(), count($stale)));
+		$this->output->line(Summary::verified($reading->count(), count($stale), count($unproven)));
 
-		return $stale;
+		foreach(Summary::unreached($reading->gaps) as $line) {
+			$this->output->line($line);
+		}
+
+		sort($unfinished);
+
+		return $unfinished;
+	}
+
+	/**
+	 * Of the files this run mutated, the ones it may record.
+	 *
+	 * A file the tests do not reach all of is mutated like any other and
+	 * recorded like none: the engine only ever made mutants for the lines that
+	 * ran, so a clean exit says nothing about the rest of it.
+	 *
+	 * @param Reading $reading
+	 * @param list<string>|null $scope What was mutated, or NULL for the whole project.
+	 * @return list<string>
+	 */
+	private function bankable(Reading $reading, ?array $scope): array {
+		return $scope === NULL ? $reading->verdicts->paths() : $reading->verdicts->knownOf($scope);
 	}
 }

@@ -26,12 +26,15 @@ final class CoveringProcesses implements ProcessesInterface {
 	 * @param array<string, list<string>> $covered Source path, relative to the source root, to its covering tests.
 	 * @param string $sourceRoot The absolute directory the report's own paths are relative to.
 	 * @param list<int> $statuses One exit status per run, in order; 0 once they run out.
+	 * @param array<string, array{executable: int, executed: int, methods: list<array{name: string, start: int, end: int, executable: int, executed: int}>}> $gaps
+	 *        Source paths the tests do not reach all of, keyed as in $covered.
 	 */
 	public function __construct(
 		private InMemoryFilesystem $filesystem,
 		private array $covered = [],
 		private string $sourceRoot = "/project/src",
 		private array $statuses = [],
+		private array $gaps = [],
 	) {}
 
 	/**
@@ -99,10 +102,19 @@ final class CoveringProcesses implements ProcessesInterface {
 		$this->filesystem->given("{$directory}/index.xml", CoverageXml::index($this->sourceRoot));
 
 		foreach($this->covered as $path => $coveringTests) {
-			$this->filesystem->given(
-				"{$directory}/{$path}.xml",
-				CoverageXml::file(basename($path), dirname("/{$path}"), $coveringTests),
-			);
+			$gap = $this->gaps[$path] ?? NULL;
+			$report = $gap === NULL
+				? CoverageXml::file(basename($path), dirname("/{$path}"), $coveringTests)
+				: CoverageXml::partialFile(
+					basename($path),
+					dirname("/{$path}"),
+					$coveringTests,
+					$gap["executable"],
+					$gap["executed"],
+					$gap["methods"],
+				);
+
+			$this->filesystem->given("{$directory}/{$path}.xml", $report);
 		}
 	}
 }
