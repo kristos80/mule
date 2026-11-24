@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
+use Kristos80\Mule\Cache\Declared;
 use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Reading;
 use Kristos80\Mule\Cache\StoreFormat;
@@ -310,7 +311,7 @@ final class KeyingTest extends TestCase {
 		], ["/project/src", "/project/tests"]);
 		$universe = new Universe($project, $this->filesystem, $classes);
 
-		return (new Keying($project, $this->filesystem, $classes, $universe))->of("/run/coverage-xml", $only);
+		return (new Keying($project, $this->filesystem, $classes, $universe, $this->declared()))->of("/run/coverage-xml", $only);
 	}
 
 	/**
@@ -373,5 +374,12 @@ final class KeyingTest extends TestCase {
 		}
 
 		return ["source" => $tests[$path]["source"], "touches" => $touches];
+	}
+
+	/**
+	 * @return Declared
+	 */
+	private function declared(): Declared {
+		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem);
 	}
 }

@@ -602,9 +602,25 @@ are deliberate about that.
   `testKeepsTheRecordedConfigurationWhenBankingANarrowedRun` kills it.
 
 **A store written by the previous release reads as having no configuration**,
-which needs no migration code and no format version: no recorded configuration
-cannot match the one being measured, so every verdict in it is stale and the
-next run proves the project once. The two sections are also disjoint by
+which needs no migration code and no format version — but getting that right
+took a second pass, and the first version of this entry claimed something
+false. `supersedes()` lives in `staleAgainst()`, which is only reached *after*
+a coverage run, so the fast path never saw it: `Freshness` compared the store's
+own recorded digests against the tree, and an empty section matched trivially.
+Measured on a 610-file project, a previous-release store answered "610 of 610
+files verified, 0 stale" in 0.6 s and would have gone on doing so for good.
+
+The same gap hid a second one. Nothing could notice a declared file that
+*appeared*: the store can only be checked for digests it already holds, so a
+project that gained an `infection.json5` it never had would keep answering from
+verdicts proven without one — in the new format as much as the old.
+
+So the declared set is now asked of the **tree**, by `Cache\Declared`, and
+`Freshness` requires the store's section to equal it exactly. That one
+comparison covers a declaration changing, appearing, vanishing, and a store
+that records none at all. It is also the only part of the check that does not
+depend on the store to know what is worth looking at, which is what let the
+appearance case exist in the first place. The two sections are also disjoint by
 construction in `Snapshot::of()`, so an old store that kept `composer.json`
 under `watched` does not carry it in both forever.
 

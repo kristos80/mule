@@ -27,11 +27,13 @@ final readonly class Freshness {
 	 * @param Project $project
 	 * @param FilesystemInterface $filesystem
 	 * @param Universe $universe
+	 * @param Declared $declared
 	 */
 	public function __construct(
 		private Project $project,
 		private FilesystemInterface $filesystem,
 		private Universe $universe,
+		private Declared $declared,
 	) {}
 
 	/**
@@ -141,14 +143,24 @@ final readonly class Freshness {
 	/**
 	 * Whether the store is about this tree at all.
 	 *
+	 * **The declared configuration is compared against the tree, not against
+	 * the store's own entries.** Every other section can only be checked for
+	 * having moved, because the store is the only record that those paths were
+	 * ever interesting. The declared set is known independently, so it is the
+	 * one place an *appearance* can be noticed without a coverage run: a
+	 * project that gains an `infection.json5` it never had does not get to go
+	 * on answering from verdicts proven without one. It is also what makes a
+	 * store written before the section existed re-prove itself exactly once —
+	 * it records no configuration, the tree has some, and that is a mismatch.
+	 *
 	 * @param Snapshot $stored
 	 * @param array<string, string> $recorded
 	 * @param array<string, string> $now
 	 * @return bool
 	 */
 	private function describes(Snapshot $stored, array $recorded, array $now): bool {
-		return $this->same($stored->watched(), $now)
-			&& $this->same($stored->configuration(), $now)
+		return $stored->configuration() === $this->declared->digests()
+			&& $this->same($stored->watched(), $now)
 			&& $this->same($stored->unprovenDigests(), $now)
 			&& $this->nothingNew($recorded);
 	}

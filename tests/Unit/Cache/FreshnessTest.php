@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
+use Kristos80\Mule\Cache\Declared;
 use Kristos80\Mule\Cache\Freshness;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Touched;
@@ -91,10 +92,57 @@ final class FreshnessTest extends TestCase {
 		self::assertSame(["src/A.php"], $this->freshness()->of($this->stored())->stale);
 	}
 
-	public function testRefusesWhenAFileItWatchesMoved(): void {
+	public function testRefusesWhenADeclaredFileMoved(): void {
 		$this->filesystem->given("/project/composer.json", '{"name": "acme/thing"}');
 
 		self::assertFalse($this->freshness()->of($this->stored())->usable);
+	}
+
+	public function testRefusesWhenAFileItWatchesMoved(): void {
+		$this->filesystem->given("/project/src/Excluded.php", "<?php interface Excluded {}");
+		$stored = Snapshot::of(
+			["src/A.php" => hash("sha256", self::SOURCE)],
+			["tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"])],
+			[],
+			["src/Excluded.php" => hash("sha256", "<?php interface Excluded {}")],
+			["composer.json" => hash("sha256", "{}")],
+		);
+
+		$this->filesystem->given("/project/src/Excluded.php", "<?php interface Excluded { public function one(); }");
+
+		self::assertFalse($this->freshness()->of($stored)->usable);
+	}
+
+	/**
+	 * The one change no section of the store can notice by itself: a file that
+	 * declares the gate appearing where there was none. Every other digest is
+	 * only interesting because the store says so, but the declared set is known
+	 * independently of it — so an `infection.json5` that was not there when the
+	 * verdicts were proven is a mismatch rather than a blind spot.
+	 *
+	 * @return void
+	 */
+	public function testRefusesWhenADeclaredFileAppearsThatWasNeverThere(): void {
+		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
+
+		self::assertFalse($this->freshness()->of($this->stored())->usable);
+	}
+
+	/**
+	 * A store written before the configuration was a section of its own records
+	 * none, which cannot match a tree that has some — so it re-proves itself
+	 * once and comes back in the current shape. That is the whole of the
+	 * migration.
+	 *
+	 * @return void
+	 */
+	public function testRefusesAStoreThatRecordedNoConfigurationAtAll(): void {
+		$stored = Snapshot::of(
+			["src/A.php" => hash("sha256", self::SOURCE)],
+			["tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"])],
+		);
+
+		self::assertFalse($this->freshness()->of($stored)->usable);
 	}
 
 	public function testRefusesWhenAFileItCouldNotProveMoved(): void {
@@ -128,6 +176,7 @@ final class FreshnessTest extends TestCase {
 			$this->project(),
 			$this->filesystem,
 			$this->universe(["/project/src", "/project/tests", "/project/gone"]),
+			$this->declared(),
 		);
 
 		self::assertTrue($freshness->of($this->stored())->usable);
@@ -140,6 +189,7 @@ final class FreshnessTest extends TestCase {
 			$this->project(),
 			$this->filesystem,
 			$this->universe(["/project/src", "/project/tests", "/elsewhere"]),
+			$this->declared(),
 		);
 
 		self::assertTrue($freshness->of($this->stored())->usable);
@@ -166,6 +216,7 @@ final class FreshnessTest extends TestCase {
 			["src/A.php" => hash("sha256", self::SOURCE)],
 			["tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php", "src/B.php"])],
 			["src/B.php" => new Unproven(hash("sha256", "<?php class B {}"), [])],
+			[],
 			["composer.json" => hash("sha256", "{}")],
 		);
 
@@ -181,6 +232,7 @@ final class FreshnessTest extends TestCase {
 				"tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"]),
 				"tests/BTest.php" => new Touched(hash("sha256", "<?php class BTest {}"), ["src/A.php"]),
 			],
+			[],
 			[],
 			["composer.json" => hash("sha256", "{}")],
 		);
@@ -198,6 +250,7 @@ final class FreshnessTest extends TestCase {
 				"tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"]),
 				"tests/Other.php" => new Touched(hash("sha256", "<?php class Other {}"), []),
 			],
+			[],
 			[],
 			["composer.json" => hash("sha256", "{}")],
 		);
@@ -236,7 +289,12 @@ final class FreshnessTest extends TestCase {
 	 * @return Freshness
 	 */
 	private function freshness(): Freshness {
-		return new Freshness($this->project(), $this->filesystem, $this->universe(["/project/src", "/project/tests"]));
+		return new Freshness(
+			$this->project(),
+			$this->filesystem,
+			$this->universe(["/project/src", "/project/tests"]),
+			$this->declared(),
+		);
 	}
 
 	/**
@@ -264,6 +322,7 @@ final class FreshnessTest extends TestCase {
 			["src/A.php" => hash("sha256", self::SOURCE)],
 			["tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"])],
 			[],
+			[],
 			["composer.json" => hash("sha256", "{}")],
 		);
 	}
@@ -282,7 +341,15 @@ final class FreshnessTest extends TestCase {
 			["src/A.php" => hash("sha256", self::SOURCE)],
 			["tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"])],
 			["src/B.php" => new Unproven(hash("sha256", $source), [new Unreached("two", 3, 8, 2)])],
+			[],
 			["composer.json" => hash("sha256", "{}")],
 		);
+	}
+
+	/**
+	 * @return Declared
+	 */
+	private function declared(): Declared {
+		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem);
 	}
 }

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Console;
 
+use Kristos80\Mule\Cache\Declared;
 use Kristos80\Mule\Cache\Freshness;
 use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Store;
@@ -89,12 +90,13 @@ final readonly class Application {
 		$project = Project::containing($directory, $this->filesystem);
 		$configuration = Configuration::load($project, $this->filesystem);
 		$universe = new Universe($project, $this->filesystem, $this->classes);
+		$declared = new Declared($project, $this->filesystem);
 
 		return new Gate(
 			$project,
 			$configuration,
-			new Keying($project, $this->filesystem, $this->classes, $universe),
-			new Freshness($project, $this->filesystem, $universe),
+			new Keying($project, $this->filesystem, $this->classes, $universe, $declared),
+			new Freshness($project, $this->filesystem, $universe, $declared),
 			new Store($project, $this->filesystem, $this->random),
 			new Infection($configuration->binary, $configuration->options),
 			new Scratch($this->filesystem, $this->random),

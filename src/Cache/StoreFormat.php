@@ -26,8 +26,10 @@ final readonly class StoreFormat {
 	 *
 	 * **A store written before `configuration` was a section of its own reads
 	 * as having none**, which is the conservative answer rather than a special
-	 * case: no recorded configuration cannot match the one being measured now,
-	 * so every verdict in it is stale and gets proven again once.
+	 * case: {@see Freshness} compares the recorded configuration against the
+	 * declared files as they are now, and no configuration cannot match a tree
+	 * that has some — so such a store re-proves itself once and is written back
+	 * in the current shape.
 	 *
 	 * @param string $json
 	 * @return Snapshot

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Unit;
 
+use Kristos80\Mule\Cache\Declared;
 use Kristos80\Mule\Cache\Freshness;
 use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Snapshot;
@@ -675,8 +676,8 @@ final class GateTest extends TestCase {
 		return new Gate(
 			$project,
 			Configuration::load($project, $this->filesystem),
-			new Keying($project, $this->filesystem, $classes, $universe),
-			new Freshness($project, $this->filesystem, $universe),
+			new Keying($project, $this->filesystem, $classes, $universe, $this->declared()),
+			new Freshness($project, $this->filesystem, $universe, $this->declared()),
 			new Store($project, $this->filesystem, $random),
 			new Infection("infection"),
 			new Scratch($this->filesystem, $random),
@@ -707,5 +708,12 @@ final class GateTest extends TestCase {
 		);
 
 		return $store->read();
+	}
+
+	/**
+	 * @return Declared
+	 */
+	private function declared(): Declared {
+		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem);
 	}
 }

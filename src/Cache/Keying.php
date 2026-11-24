@@ -16,47 +16,18 @@ use Kristos80\Mule\Project;
 final readonly class Keying {
 
 	/**
-	 * What the project declares, recorded because changing it changes what a
-	 * verdict means.
-	 *
-	 * **These are kept apart from what is merely watched**, and the difference
-	 * is what happens when one moves. A watched file changing means the store
-	 * can no longer describe the tree, so a coverage run settles it; one of
-	 * these changing means every verdict in the store answers a question
-	 * nobody asked any more — see {@see Snapshot::supersedes()}. They are
-	 * committed and byte-identical on every machine, so recording them costs
-	 * nothing a committed store cares about.
-	 *
-	 * **`mule.json` is deliberately not here.** It is the one file whose whole
-	 * purpose is to differ between machines — a coverage driver wrapper on a
-	 * laptop, nothing on CI, which is why CI deletes it — so watching it would
-	 * make the committed store unusable on the very machine it exists to help.
-	 * The cost, which is the right way round: changing the coverage command or
-	 * the engine's options does not invalidate anything, so run `mule full`
-	 * after changing one.
-	 *
-	 *
-	 * @var list<string>
-	 */
-	private const array CONFIGURATION = [
-		"composer.json",
-		"infection.json5",
-		"infection.json",
-		"infection.json5.dist",
-		"infection.json.dist",
-	];
-
-	/**
 	 * @param Project $project
 	 * @param FilesystemInterface $filesystem
 	 * @param ClassesInterface $classes
 	 * @param Universe $universe
+	 * @param Declared $declared
 	 */
 	public function __construct(
 		private Project $project,
 		private FilesystemInterface $filesystem,
 		private ClassesInterface $classes,
 		private Universe $universe,
+		private Declared $declared,
 	) {}
 
 	/**
@@ -105,7 +76,7 @@ final readonly class Keying {
 				$tests,
 				$unproven,
 				$whole ? $this->watched($known) : [],
-				$whole ? $this->digestsOf(self::CONFIGURATION) : [],
+				$whole ? $this->declared->digests() : [],
 			),
 			$gaps,
 		);
@@ -175,29 +146,6 @@ final readonly class Keying {
 		}
 
 		return $watched;
-	}
-
-	/**
-	 * Of the paths named, the digest of each one that is there.
-	 *
-	 * A configuration file that does not exist is recorded as absent rather
-	 * than as empty bytes, because a project may have `infection.json5` or
-	 * `infection.json` and never both — and one appearing is a change in what
-	 * the gate means, which a missing entry turning into a present one says.
-	 *
-	 * @param list<string> $paths
-	 * @return array<string, string>
-	 */
-	private function digestsOf(array $paths): array {
-		$digests = [];
-
-		foreach($paths as $path) {
-			if($this->filesystem->exists($this->project->absolute($path))) {
-				$digests[$path] = $this->filesystem->digest($this->project->absolute($path));
-			}
-		}
-
-		return $digests;
 	}
 
 	/**
