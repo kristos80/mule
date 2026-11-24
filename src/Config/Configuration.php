@@ -30,6 +30,17 @@ final readonly class Configuration {
 
 	public const string JUNIT_PLACEHOLDER = "{junit}";
 
+	/**
+	 * Where the test files a narrowed run needs go, as its own argument.
+	 *
+	 * **Optional, and its absence is the opt-out.** A coverage command without
+	 * it is run whole every time, which is what every project gets until it
+	 * says otherwise — narrowing a test run is sound only where tests do not
+	 * depend on one another, and that is not something mule may assume on a
+	 * project's behalf.
+	 */
+	public const string TESTS_PLACEHOLDER = "{tests}";
+
 	private const string FILE = "mule.json";
 
 	/**
@@ -60,6 +71,21 @@ final readonly class Configuration {
 			$declared->stringOr("binary", self::engineOf($project, $filesystem)),
 			$declared->strings("options"),
 		);
+	}
+
+	/**
+	 * Whether the coverage command can be told to run only some of the tests.
+	 *
+	 * @return bool
+	 */
+	public function narrowable(): bool {
+		foreach($this->coverage as $argument) {
+			if($argument === self::TESTS_PLACEHOLDER) {
+				return TRUE;
+			}
+		}
+
+		return FALSE;
 	}
 
 	/**

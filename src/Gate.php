@@ -6,6 +6,7 @@ namespace Kristos80\Mule;
 use Kristos80\Mule\Cache\Freshness;
 use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Reading;
+use Kristos80\Mule\Cache\Standing;
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Console\Summary;
@@ -66,7 +67,7 @@ final readonly class Gate {
 	 * @return int
 	 */
 	public function full(): int {
-		return $this->gated(FALSE);
+		return $this->gated(FALSE, Standing::unusable());
 	}
 
 	/**
@@ -75,7 +76,9 @@ final readonly class Gate {
 	 * @return int
 	 */
 	public function narrowed(): int {
-		return $this->settled() ?? $this->gated(TRUE);
+		$standing = $this->freshness->of($this->store->read());
+
+		return $this->settled($standing) ?? $this->gated(TRUE, $standing);
 	}
 
 	/**
@@ -96,11 +99,10 @@ final readonly class Gate {
 	 * stored one does not — and generating one to be told so is the cost this
 	 * cache exists to remove.
 	 *
+	 * @param Standing $standing
 	 * @return int|null NULL where the store cannot answer, and the run proceeds.
 	 */
-	private function settled(): ?int {
-		$standing = $this->freshness->of($this->store->read());
-
+	private function settled(Standing $standing): ?int {
 		if(!$standing->isSettled()) {
 			return NULL;
 		}
@@ -139,13 +141,13 @@ final readonly class Gate {
 		$run = $this->scratch->create();
 
 		try {
-			$coverage = $this->cover($run);
+			$coverage = $this->cover($run, NULL);
 
 			if($coverage !== 0) {
 				return $coverage;
 			}
 
-			$this->report($this->keying->of($run->coverageXml()));
+			$this->report($this->keying->of($run->coverageXml()), Standing::unusable());
 
 			return 0;
 		} finally {
@@ -157,20 +159,22 @@ final readonly class Gate {
 	 * Coverage, then the engine over the scope, then the bank.
 	 *
 	 * @param bool $narrowed Whether to mutate only what the store cannot vouch for.
+	 * @param Standing $standing What the store could say before any of this ran.
 	 * @return int
 	 */
-	private function gated(bool $narrowed): int {
+	private function gated(bool $narrowed, Standing $standing): int {
+		$subset = $this->subsetFor($narrowed, $standing);
 		$run = $this->scratch->create();
 
 		try {
-			$coverage = $this->cover($run);
+			$coverage = $this->cover($run, $subset === NULL ? NULL : $standing->tests);
 
 			if($coverage !== 0) {
 				return $coverage;
 			}
 
-			$reading = $this->keying->of($run->coverageXml());
-			$unfinished = $this->report($reading);
+			$reading = $this->keying->of($run->coverageXml(), $subset);
+			$unfinished = $this->report($reading, $standing);
 			$scope = $narrowed ? $unfinished : NULL;
 
 			if($scope === []) {
@@ -199,30 +203,83 @@ final readonly class Gate {
 	 * Generates the coverage report this run works from.
 	 *
 	 * @param Run $run
+	 * @param list<string>|null $tests The test files to run, or NULL for all of them.
 	 * @return int
 	 */
-	private function cover(Run $run): int {
-		$command = array_map(static fn(string $argument): string => str_replace(
-			[Configuration::COVERAGE_PLACEHOLDER, Configuration::JUNIT_PLACEHOLDER],
-			[$run->coverageXml(), $run->junit()],
-			$argument,
-		), $this->configuration->coverage);
+	private function cover(Run $run, ?array $tests): int {
+		return $this->processes->run($this->coverageCommand($run, $tests), $this->project->root);
+	}
 
-		return $this->processes->run($command, $this->project->root);
+	/**
+	 * The coverage command with its placeholders filled in.
+	 *
+	 * **`{tests}` is an argument, and it expands in place** — to the test
+	 * files a narrowed run needs, or to nothing at all on a run that wants the
+	 * whole suite. Expanding to nothing rather than to an empty string matters:
+	 * a runner handed `""` as an argument looks for a test file called nothing.
+	 *
+	 * @param Run $run
+	 * @param list<string>|null $tests
+	 * @return list<string>
+	 */
+	private function coverageCommand(Run $run, ?array $tests): array {
+		$command = [];
+
+		foreach($this->configuration->coverage as $argument) {
+			if($argument !== Configuration::TESTS_PLACEHOLDER) {
+				$command[] = str_replace(
+					[Configuration::COVERAGE_PLACEHOLDER, Configuration::JUNIT_PLACEHOLDER],
+					[$run->coverageXml(), $run->junit()],
+					$argument,
+				);
+
+				continue;
+			}
+
+			foreach($tests ?? [] as $test) {
+				$command[] = $test;
+			}
+		}
+
+		return $command;
+	}
+
+	/**
+	 * The paths a subset run may draw conclusions about, or NULL where the
+	 * whole suite is going to run anyway.
+	 *
+	 * **Three things have to hold.** The run must be narrowed, the store must
+	 * still describe the tree — otherwise there is no trustworthy list of
+	 * tests to ask for — and the coverage command must say where the test
+	 * files go. Any of them missing and the suite runs whole, which is the
+	 * behaviour every project gets until it opts in.
+	 *
+	 * @param bool $narrowed
+	 * @param Standing $standing
+	 * @return list<string>|null
+	 */
+	private function subsetFor(bool $narrowed, Standing $standing): ?array {
+		if(!$narrowed || !$standing->usable || !$this->configuration->narrowable()) {
+			return NULL;
+		}
+
+		return $standing->outstanding();
 	}
 
 	/**
 	 * Says how much of the project the store vouches for, and answers the rest.
 	 *
 	 * @param Reading $reading
+	 * @param Standing $standing
 	 * @return list<string> Everything that still needs the engine: stale, plus never bankable.
 	 */
-	private function report(Reading $reading): array {
+	private function report(Reading $reading, Standing $standing): array {
 		$stale = $reading->snapshot->staleAgainst($this->store->read());
 		$unproven = $reading->unproven();
 		$unfinished = [...$stale, ...$unproven];
+		$total = $standing->usable ? $standing->total : $reading->count();
 
-		$this->announce($reading->count(), count($stale), $reading->gaps);
+		$this->announce($total, count($stale), $reading->gaps);
 
 		sort($unfinished);
 

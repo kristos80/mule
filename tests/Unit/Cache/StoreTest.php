@@ -5,6 +5,7 @@ namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Cache\Snapshot;
+use Kristos80\Mule\Cache\StoreFormat;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\FixedRandom;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
@@ -28,7 +29,7 @@ final class StoreTest extends TestCase {
 	}
 
 	public function testReadsBackWhatWasRecorded(): void {
-		$this->filesystem->given(self::FILE, self::verdicts(["src/A.php"])->toJson());
+		$this->filesystem->given(self::FILE, StoreFormat::write(self::verdicts(["src/A.php"])));
 
 		self::assertSame(["src/A.php"], $this->store()->read()->paths());
 	}
@@ -37,30 +38,30 @@ final class StoreTest extends TestCase {
 		$banked = $this->store()->bank(self::verdicts(["src/A.php", "src/B.php"]), ["src/A.php"]);
 
 		self::assertSame(1, $banked);
-		self::assertSame(self::verdicts(["src/A.php"])->toJson(), $this->filesystem->contentsOf(self::FILE));
+		self::assertSame(StoreFormat::write(self::verdicts(["src/A.php"])), $this->filesystem->contentsOf(self::FILE));
 	}
 
 	public function testRecordsEveryFileOfAWholeProjectRun(): void {
 		$current = self::verdicts(["src/A.php", "src/B.php"]);
 
 		self::assertSame(2, $this->store()->bank($current, $current->paths()));
-		self::assertSame($current->toJson(), $this->filesystem->contentsOf(self::FILE));
+		self::assertSame(StoreFormat::write($current), $this->filesystem->contentsOf(self::FILE));
 	}
 
 	public function testKeepsWhatAnEarlierRunRecordedAboutOtherFiles(): void {
-		$this->filesystem->given(self::FILE, self::verdicts(["src/Old.php"])->toJson());
+		$this->filesystem->given(self::FILE, StoreFormat::write(self::verdicts(["src/Old.php"])));
 
 		$this->store()->bank(self::verdicts(["src/A.php"]), ["src/A.php"]);
 
-		self::assertSame(self::verdicts(["src/A.php", "src/Old.php"])->toJson(), $this->filesystem->contentsOf(self::FILE));
+		self::assertSame(StoreFormat::write(self::verdicts(["src/A.php", "src/Old.php"])), $this->filesystem->contentsOf(self::FILE));
 	}
 
 	public function testWritesOverWhatAnEarlierRunRecordedAboutTheSameFile(): void {
-		$this->filesystem->given(self::FILE, Snapshot::of(["src/A.php" => "old"], [])->toJson());
+		$this->filesystem->given(self::FILE, StoreFormat::write(Snapshot::of(["src/A.php" => "old"], [])));
 
 		$this->store()->bank(self::verdicts(["src/A.php"]), ["src/A.php"]);
 
-		self::assertSame(self::verdicts(["src/A.php"])->toJson(), $this->filesystem->contentsOf(self::FILE));
+		self::assertSame(StoreFormat::write(self::verdicts(["src/A.php"])), $this->filesystem->contentsOf(self::FILE));
 	}
 
 	public function testLeavesNoScratchFileBehind(): void {
@@ -77,7 +78,7 @@ final class StoreTest extends TestCase {
 
 		$this->store()->bank(self::verdicts(["src/A.php"]), ["src/A.php"]);
 
-		self::assertSame(self::verdicts(["src/A.php"])->toJson(), $this->filesystem->contentsOf(self::FILE));
+		self::assertSame(StoreFormat::write(self::verdicts(["src/A.php"])), $this->filesystem->contentsOf(self::FILE));
 	}
 
 	/**
@@ -102,7 +103,7 @@ final class StoreTest extends TestCase {
 	 * @return void
 	 */
 	public function testMergesAndReplacesWhileHoldingIt(): void {
-		$this->filesystem->given(self::FILE, self::verdicts(["src/Old.php"])->toJson());
+		$this->filesystem->given(self::FILE, StoreFormat::write(self::verdicts(["src/Old.php"])));
 
 		$this->store()->bank(self::verdicts(["src/A.php"]), ["src/A.php"]);
 

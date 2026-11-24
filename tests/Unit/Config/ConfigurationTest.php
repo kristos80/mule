@@ -75,6 +75,16 @@ final class ConfigurationTest extends TestCase {
 		self::assertSame("infection", $this->configuration()->binary);
 	}
 
+	public function testCannotNarrowACoverageCommandThatSaysNowhereToPutTheTests(): void {
+		self::assertFalse($this->configuration()->narrowable());
+	}
+
+	public function testCanNarrowACoverageCommandThatSaysWhereTheTestsGo(): void {
+		$this->givenMuleJson('{"coverage": ["./vendor/bin/phpunit", "--coverage-xml={coverage-xml}", "--log-junit={junit}", "{tests}"]}');
+
+		self::assertTrue($this->configuration()->narrowable());
+	}
+
 	public function testRejectsACoverageCommandThatNamesNoCoverageDirectory(): void {
 		$this->givenMuleJson('{"coverage": ["./vendor/bin/phpunit", "--log-junit={junit}"]}');
 

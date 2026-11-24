@@ -63,7 +63,7 @@ final readonly class Store {
 		$file = $this->project->absolute(self::PATH);
 
 		return $this->filesystem->exists($file)
-			? Snapshot::fromJson($this->filesystem->read($file))
+			? StoreFormat::read($this->filesystem->read($file))
 			: Snapshot::of([], []);
 	}
 
@@ -105,7 +105,7 @@ final readonly class Store {
 
 		$scratch = "{$file}.{$this->random->token()}";
 
-		$this->filesystem->write($scratch, $this->read()->merged($banked)->toJson());
+		$this->filesystem->write($scratch, StoreFormat::write($this->read()->merged($banked)));
 		$this->filesystem->rename($scratch, $file);
 
 		return $banked->count();

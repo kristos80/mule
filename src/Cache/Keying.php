@@ -47,19 +47,24 @@ final readonly class Keying {
 	 * What one coverage report says about every file in it: a verdict where
 	 * the tests reach the whole file, and the gap where they do not.
 	 *
+	 * **A report may be partial.** A run that asked the test runner for a
+	 * subset still gets a report naming every source file, most of them with
+	 * no covering test at all — so when `$only` is given, every other path in
+	 * it is ignored rather than read as "nothing covers this now". Nothing is
+	 * watched either: what the whole tree looks like is not something a
+	 * partial report can say.
+	 *
 	 * @param string $coverageXml The report directory.
+	 * @param list<string>|null $only The paths this report is authoritative about.
 	 * @return Reading
 	 */
-	public function of(string $coverageXml): Reading {
+	public function of(string $coverageXml, ?array $only = NULL): Reading {
 		$root = Report::sourceRoot($this->filesystem->read("{$coverageXml}/index.xml"));
 		$verified = [];
 		$gaps = [];
 		$runs = [];
 
-		foreach(Report::reports($this->filesystem->entriesUnder($coverageXml)) as $report) {
-			$file = CoveredFile::of($this->filesystem->read($report), $root, $report);
-			$path = $this->project->relative($file->path);
-
+		foreach($this->filesIn($coverageXml, $root, $only) as $path => $file) {
 			foreach($this->testFilesOf($file) as $test) {
 				$runs[$test][] = $path;
 			}
@@ -76,8 +81,34 @@ final readonly class Keying {
 		$tests = $this->touched($runs);
 		$unproven = $this->unproven($gaps);
 		$known = [...$verified, ...$tests, ...$unproven];
+		$watched = $only === NULL ? $this->watched($known) : [];
 
-		return new Reading(Snapshot::of($verified, $tests, $unproven, $this->watched($known)), $gaps);
+		return new Reading(Snapshot::of($verified, $tests, $unproven, $watched), $gaps);
+	}
+
+	/**
+	 * Every per-file report this run is allowed to draw conclusions from,
+	 * keyed by the source file it is about.
+	 *
+	 * @param string $coverageXml
+	 * @param string $root
+	 * @param list<string>|null $only
+	 * @return array<string, CoveredFile>
+	 */
+	private function filesIn(string $coverageXml, string $root, ?array $only): array {
+		$authoritative = $only === NULL ? NULL : array_flip($only);
+		$files = [];
+
+		foreach(Report::reports($this->filesystem->entriesUnder($coverageXml)) as $report) {
+			$file = CoveredFile::of($this->filesystem->read($report), $root, $report);
+			$path = $this->project->relative($file->path);
+
+			if($authoritative === NULL || isset($authoritative[$path])) {
+				$files[$path] = $file;
+			}
+		}
+
+		return $files;
 	}
 
 	/**

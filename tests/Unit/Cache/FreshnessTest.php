@@ -123,6 +123,69 @@ final class FreshnessTest extends TestCase {
 		self::assertTrue($freshness->of($this->stored())->usable);
 	}
 
+	public function testAsksForNoTestsWhenNothingHasMoved(): void {
+		self::assertSame([], $this->freshness()->of($this->stored())->tests);
+	}
+
+	public function testAsksForTheTestThatChanged(): void {
+		$this->filesystem->given("/project/tests/ATest.php", "<?php class ATest { /* weaker */ }");
+
+		self::assertSame(["tests/ATest.php"], $this->freshness()->of($this->stored())->tests);
+	}
+
+	public function testAsksForTheTestThatRunsAFileThatChanged(): void {
+		$this->filesystem->given("/project/src/A.php", "<?php class A { public function one() {} }");
+
+		self::assertSame(["tests/ATest.php"], $this->freshness()->of($this->stored())->tests);
+	}
+
+	public function testAsksForTheTestThatRunsAFileNothingCouldProve(): void {
+		$stored = Snapshot::of(
+			["src/A.php" => hash("sha256", self::SOURCE)],
+			["tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php", "src/B.php"])],
+			["src/B.php" => new Unproven(hash("sha256", "<?php class B {}"), [])],
+			["composer.json" => hash("sha256", "{}")],
+		);
+
+		$this->filesystem->given("/project/src/B.php", "<?php class B {}");
+
+		self::assertSame(["tests/ATest.php"], $this->freshness()->of($stored)->tests);
+	}
+
+	public function testAsksForEveryTestThatMattersRatherThanTheFirst(): void {
+		$stored = Snapshot::of(
+			["src/A.php" => hash("sha256", self::SOURCE)],
+			[
+				"tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"]),
+				"tests/BTest.php" => new Touched(hash("sha256", "<?php class BTest {}"), ["src/A.php"]),
+			],
+			[],
+			["composer.json" => hash("sha256", "{}")],
+		);
+
+		$this->filesystem->given("/project/tests/BTest.php", "<?php class BTest {}");
+		$this->filesystem->given("/project/src/A.php", "<?php class A { public function one() {} }");
+
+		self::assertSame(["tests/ATest.php", "tests/BTest.php"], $this->freshness()->of($stored)->tests);
+	}
+
+	public function testDoesNotAskForATestThatRunsNothingOfInterest(): void {
+		$stored = Snapshot::of(
+			["src/A.php" => hash("sha256", self::SOURCE)],
+			[
+				"tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"]),
+				"tests/Other.php" => new Touched(hash("sha256", "<?php class Other {}"), []),
+			],
+			[],
+			["composer.json" => hash("sha256", "{}")],
+		);
+
+		$this->filesystem->given("/project/tests/Other.php", "<?php class Other {}");
+		$this->filesystem->given("/project/src/A.php", "<?php class A { public function one() {} }");
+
+		self::assertSame(["tests/ATest.php"], $this->freshness()->of($stored)->tests);
+	}
+
 	public function testCarriesTheRecordedGapsAndCountsThemInTheTotal(): void {
 		$standing = $this->freshness()->of($this->storedWithAGap());
 

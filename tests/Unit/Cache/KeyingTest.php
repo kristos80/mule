@@ -5,6 +5,7 @@ namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Reading;
+use Kristos80\Mule\Cache\StoreFormat;
 use Kristos80\Mule\Cache\Universe;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\CoverageXml;
@@ -222,6 +223,24 @@ final class KeyingTest extends TestCase {
 		self::assertArrayNotHasKey("src/Cache/Key.php", $this->decoded()["watched"]);
 	}
 
+	public function testReadsOnlyThePathsAPartialReportIsAboutAtAll(): void {
+		$this->filesystem->given("/project/src/Project.php", "<?php class Project {}");
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+		$this->givenReport("Project.php", "Project.php", "/", ["Acme\\Tests\\GateTest::testOne"]);
+
+		$reading = $this->reading(["src/Cache/Key.php"]);
+
+		self::assertSame(["src/Cache/Key.php"], $reading->snapshot->paths());
+		self::assertSame(["tests/KeyTest.php"], array_keys($reading->snapshot->tests()));
+	}
+
+	public function testWatchesNothingFromAPartialReport(): void {
+		$this->filesystem->given("/project/src/Excluded.php", "<?php class Excluded {}");
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+
+		self::assertSame([], $this->reading(["src/Cache/Key.php"])->snapshot->watched());
+	}
+
 	public function testRejectsACoveringTestTheAutoloaderCannotPlace(): void {
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Other\\Thing::testOne"]);
 
@@ -259,9 +278,10 @@ final class KeyingTest extends TestCase {
 	}
 
 	/**
+	 * @param list<string>|null $only
 	 * @return Reading
 	 */
-	private function reading(): Reading {
+	private function reading(?array $only = NULL): Reading {
 		$project = Project::containing("/project", $this->filesystem);
 		$classes = new MappedClasses([
 			"Acme\\Tests\\KeyTest" => "/project/tests/KeyTest.php",
@@ -269,7 +289,7 @@ final class KeyingTest extends TestCase {
 		], ["/project/src", "/project/tests"]);
 		$universe = new Universe($project, $this->filesystem, $classes);
 
-		return (new Keying($project, $this->filesystem, $classes, $universe))->of("/run/coverage-xml");
+		return (new Keying($project, $this->filesystem, $classes, $universe))->of("/run/coverage-xml", $only);
 	}
 
 	/**
@@ -279,7 +299,7 @@ final class KeyingTest extends TestCase {
 	 * @return array{verified: array<mixed>, tests: array<mixed>, unproven: array<mixed>, watched: array<mixed>}
 	 */
 	private function decoded(): array {
-		$decoded = json_decode($this->reading()->snapshot->toJson(), TRUE);
+		$decoded = json_decode(StoreFormat::write($this->reading()->snapshot), TRUE);
 
 		self::assertIsArray($decoded);
 		self::assertIsArray($decoded["verified"]);

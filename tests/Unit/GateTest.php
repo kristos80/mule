@@ -241,6 +241,119 @@ final class GateTest extends TestCase {
 		self::assertStringContainsString("mule: 1 file(s) recorded at the full score", $this->output->text());
 	}
 
+	public function testAsksTheRunnerForOnlyTheTestsThatCouldMatter(): void {
+		$this->givenTheCoverageCommandSaysWhereTestsGo();
+		$this->gate()->full();
+		$this->filesystem->given("/project/src/Key.php", "<?php class Key { public function one() {} }");
+
+		$this->gate()->narrowed();
+
+		self::assertSame([
+			"./vendor/bin/phpunit",
+			"--coverage-xml=" . self::RUN . "/coverage-xml",
+			"--log-junit=" . self::RUN . "/junit.xml",
+			"tests/KeyTest.php",
+		], $this->processes->command(2));
+	}
+
+	public function testExpandsTheTestsPlaceholderToNothingWhenTheWholeSuiteRuns(): void {
+		$this->givenTheCoverageCommandSaysWhereTestsGo();
+
+		$this->gate()->full();
+
+		self::assertSame([
+			"./vendor/bin/phpunit",
+			"--coverage-xml=" . self::RUN . "/coverage-xml",
+			"--log-junit=" . self::RUN . "/junit.xml",
+		], $this->processes->command(0));
+		self::assertSame(["src/Gate.php", "src/Key.php"], $this->stored(), "a whole run still reads the whole report.");
+	}
+
+	public function testAsksForTheTestsOfEverythingOutstanding(): void {
+		$this->givenTheCoverageCommandSaysWhereTestsGo();
+		$this->givenKeyIsHalfCovered();
+		$this->gate()->full();
+		$this->filesystem->given("/project/src/Gate.php", "<?php class Gate { public function run() {} }");
+
+		$this->gate()->narrowed();
+
+		// Gate.php changed; Key.php was never provable. Both need the engine,
+		// so both their tests have to run again.
+		self::assertSame([
+			"./vendor/bin/phpunit",
+			"--coverage-xml=" . self::RUN . "/coverage-xml",
+			"--log-junit=" . self::RUN . "/junit.xml",
+			"tests/GateTest.php",
+			"tests/KeyTest.php",
+		], $this->processes->command(2));
+		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->processes->command(3)[5] ?? "");
+	}
+
+	/**
+	 * The hazard a partial report carries: it still names every source file,
+	 * and the ones whose tests were not asked for come back looking as though
+	 * nothing covers them. Read whole, that would overwrite a good verdict
+	 * with a wrong one.
+	 *
+	 * @return void
+	 */
+	public function testIgnoresWhatAPartialReportSaysAboutFilesItDidNotAskAbout(): void {
+		$this->givenTheCoverageCommandSaysWhereTestsGo();
+		$this->gate()->full();
+		$this->filesystem->given("/project/src/Key.php", "<?php class Key { public function one() {} }");
+		// What a subset report really looks like: Gate.php is still in it, with
+		// its lines still executable and none of them executed, because the
+		// test that runs it was not asked for.
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => [],
+		], "/project/src", [], [
+			"Gate.php" => [
+				"executable" => 3,
+				"executed" => 0,
+				"methods" => [["name" => "run", "start" => 5, "end" => 11, "executable" => 3, "executed" => 0]],
+			],
+		]);
+
+		$this->gate()->narrowed();
+
+		self::assertSame(["src/Gate.php", "src/Key.php"], $this->stored());
+		self::assertStringNotContainsString("not covered in full", $this->output->text());
+		self::assertStringContainsString("mule: 1 of 2 files verified, 1 stale.", $this->output->text());
+		self::assertStringContainsString("mule: 1 file(s) recorded at the full score", $this->output->text());
+	}
+
+	public function testRunsTheWholeSuiteWhenTheStoreCannotSayWhichTestsMatter(): void {
+		$this->givenTheCoverageCommandSaysWhereTestsGo();
+		$this->gate()->full();
+		$this->filesystem->given("/project/src/New.php", "<?php class New_ {}");
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+			"New.php" => ["Acme\\Tests\\GateTest::testTwo"],
+		]);
+
+		$this->gate()->narrowed();
+
+		self::assertSame([
+			"./vendor/bin/phpunit",
+			"--coverage-xml=" . self::RUN . "/coverage-xml",
+			"--log-junit=" . self::RUN . "/junit.xml",
+		], $this->processes->command(0), "a store that cannot describe the tree cannot name the tests either.");
+		self::assertContains("src/New.php", $this->stored(), "and it has to read the whole report back.");
+	}
+
+	public function testNarrowsToEveryStaleFileRatherThanTheFirst(): void {
+		$this->givenTheCoverageCommandSaysWhereTestsGo();
+		$this->gate()->full();
+		$this->filesystem->given("/project/src/Key.php", "<?php class Key { public function one() {} }");
+		$this->filesystem->given("/project/src/Gate.php", "<?php class Gate { public function run() {} }");
+
+		$this->gate()->narrowed();
+
+		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->processes->command(3)[5] ?? "");
+	}
+
 	public function testGivesUpWhenCoverageFailsAndBanksNothing(): void {
 		$this->processes = new CoveringProcesses($this->filesystem, [], "/project/src", [2]);
 
@@ -306,6 +419,17 @@ final class GateTest extends TestCase {
 		$this->gate()->full();
 
 		self::assertFalse($this->filesystem->exists(self::RUN));
+	}
+
+	/**
+	 * Opts the project into narrowed coverage runs.
+	 *
+	 * @return void
+	 */
+	private function givenTheCoverageCommandSaysWhereTestsGo(): void {
+		$this->filesystem->given("/project/mule.json", json_encode([
+			"coverage" => ["./vendor/bin/phpunit", "--coverage-xml={coverage-xml}", "--log-junit={junit}", "{tests}"],
+		], JSON_THROW_ON_ERROR));
 	}
 
 	/**

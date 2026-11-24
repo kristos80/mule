@@ -39,42 +39,71 @@ final readonly class Freshness {
 	 * @return Standing
 	 */
 	public function of(Snapshot $stored): Standing {
-		if(!$this->describes($stored)) {
+		$recorded = $stored->digests();
+		$now = $this->digestsOf($recorded);
+
+		if($now === NULL || !$this->describes($stored, $recorded, $now)) {
 			return Standing::unusable();
 		}
 
 		$gaps = $stored->gaps();
+		$stale = $this->asSeenNow($stored, $now)->staleAgainst($stored);
+		$outstanding = array_flip([...$stale, ...array_keys($gaps)]);
 
 		return Standing::of(
-			$this->asSeenNow($stored)->staleAgainst($stored),
+			$stale,
 			$gaps,
 			$stored->count() + count($gaps),
+			$this->testsRunning($stored, $outstanding),
 		);
+	}
+
+	/**
+	 * Every recorded file as it hashes now, or NULL where one has gone.
+	 *
+	 * **Hashed once, here.** Everything below is derived from this map rather
+	 * than re-reading the tree, which is the difference between one pass over
+	 * a thousand files and three.
+	 *
+	 * @param array<string, string> $recorded
+	 * @return array<string, string>|null
+	 */
+	private function digestsOf(array $recorded): ?array {
+		$now = [];
+
+		foreach($recorded as $path => $digest) {
+			if(!$this->filesystem->exists($this->project->absolute($path))) {
+				return NULL;
+			}
+
+			$now[$path] = $this->digestOf($path);
+		}
+
+		return $now === [] ? NULL : $now;
 	}
 
 	/**
 	 * Whether the store is about this tree at all.
 	 *
 	 * @param Snapshot $stored
+	 * @param array<string, string> $recorded
+	 * @param array<string, string> $now
 	 * @return bool
 	 */
-	private function describes(Snapshot $stored): bool {
-		$digests = $stored->digests();
-
-		return $digests !== []
-			&& $this->allPresent($digests)
-			&& $this->unchanged($stored->watched())
-			&& $this->unchanged($stored->unprovenDigests())
-			&& $this->nothingNew($digests);
+	private function describes(Snapshot $stored, array $recorded, array $now): bool {
+		return $this->same($stored->watched(), $now)
+			&& $this->same($stored->unprovenDigests(), $now)
+			&& $this->nothingNew($recorded);
 	}
 
 	/**
 	 * @param array<string, string> $digests
+	 * @param array<string, string> $now
 	 * @return bool
 	 */
-	private function allPresent(array $digests): bool {
+	private function same(array $digests, array $now): bool {
 		foreach($digests as $path => $digest) {
-			if(!$this->filesystem->exists($this->project->absolute($path))) {
+			if($now[$path] !== $digest) {
 				return FALSE;
 			}
 		}
@@ -83,19 +112,35 @@ final readonly class Freshness {
 	}
 
 	/**
-	 * Whether every one of these files still hashes to what was recorded.
+	 * The tests a run would have to execute again: every test that runs
+	 * anything still outstanding.
 	 *
-	 * @param array<string, string> $digests
-	 * @return bool
+	 * **Every one of them, not just the ones that changed.** A file is being
+	 * re-keyed, and its key is what the report says covers it — so a run that
+	 * executed only some of its tests would come back saying the rest of it is
+	 * unreached, and record a file as half-covered that is nothing of the kind.
+	 *
+	 * **The set is closed.** A test that runs nothing outstanding cannot have
+	 * a different footprint either: for it to have changed, something it runs
+	 * would have had to change, which would have made that file outstanding.
+	 *
+	 * They come out in path order because a snapshot holds them in path order;
+	 * there is nothing here to sort.
+	 *
+	 * @param Snapshot $stored
+	 * @param array<string, int> $outstanding
+	 * @return list<string>
 	 */
-	private function unchanged(array $digests): bool {
-		foreach($digests as $path => $digest) {
-			if($this->digestOf($path) !== $digest) {
-				return FALSE;
+	private function testsRunning(Snapshot $stored, array $outstanding): array {
+		$tests = [];
+
+		foreach($stored->tests() as $path => $test) {
+			if($test->runsAnyOf($outstanding)) {
+				$tests[] = $path;
 			}
 		}
 
-		return TRUE;
+		return $tests;
 	}
 
 	/**
@@ -123,18 +168,19 @@ final readonly class Freshness {
 	 * nothing it could run has.
 	 *
 	 * @param Snapshot $stored
+	 * @param array<string, string> $now
 	 * @return Snapshot
 	 */
-	private function asSeenNow(Snapshot $stored): Snapshot {
+	private function asSeenNow(Snapshot $stored, array $now): Snapshot {
 		$verified = [];
 		$tests = [];
 
 		foreach($stored->paths() as $path) {
-			$verified[$path] = $this->digestOf($path);
+			$verified[$path] = $now[$path];
 		}
 
 		foreach($stored->tests() as $path => $test) {
-			$tests[$path] = new Touched($this->digestOf($path), $test->touches);
+			$tests[$path] = new Touched($now[$path], $test->touches);
 		}
 
 		return Snapshot::of($verified, $tests);

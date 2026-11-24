@@ -21,12 +21,14 @@ final readonly class Standing {
 	 * @param list<string> $stale What it proved and can no longer vouch for.
 	 * @param array<string, list<Unreached>> $gaps Where the tests were last seen to stop.
 	 * @param int $total Every file it knows about, proven or not.
+	 * @param list<string> $tests The test files a run would have to execute again.
 	 */
 	private function __construct(
 		public bool $usable,
 		public array $stale,
 		public array $gaps,
 		public int $total,
+		public array $tests,
 	) {}
 
 	/**
@@ -35,17 +37,28 @@ final readonly class Standing {
 	 * @return self
 	 */
 	public static function unusable(): self {
-		return new self(FALSE, [], [], 0);
+		return new self(FALSE, [], [], 0, []);
 	}
 
 	/**
 	 * @param list<string> $stale
 	 * @param array<string, list<Unreached>> $gaps
 	 * @param int $total
+	 * @param list<string> $tests
 	 * @return self
 	 */
-	public static function of(array $stale, array $gaps, int $total): self {
-		return new self(TRUE, $stale, $gaps, $total);
+	public static function of(array $stale, array $gaps, int $total, array $tests = []): self {
+		return new self(TRUE, $stale, $gaps, $total, $tests);
+	}
+
+	/**
+	 * Everything still needing the engine: what cannot be vouched for, and
+	 * what could never be banked.
+	 *
+	 * @return list<string>
+	 */
+	public function outstanding(): array {
+		return [...$this->stale, ...array_keys($this->gaps)];
 	}
 
 	/**

@@ -156,8 +156,30 @@ with nothing changed is **0.05 s against the 2.4 s** its coverage run costs, and
 the gap grows with the suite.
 
 Anything else — a file edited, a file appearing, a file the tests do not reach
-all of — and coverage runs as before, because deciding *what* is stale is one
-question and proving the rest is another. Mule refuses the shortcut whenever
+all of — and coverage runs, because deciding *what* is stale is one question
+and proving the rest is another. **It can run over fewer tests, if you say
+where they go:**
+
+```json
+{
+	"coverage": ["./vendor/bin/phpunit", "--coverage-xml={coverage-xml}", "--log-junit={junit}", "{tests}"]
+}
+```
+
+`{tests}` is its own argument and expands in place to every test that runs
+something still outstanding — every one of them, because a file is only as
+covered as the report says, and a run that executed some of its tests would
+report the rest of it as unreached. Leave the placeholder out and the suite
+runs whole, which is what every project gets until it opts in: narrowing a test
+run is sound only where tests do not depend on each other having run, and that
+is not something mule may assume on your behalf.
+
+**How much it buys depends entirely on how broad your tests are**, and this
+package is the wrong advertisement for it: editing one file here leaves 23 of
+30 files outstanding, so nearly every test runs anyway and the subset is the
+whole suite. A repository of narrow unit tests — hermes-2 averages 4.8 source
+files per test — narrows to a handful. Same mechanism, opposite result, and the
+difference is the test suite rather than the cache. Mule refuses the shortcut whenever
 the store no longer describes the tree in front of it: a recorded file missing,
 a file nobody recorded appearing, or one of the files it watches rather than
 proves having moved.

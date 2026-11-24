@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Snapshot;
+use Kristos80\Mule\Cache\StoreFormat;
 use Kristos80\Mule\Cache\Touched;
 use Kristos80\Mule\Cache\Unproven;
 use Kristos80\Mule\Coverage\Unreached;
@@ -119,7 +120,7 @@ final class SnapshotTest extends TestCase {
 		$merged = self::snapshot(["src/A.php" => "old", "src/B.php" => "bb"])
 			->merged(self::snapshot(["src/A.php" => "new"]));
 
-		self::assertStringContainsString('"src/A.php": {"digest":"new"}', $merged->toJson());
+		self::assertStringContainsString('"src/A.php": {"digest":"new"}', StoreFormat::write($merged));
 		self::assertSame(["src/A.php", "src/B.php"], $merged->paths());
 	}
 
@@ -127,8 +128,40 @@ final class SnapshotTest extends TestCase {
 		$mine = Snapshot::of([], ["tests/ATest.php" => new Touched("tt", ["src/A.php"])]);
 		$merged = $mine->merged(Snapshot::of([], ["tests/BTest.php" => new Touched("uu", ["src/B.php"])]));
 
-		self::assertStringContainsString("tests/ATest.php", $merged->toJson());
-		self::assertStringContainsString("tests/BTest.php", $merged->toJson());
+		self::assertStringContainsString("tests/ATest.php", StoreFormat::write($merged));
+		self::assertStringContainsString("tests/BTest.php", StoreFormat::write($merged));
+	}
+
+	public function testKeepsWhatTheOtherSnapshotNeverMeasured(): void {
+		$stored = Snapshot::of(
+			["src/A.php" => "aa"],
+			[],
+			["src/B.php" => new Unproven("bb", [])],
+			["composer.json" => "cc"],
+		);
+
+		$merged = $stored->merged(Snapshot::of(["src/A.php" => "new"], []));
+
+		self::assertSame(["src/B.php"], array_keys($merged->gaps()));
+		self::assertSame(["composer.json"], array_keys($merged->watched()));
+	}
+
+	public function testAFileTheNewerSnapshotProvedStopsBeingUnproven(): void {
+		$stored = Snapshot::of([], [], ["src/B.php" => new Unproven("bb", [])], []);
+
+		$merged = $stored->merged(Snapshot::of(["src/B.php" => "bb"], []));
+
+		self::assertSame(["src/B.php"], $merged->paths());
+		self::assertSame([], $merged->gaps());
+	}
+
+	public function testAFileTheNewerSnapshotCouldNotProveStopsBeingVerified(): void {
+		$stored = Snapshot::of(["src/A.php" => "aa"], []);
+
+		$merged = $stored->merged(Snapshot::of([], [], ["src/A.php" => new Unproven("aa", [])], []));
+
+		self::assertSame([], $merged->paths());
+		self::assertSame(["src/A.php"], array_keys($merged->gaps()));
 	}
 
 	public function testNarrowsToTheNamedFilesAndTheTestsThatRunThem(): void {
@@ -140,8 +173,24 @@ final class SnapshotTest extends TestCase {
 		$only = $snapshot->only(["src/A.php"]);
 
 		self::assertSame(["src/A.php"], $only->paths());
-		self::assertStringContainsString("tests/ATest.php", $only->toJson());
-		self::assertStringNotContainsString("tests/BTest.php", $only->toJson());
+		self::assertStringContainsString("tests/ATest.php", StoreFormat::write($only));
+		self::assertStringNotContainsString("tests/BTest.php", StoreFormat::write($only));
+	}
+
+	public function testNarrowingKeepsTheTestsOfTheFilesItCouldNotProve(): void {
+		$snapshot = Snapshot::of(
+			["src/A.php" => "aa"],
+			[
+				"tests/ATest.php" => new Touched("tt", ["src/A.php"]),
+				"tests/BTest.php" => new Touched("uu", ["src/B.php"]),
+			],
+			["src/B.php" => new Unproven("bb", [])],
+			[],
+		);
+
+		$only = $snapshot->only(["src/A.php"]);
+
+		self::assertSame(["tests/ATest.php", "tests/BTest.php"], array_keys($only->tests()));
 	}
 
 	public function testRejectsNarrowingToAPathItDoesNotHold(): void {
@@ -149,24 +198,6 @@ final class SnapshotTest extends TestCase {
 		$this->expectExceptionMessage("src/Gone.php is not in this run's verdicts, so mule cannot bank it.");
 
 		self::snapshot(["src/A.php" => "aa"])->only(["src/Gone.php"]);
-	}
-
-	public function testWritesItselfSortedOneEntryPerLine(): void {
-		$snapshot = Snapshot::of(["src/B.php" => "bb", "src/A.php" => "aa"], [
-			"tests/BTest.php" => new Touched("uu", ["src/B.php"]),
-			"tests/ATest.php" => new Touched("tt", ["src/A.php"]),
-		]);
-
-		self::assertSame(
-			"{\n\t\"verified\": {\n"
-			. "\t\t\"src/A.php\": {\"digest\":\"aa\"},\n"
-			. "\t\t\"src/B.php\": {\"digest\":\"bb\"}\n"
-			. "\t},\n\t\"unproven\": {},\n\t\"tests\": {\n"
-			. "\t\t\"tests/ATest.php\": {\"source\":\"tt\",\"touches\":[\"src/A.php\"]},\n"
-			. "\t\t\"tests/BTest.php\": {\"source\":\"uu\",\"touches\":[\"src/B.php\"]}\n"
-			. "\t},\n\t\"watched\": {}\n}\n",
-			$snapshot->toJson(),
-		);
 	}
 
 	/**
@@ -185,31 +216,6 @@ final class SnapshotTest extends TestCase {
 		self::assertSame(["src/A.php", "src/B.php"], $current->staleAgainst($stored));
 	}
 
-	public function testWritesAnEmptySnapshotAsEmptySections(): void {
-		self::assertSame(
-			"{\n\t\"verified\": {},\n\t\"unproven\": {},\n\t\"tests\": {},\n\t\"watched\": {}\n}\n",
-			Snapshot::of([], [])->toJson(),
-		);
-	}
-
-	public function testWritesWhatItWatchesAndWhereTheTestsStop(): void {
-		$snapshot = Snapshot::of(
-			[],
-			[],
-			["src/B.php" => new Unproven("bb", [new Unreached("one", 4, 9, 2)])],
-			["composer.json" => "cc"],
-		);
-
-		self::assertSame(
-			"{\n\t\"verified\": {},\n\t\"unproven\": {\n"
-			. "\t\t\"src/B.php\": {\"digest\":\"bb\",\"unreached\":[{\"name\":\"one\",\"from\":4,\"to\":9,\"lines\":2}]}\n"
-			. "\t},\n\t\"tests\": {},\n\t\"watched\": {\n"
-			. "\t\t\"composer.json\": {\"digest\":\"cc\"}\n"
-			. "\t}\n}\n",
-			$snapshot->toJson(),
-		);
-	}
-
 	public function testSortsTheGapsAndTheWatchedFilesTooWhateverOrderTheyArrivedIn(): void {
 		$snapshot = Snapshot::of([], [], [
 			"src/Z.php" => new Unproven("zz", [new Unreached("two", 1, 2, 1)]),
@@ -223,61 +229,6 @@ final class SnapshotTest extends TestCase {
 			["composer.json" => "cc", "mule.json" => "mm", "src/A.php" => "aa", "src/Z.php" => "zz"],
 			$snapshot->digests(),
 		);
-	}
-
-	public function testReadsBackEveryGapRatherThanTheFirst(): void {
-		$snapshot = Snapshot::of([], [], [
-			"src/A.php" => new Unproven("aa", [new Unreached("one", 3, 4, 1)]),
-			"src/Z.php" => new Unproven("zz", [new Unreached("two", 1, 2, 1)]),
-		], []);
-
-		self::assertSame(["src/A.php", "src/Z.php"], array_keys(Snapshot::fromJson($snapshot->toJson())->gaps()));
-	}
-
-	public function testReadsBackTheGapsAndTheWatchedFiles(): void {
-		$snapshot = Snapshot::of(
-			["src/A.php" => "aa"],
-			[],
-			["src/B.php" => new Unproven("bb", [new Unreached("one", 4, 9, 2)])],
-			["composer.json" => "cc"],
-		);
-
-		$read = Snapshot::fromJson($snapshot->toJson());
-
-		self::assertSame($snapshot->toJson(), $read->toJson());
-		self::assertSame("one() lines 4-9, 2 unreached", $read->gaps()["src/B.php"][0]->described());
-		self::assertSame(
-			["composer.json" => "cc", "src/A.php" => "aa", "src/B.php" => "bb"],
-			$read->digests(),
-		);
-	}
-
-	public function testReadsBackWhatItWrote(): void {
-		$snapshot = Snapshot::of(["src/B.php" => "bb", "src/A.php" => "aa"], [
-			"tests/ATest.php" => new Touched("tt", ["src/A.php", "src/B.php"]),
-		]);
-
-		self::assertSame($snapshot->toJson(), Snapshot::fromJson($snapshot->toJson())->toJson());
-	}
-
-	public function testReadsAStoreWrittenBeforeTheseSectionsExistedAsEmpty(): void {
-		$old = '{"src/A.php": {"source": "aa", "tests": "tt"}}';
-
-		self::assertSame(0, Snapshot::fromJson($old)->count());
-	}
-
-	public function testRejectsAStoreEntryMissingItsDigest(): void {
-		$this->expectException(RuntimeException::class);
-		$this->expectExceptionMessage("The digest in the mule store verified entry for src/A.php must be a non-empty string.");
-
-		Snapshot::fromJson('{"verified": {"src/A.php": {}}}');
-	}
-
-	public function testRejectsASectionThatIsNotAnObject(): void {
-		$this->expectException(RuntimeException::class);
-		$this->expectExceptionMessage("The verified in the mule store must be an object.");
-
-		Snapshot::fromJson('{"verified": "src/A.php"}');
 	}
 
 	/**

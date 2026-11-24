@@ -240,6 +240,37 @@ status is still 1 either way: what changed is what the human reads. And because
 `Failure` *is* a `RuntimeException`, every existing test that expected one kept
 passing untouched.
 
+## A coverage run can be narrowed, and the rule for it took two goes
+
+`{tests}` in the coverage command expands in place to the tests a run needs.
+Its absence is the opt-out, because narrowing a test run assumes tests do not
+depend on one another having run, which is not mule's assumption to make.
+
+**The first rule was wrong, and dogfooding caught it.** It asked for every test
+that ran something *changed* — and the run came back reporting ten files as not
+covered in full. A file being re-keyed is only as covered as the report says
+covers it, so running some of its tests makes the rest of it look unreached.
+The rule is every test that runs anything **outstanding**: stale or unproven,
+the same set the engine is about to mutate. The closure argument still holds —
+a test that runs nothing outstanding cannot have changed its own footprint,
+because for it to have changed, something it runs would have had to change,
+which would have made that file outstanding.
+
+**A partial report still names every file in the project**, most with no
+covering test, which is how it says "I did not run those". Reading it whole
+would record them as uncovered and quietly destroy good verdicts, so `Keying`
+takes the list of paths a report is authoritative about and ignores the rest —
+and watches nothing, since what the whole tree looks like is not something a
+partial report can say. A canary proved the test for this: the first version
+passed with the partiality removed, because its fixture made the untouched file
+look trivially covered rather than uncovered.
+
+**It buys nothing on this repository.** Editing one file leaves 23 of 30 files
+outstanding — the broad in-memory tests here touch sixteen source files apiece
+— so the subset is the whole suite. The mechanism is for repositories whose
+tests are narrow; kept in `mule.json` here as dogfooding rather than as a
+speed-up.
+
 ## Staleness is answered by hashing, and coverage only runs when it must
 
 Deciding what is stale used to require generating a coverage report, which

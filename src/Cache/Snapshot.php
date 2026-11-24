@@ -3,9 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Cache;
 
-use Kristos80\Mule\Coverage\Unreached;
 use Kristos80\Mule\Failure;
-use Kristos80\Mule\Json\Decoded;
 
 /**
  * What a run saw: a digest for every source file it proved, and for every test
@@ -76,6 +74,24 @@ final readonly class Snapshot {
 	}
 
 	/**
+	 * Each proven file and the digest it was proven against.
+	 *
+	 * @return array<string, string>
+	 */
+	public function verified(): array {
+		return $this->verified;
+	}
+
+	/**
+	 * Each file the tests do not reach all of, as it was measured.
+	 *
+	 * @return array<string, Unproven>
+	 */
+	public function unproven(): array {
+		return $this->unproven;
+	}
+
+	/**
 	 * The files the tests do not reach all of, and where they stop.
 	 *
 	 * @return array<string, list<\Kristos80\Mule\Coverage\Unreached>>
@@ -122,64 +138,6 @@ final readonly class Snapshot {
 	 */
 	public function tests(): array {
 		return $this->tests;
-	}
-
-	/**
-	 * A snapshot read back from the store.
-	 *
-	 * A store written by an older mule has neither section and reads as empty,
-	 * so the next run proves everything once rather than refusing to start.
-	 * Bytes that are not a JSON object at all still stop the run.
-	 *
-	 * @param string $json
-	 * @return self
-	 */
-	public static function fromJson(string $json): self {
-		$store = Decoded::of($json, "the mule store");
-		$verified = [];
-		$tests = [];
-		$watched = [];
-
-		foreach($store->object("verified")->entries() as $path => $entry) {
-			$verified[$path] = $entry->string("digest");
-		}
-
-		foreach($store->object("tests")->entries() as $path => $entry) {
-			$tests[$path] = new Touched($entry->string("source"), $entry->strings("touches"));
-		}
-
-		foreach($store->object("watched")->entries() as $path => $entry) {
-			$watched[$path] = $entry->string("digest");
-		}
-
-		return self::of($verified, $tests, self::unprovenIn($store), $watched);
-	}
-
-	/**
-	 * The unproven section, read back.
-	 *
-	 * @param Decoded $store
-	 * @return array<string, Unproven>
-	 */
-	private static function unprovenIn(Decoded $store): array {
-		$unproven = [];
-
-		foreach($store->object("unproven")->entries() as $path => $entry) {
-			$unreached = [];
-
-			foreach($entry->objects("unreached") as $gap) {
-				$unreached[] = new Unreached(
-					$gap->string("name"),
-					$gap->number("from"),
-					$gap->number("to"),
-					$gap->number("lines"),
-				);
-			}
-
-			$unproven[$path] = new Unproven($entry->string("digest"), $unreached);
-		}
-
-		return $unproven;
 	}
 
 	/**
@@ -242,23 +200,47 @@ final readonly class Snapshot {
 	}
 
 	/**
-	 * This snapshot with another's entries written over it.
+	 * This snapshot with another's entries written over it, section by
+	 * section.
+	 *
+	 * **Written over, never replaced.** A run that re-measured only part of
+	 * the project knows nothing about the rest, so its empty sections must not
+	 * erase what an earlier run recorded. What it does know wins: a file it
+	 * proved stops being unproven, and a file it could not prove stops being
+	 * verified, because a path belongs to exactly one of the two and the
+	 * newer answer is the true one.
 	 *
 	 * @param self $other
 	 * @return self
 	 */
 	public function merged(self $other): self {
+		$verified = [...$this->verified, ...$other->verified];
+		$unproven = [...$this->unproven, ...$other->unproven];
+
+		foreach($other->verified as $path => $digest) {
+			unset($unproven[$path]);
+		}
+
+		foreach($other->unproven as $path => $entry) {
+			unset($verified[$path]);
+		}
+
 		return self::of(
-			[...$this->verified, ...$other->verified],
+			$verified,
 			[...$this->tests, ...$other->tests],
-			$other->unproven,
-			$other->watched,
+			$unproven,
+			[...$this->watched, ...$other->watched],
 		);
 	}
 
 	/**
-	 * Just the named files, and every test that runs one of them, which is
-	 * what a narrowed run banks.
+	 * Just the named files, plus everything that was observed rather than
+	 * proven: the gaps, what is watched, and every test that runs any of it.
+	 *
+	 * **The tests of an unproven file are kept too.** A file nothing could
+	 * prove is still carried forward, and dropping the test that runs it would
+	 * leave the store describing a tree it has a hole in — which the next run
+	 * reads as "a file I have never heard of" and refuses to answer from.
 	 *
 	 * @param list<string> $paths
 	 * @return self
@@ -273,42 +255,11 @@ final readonly class Snapshot {
 			$wanted[] = $path;
 		}
 
-		return self::of($verified, $this->testsRunning(array_flip($wanted)), $this->unproven, $this->watched);
-	}
-
-	/**
-	 * The snapshot as it is written: sorted, one entry per line, so that a
-	 * rebase conflict in a committed store is mechanical to resolve.
-	 *
-	 * @return string
-	 */
-	public function toJson(): string {
-		$verified = [];
-		$tests = [];
-		$unproven = [];
-		$watched = [];
-
-		foreach($this->verified as $path => $digest) {
-			$verified[] = "\t\t" . self::encoded($path) . ": " . self::encoded(["digest" => $digest]);
-		}
-
-		foreach($this->tests as $path => $test) {
-			$tests[] = "\t\t" . self::encoded($path) . ": "
-				. self::encoded(["source" => $test->source, "touches" => $test->touches]);
-		}
-
 		foreach($this->unproven as $path => $entry) {
-			$unproven[] = "\t\t" . self::encoded($path) . ": " . self::encoded($entry->toArray());
+			$wanted[] = $path;
 		}
 
-		foreach($this->watched as $path => $digest) {
-			$watched[] = "\t\t" . self::encoded($path) . ": " . self::encoded(["digest" => $digest]);
-		}
-
-		return "{\n\t\"verified\": {" . self::block($verified)
-			. "},\n\t\"unproven\": {" . self::block($unproven)
-			. "},\n\t\"tests\": {" . self::block($tests)
-			. "},\n\t\"watched\": {" . self::block($watched) . "}\n}\n";
+		return self::of($verified, $this->testsRunning(array_flip($wanted)), $this->unproven, $this->watched);
 	}
 
 	/**
@@ -390,27 +341,5 @@ final readonly class Snapshot {
 		}
 
 		return $running;
-	}
-
-	/**
-	 * One section's lines, or nothing between the braces where it has none.
-	 *
-	 * @param list<string> $lines
-	 * @return string
-	 */
-	private static function block(array $lines): string {
-		return $lines === [] ? "" : "\n" . implode(",\n", $lines) . "\n\t";
-	}
-
-	/**
-	 * One value as the store spells it: slashes as they were written, because
-	 * a store full of `src\/Cache` is for a machine to read and this one is for
-	 * a person resolving a conflict in it.
-	 *
-	 * @param string|array<string, mixed> $value
-	 * @return string
-	 */
-	private static function encoded(string|array $value): string {
-		return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
 	}
 }
