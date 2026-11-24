@@ -59,13 +59,23 @@ final readonly class Freshness {
 	}
 
 	/**
-	 * Of the paths given, those whose bytes are still what the snapshot says.
+	 * Of the paths given, those whose verdict still rests on the bytes it was
+	 * proven against — the file's own, **and those of every test that runs it**.
 	 *
 	 * **Asked after the engine has run, not before.** A gate keys the tree,
-	 * then spends minutes mutating it; a file edited in between was proven as
-	 * one thing and would be recorded as another. Re-reading the handful of
-	 * files about to be banked turns that from a wrong verdict into a skipped
-	 * one.
+	 * then spends minutes mutating it, and the engine reads each file as it
+	 * goes: edit one in between and the verdict belongs to neither version.
+	 *
+	 * **What that costs is narrow and worth naming.** Banking it anyway would
+	 * record the digest the *snapshot* holds, which is the old one — so the
+	 * next run sees the file has moved and re-proves it, and the wrong verdict
+	 * never gets used. The exception is an edit that is later undone: the bytes
+	 * come back, the store still vouches for them, and the proof was against
+	 * something else entirely. That is the hole this closes, and it is the
+	 * reason the check cannot stop at the source file. A test weakened while
+	 * the engine ran, then reverted, leaves exactly the same false verdict by
+	 * the other route — the mutants died against the weakened test and the
+	 * store credits the original.
 	 *
 	 * @param Snapshot $snapshot
 	 * @param list<string> $paths
@@ -73,15 +83,35 @@ final readonly class Freshness {
 	 */
 	public function unmoved(Snapshot $snapshot, array $paths): array {
 		$digests = $snapshot->digests();
+		$disturbed = $this->disturbed($snapshot);
 		$unmoved = [];
 
 		foreach($paths as $path) {
-			if(($digests[$path] ?? NULL) === $this->digestOf($path)) {
+			if(($digests[$path] ?? NULL) === $this->digestOf($path) && !isset($disturbed[$path])) {
 				$unmoved[] = $path;
 			}
 		}
 
 		return $unmoved;
+	}
+
+	/**
+	 * Every source file proven by a test whose own bytes have moved since the
+	 * snapshot, as a set.
+	 *
+	 * @param Snapshot $snapshot
+	 * @return array<string, int> A set: only the keys mean anything.
+	 */
+	private function disturbed(Snapshot $snapshot): array {
+		$disturbed = [];
+
+		foreach($snapshot->tests() as $path => $test) {
+			if($test->source !== $this->digestOf($path)) {
+				$disturbed = [...$disturbed, ...$test->touches];
+			}
+		}
+
+		return array_flip($disturbed);
 	}
 
 	/**
@@ -118,6 +148,7 @@ final readonly class Freshness {
 	 */
 	private function describes(Snapshot $stored, array $recorded, array $now): bool {
 		return $this->same($stored->watched(), $now)
+			&& $this->same($stored->configuration(), $now)
 			&& $this->same($stored->unprovenDigests(), $now)
 			&& $this->nothingNew($recorded);
 	}

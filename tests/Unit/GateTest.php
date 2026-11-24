@@ -5,6 +5,7 @@ namespace Kristos80\Mule\Tests\Unit;
 
 use Kristos80\Mule\Cache\Freshness;
 use Kristos80\Mule\Cache\Keying;
+use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Cache\Universe;
 use Kristos80\Mule\Config\Configuration;
@@ -121,16 +122,66 @@ final class GateTest extends TestCase {
 	}
 
 	/**
-	 * Changing something mule watches rather than proves — its own config, a
-	 * file excluded from coverage — means the store can no longer speak for
-	 * the tree, so coverage runs. It may then find nothing stale after all,
-	 * and says so rather than mutating for the sake of it.
+	 * Changing what the gate *means* unproves everything, however still the
+	 * source files are.
+	 *
+	 * This is the case that was measured wrong before it was fixed: adding a
+	 * mutator profile to `infection.json5` left mule reporting "nothing to
+	 * mutate" about a gate it had just widened, because the store was
+	 * re-examined for staleness and no source digest had moved. The engine must
+	 * be handed the whole project.
+	 *
+	 * @return void
+	 */
+	public function testMutatesEverythingAgainWhenTheEnginesConfigurationChanged(): void {
+		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
+		$this->gate()->full();
+		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true, "@equal": true}}');
+		$this->output = new RecordingOutput();
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		]);
+
+		self::assertSame(0, $this->gate()->narrowed());
+
+		self::assertSame(2, $this->processes->count(), "the engine should have run.");
+		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->processes->command(1)[5] ?? "");
+		self::assertStringContainsString("mule: 0 of 2 files verified, 2 stale.", $this->output->text());
+	}
+
+	/**
+	 * The same, for the one verb that mutates nothing: a redefined gate means
+	 * the store is not entitled to call anything verified.
+	 *
+	 * @return void
+	 */
+	public function testReportsEverythingStaleWhenTheEnginesConfigurationChanged(): void {
+		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
+		$this->gate()->full();
+		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true, "@equal": true}}');
+		$this->output = new RecordingOutput();
+
+		self::assertSame(0, $this->gate()->status());
+
+		self::assertStringContainsString("mule: 0 of 2 files verified, 2 stale.", $this->output->text());
+	}
+
+	/**
+	 * Changing something mule watches rather than proves — a file excluded from
+	 * coverage, a test nothing has run yet — means the store can no longer
+	 * speak for the tree, so coverage runs. It may then find nothing stale
+	 * after all, and says so rather than mutating for the sake of it.
+	 *
+	 * Unlike the configuration, such a file cannot change what a verdict
+	 * asserts: nothing executes it, so nothing that was proven depended on it.
 	 *
 	 * @return void
 	 */
 	public function testRunsCoverageButMutatesNothingWhenOnlyAWatchedFileChanged(): void {
+		$this->filesystem->given("/project/src/Unused.php", "<?php interface Unused {}");
 		$this->gate()->full();
-		$this->filesystem->given("/project/composer.json", '{"name": "acme/thing"}');
+		$this->filesystem->given("/project/src/Unused.php", "<?php interface Unused { public function one(); }");
 		$this->output = new RecordingOutput();
 		$this->processes = new CoveringProcesses($this->filesystem, [
 			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
@@ -203,6 +254,28 @@ final class GateTest extends TestCase {
 
 		self::assertSame("--filter=src/Key.php", $this->processes->command(3)[5] ?? "");
 		self::assertStringContainsString("mule: 1 of 2 files verified, 0 stale, 1 not covered in full.", $this->output->text());
+	}
+
+	/**
+	 * A narrowed run reads a partial report, which cannot say what the
+	 * configuration is — so banking one must carry forward what the store
+	 * already recorded rather than replacing it with nothing. Lose it and the
+	 * next run finds no configuration stored, cannot match it against the one
+	 * it measures, and re-proves the whole project.
+	 *
+	 * @return void
+	 */
+	public function testKeepsTheRecordedConfigurationWhenBankingANarrowedRun(): void {
+		$this->givenTheCoverageCommandSaysWhereTestsGo();
+		$this->gate()->full();
+		$this->filesystem->given("/project/src/Key.php", "<?php class Key { public function one() {} }");
+
+		$this->gate()->narrowed();
+
+		self::assertSame(
+			["composer.json"],
+			array_keys($this->storedSnapshot()->configuration()),
+		);
 	}
 
 	public function testHasSomethingToMutateWhileAnythingIsNotCoveredInFull(): void {
@@ -383,6 +456,113 @@ final class GateTest extends TestCase {
 		);
 	}
 
+	public function testStillAnswersFromTheStoreAfterAFileIsDeleted(): void {
+		$this->gate()->full();
+		$this->filesystem->delete("/project/src/Key.php");
+		$this->filesystem->delete("/project/tests/KeyTest.php");
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		]);
+		$this->gate()->full();
+
+		$this->output = new RecordingOutput();
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		]);
+
+		self::assertSame(0, $this->gate()->narrowed());
+
+		self::assertSame(0, $this->processes->count(), "the store should have answered alone.");
+	}
+
+	/**
+	 * A file that appears *during* a run is not in the report the run worked
+	 * from, so nothing about it is recorded — and the store it leaves behind
+	 * says so rather than claiming to describe the whole tree. The next run
+	 * finds a PHP file it has never heard of and goes back to the engine.
+	 *
+	 * This is the one way a run can bank a store that is already incomplete,
+	 * and it costs a coverage run rather than a wrong answer.
+	 *
+	 * @return void
+	 */
+	public function testNoticesAFileThatAppearedWhileTheEngineRan(): void {
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		], "/project/src", [], [], [
+			"/project/src/Appeared.php" => "<?php class Appeared {}",
+		]);
+
+		self::assertSame(0, $this->gate()->full());
+		self::assertSame(["src/Gate.php", "src/Key.php"], $this->stored());
+
+		$this->output = new RecordingOutput();
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		]);
+
+		self::assertSame(0, $this->gate()->narrowed());
+
+		self::assertSame(1, $this->processes->count(), "the store should not have answered on its own.");
+	}
+
+	/**
+	 * Every file of every test that moved, not the first file of the last test.
+	 *
+	 * `KeyTest` runs two source files and `GateTest` a third, and both tests
+	 * are edited while the engine runs: all three verdicts rest on bytes that
+	 * are no longer there, so none of them is recorded.
+	 *
+	 * @return void
+	 */
+	public function testWithholdsEveryFileOfEveryTestThatChangedWhileTheEngineRan(): void {
+		$this->filesystem->given("/project/src/Extra.php", "<?php class Extra {}");
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Extra.php" => ["Acme\\Tests\\GateTest::testOne"],
+		], "/project/src", [], [], [
+			"/project/tests/KeyTest.php" => "<?php class KeyTest { /* one assertion fewer */ }",
+			"/project/tests/GateTest.php" => "<?php class GateTest { /* one assertion fewer */ }",
+		]);
+
+		self::assertSame(0, $this->gate()->full());
+
+		self::assertSame([], $this->stored());
+		self::assertStringContainsString(
+			"mule: 3 file(s) changed while the gate ran and were not recorded.",
+			$this->output->text(),
+		);
+	}
+
+	/**
+	 * The same guard by the other route. The mutants in `src/Key.php` died
+	 * against whatever `tests/KeyTest.php` said while the engine ran, so a
+	 * verdict credited to the test as it was before is not one mule measured —
+	 * and if the edit is undone, the store would vouch for bytes nothing
+	 * proved.
+	 *
+	 * @return void
+	 */
+	public function testDoesNotBankAFileWhoseTestChangedWhileTheEngineRan(): void {
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		], "/project/src", [], [], [
+			"/project/tests/KeyTest.php" => "<?php class KeyTest { /* one assertion fewer */ }",
+		]);
+
+		self::assertSame(0, $this->gate()->full());
+
+		self::assertSame(["src/Gate.php"], $this->stored());
+		self::assertStringContainsString(
+			"mule: 1 file(s) changed while the gate ran and were not recorded.",
+			$this->output->text(),
+		);
+	}
+
 	public function testGivesUpWhenCoverageFailsAndBanksNothing(): void {
 		$this->processes = new CoveringProcesses($this->filesystem, [], "/project/src", [2]);
 
@@ -511,12 +691,21 @@ final class GateTest extends TestCase {
 	 * @return list<string>
 	 */
 	private function stored(): array {
+		return $this->storedSnapshot()->paths();
+	}
+
+	/**
+	 * What the store holds, read back as a snapshot.
+	 *
+	 * @return Snapshot
+	 */
+	private function storedSnapshot(): Snapshot {
 		$store = new Store(
 			Project::containing("/project", $this->filesystem),
 			$this->filesystem,
 			new FixedRandom(),
 		);
 
-		return $store->read()->paths();
+		return $store->read();
 	}
 }

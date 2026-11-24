@@ -27,12 +27,20 @@ use Kristos80\Mule\Runner\Scratch;
  * what lets the verdicts be read from a fresh covering-test set before anything
  * decides what is stale, rather than storing one and trusting it.
  *
- * **The verdicts are read once, before the engine starts.** Banking happens
- * after the engine finishes, and hashing the tree then would record whatever
- * the files say at that moment — so editing a class while the gate ran would
- * bank a verdict for content nothing had mutated. Reading them from the same
- * coverage report the engine was handed cannot drift from what was proven, and
- * an edit made meanwhile is simply stale on the next run, which is correct.
+ * **This run's own verdicts are read once, from the report the engine was
+ * handed.** Banking happens after the engine finishes, and keying the tree
+ * then would record whatever the files say at that moment — so editing a class
+ * while the gate ran would bank a verdict for content nothing had mutated.
+ * Reading them from the same report cannot drift from what was proven.
+ *
+ * **The store, by contrast, is read again when the scope is worked out**, and
+ * that is deliberate rather than an oversight. The two reads answer different
+ * questions: the first says what a run can skip before it starts, the second
+ * says what is still outstanding now — and between them another session may
+ * have banked verdicts of its own. Taking the later answer means two runs in
+ * two terminals do not each mutate what the other just proved. The cost is a
+ * second read of one small file; the alternative is re-proving work that is
+ * already recorded.
  *
  * **Only a clean exit banks anything.** The engine is gated at the full score,
  * so exit 0 proves every mutant in its scope died.
@@ -78,8 +86,9 @@ final readonly class Gate {
 	 */
 	public function narrowed(): int {
 		$stored = $this->store->read();
+		$standing = $this->freshness->of($stored);
 
-		return $this->settled($this->freshness->of($stored), $stored) ?? $this->gated(TRUE, $this->freshness->of($stored));
+		return $this->settled($standing, $stored) ?? $this->gated(TRUE, $standing);
 	}
 
 	/**

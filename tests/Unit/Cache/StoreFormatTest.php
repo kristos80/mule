@@ -26,14 +26,15 @@ final class StoreFormatTest extends TestCase {
 			. "\t},\n\t\"unproven\": {},\n\t\"tests\": {\n"
 			. "\t\t\"tests/ATest.php\": {\"source\":\"tt\",\"touches\":[\"src/A.php\"]},\n"
 			. "\t\t\"tests/BTest.php\": {\"source\":\"uu\",\"touches\":[\"src/B.php\"]}\n"
-			. "\t},\n\t\"watched\": {}\n}\n",
+			. "\t},\n\t\"watched\": {},\n\t\"configuration\": {}\n}\n",
 			StoreFormat::write($snapshot),
 		);
 	}
 
 	public function testWritesAnEmptySnapshotAsEmptySections(): void {
 		self::assertSame(
-			"{\n\t\"verified\": {},\n\t\"unproven\": {},\n\t\"tests\": {},\n\t\"watched\": {}\n}\n",
+			"{\n\t\"verified\": {},\n\t\"unproven\": {},\n\t\"tests\": {},"
+			. "\n\t\"watched\": {},\n\t\"configuration\": {}\n}\n",
 			StoreFormat::write(Snapshot::of([], [])),
 		);
 	}
@@ -43,6 +44,7 @@ final class StoreFormatTest extends TestCase {
 			[],
 			[],
 			["src/B.php" => new Unproven("bb", [new Unreached("one", 4, 9, 2)])],
+			["src/Excluded.php" => "ee"],
 			["composer.json" => "cc"],
 		);
 
@@ -50,10 +52,56 @@ final class StoreFormatTest extends TestCase {
 			"{\n\t\"verified\": {},\n\t\"unproven\": {\n"
 			. "\t\t\"src/B.php\": {\"digest\":\"bb\",\"unreached\":[{\"name\":\"one\",\"from\":4,\"to\":9,\"lines\":2}]}\n"
 			. "\t},\n\t\"tests\": {},\n\t\"watched\": {\n"
+			. "\t\t\"src/Excluded.php\": {\"digest\":\"ee\"}\n"
+			. "\t},\n\t\"configuration\": {\n"
 			. "\t\t\"composer.json\": {\"digest\":\"cc\"}\n"
 			. "\t}\n}\n",
 			StoreFormat::write($snapshot),
 		);
+	}
+
+	/**
+	 * Sorted like every other section, and it is the one section whose source
+	 * is not already in path order: the configuration files are recorded in the
+	 * order mule looks for them, which puts `infection.json5` before
+	 * `infection.json`.
+	 *
+	 * @return void
+	 */
+	public function testWritesTheConfigurationInPathOrder(): void {
+		$snapshot = Snapshot::of([], [], [], [], [
+			"infection.json5" => "55",
+			"infection.json" => "jj",
+			"composer.json" => "cc",
+		]);
+
+		self::assertSame(
+			"{\n\t\"verified\": {},\n\t\"unproven\": {},\n\t\"tests\": {},\n\t\"watched\": {},"
+			. "\n\t\"configuration\": {\n"
+			. "\t\t\"composer.json\": {\"digest\":\"cc\"},\n"
+			. "\t\t\"infection.json\": {\"digest\":\"jj\"},\n"
+			. "\t\t\"infection.json5\": {\"digest\":\"55\"}\n"
+			. "\t}\n}\n",
+			StoreFormat::write($snapshot),
+		);
+	}
+
+	/**
+	 * A store written before the two sections were told apart kept the
+	 * configuration under `watched`, and merging into it must not leave the
+	 * same path in both.
+	 *
+	 * @return void
+	 */
+	public function testReadsBackAStoreThatWatchedItsOwnConfiguration(): void {
+		$snapshot = StoreFormat::read(
+			"{\"verified\": {\"src/A.php\": {\"digest\": \"aa\"}},"
+			. "\"watched\": {\"composer.json\": {\"digest\": \"cc\"}},"
+			. "\"configuration\": {\"composer.json\": {\"digest\": \"cc\"}}}",
+		);
+
+		self::assertSame([], $snapshot->watched());
+		self::assertSame(["composer.json" => "cc"], $snapshot->configuration());
 	}
 
 	public function testReadsBackEveryGapRatherThanTheFirst(): void {

@@ -543,3 +543,120 @@ chosen so the test has teeth: one bank apiece would pass by luck. Measured with
 the lock bypassed, **35 of 200 entries survived**; with it, 200. The `mkdir`
 race above was found by that same test on its first run, having existed since
 `bank()` was written.
+
+## A verdict is stale when the gate is redefined, and "watched" was not enough
+
+`infection.json5` has been recorded since the release before this one, and that
+was only half the fix.
+
+The hole was found by experiment: adding `@equal` to the mutator list left mule
+reporting **"30 of 30 verified, nothing to mutate"** about a gate that had just
+been handed a new class of mutant to kill. Recording the file fixed what that
+experiment measured — `Freshness` now sees a digest move and returns
+`Standing::unusable()`, so the fast path stops answering and coverage runs.
+
+**And then the run still mutated nothing.** A review of the released version
+pointed out the half that was left, and reading the code confirmed it before
+anything was changed:
+
+- `Freshness` used the watched digests to decide whether the store *describes
+  the tree* — the coverage half.
+- `Snapshot::staleAgainst()` decided which verdicts survive, and it compared
+  `verified` and `tests` only. No source file had moved, so it returned `[]`,
+  and a narrowed run was told its scope was empty.
+
+So the configuration was watched for the purpose of invalidating *coverage
+reuse* and never for invalidating *verdict reuse*, which is the one that
+matters. The test suite had the behaviour pinned down as correct, in a case
+called `testRunsCoverageButMutatesNothingWhenOnlyAWatchedFileChanged` with a
+docblock explaining why it was fine. It was not fine.
+
+**The fix is a section of its own.** `watched` and `configuration` are now two
+sections in the store rather than one, because the two mean different things
+when a digest moves:
+
+| | |
+|---|---|
+| `watched` — an autoloaded file no test reached | the store can no longer claim to describe the tree, so coverage runs again. **No verdict is unproven**: nothing executed that file, so no verdict depended on it. |
+| `configuration` — `composer.json`, `infection.json5` and its siblings | every verdict in the store answers a question nobody is asking any more. **All of them go.** |
+
+`Snapshot::supersedes()` is the whole of it: a snapshot whose configuration
+differs from the stored one returns every path it knows as stale. Three things
+are deliberate about that.
+
+- **Everything, rather than working out what the change could reach.** Which
+  mutants a newly enabled profile adds to which file is the engine's business.
+  Guessing it produces a false verdict; re-proving a project whose gate was
+  just redefined is something somebody did on purpose and will not be surprised
+  by.
+- **A snapshot with no configuration recorded supersedes nothing.** That is the
+  partial report a narrowed run reads, which cannot see the whole tree and does
+  not pretend to. It is only ever read on a run whose store was usable, and a
+  usable store has already had its configuration compared — so the guard is not
+  a loophole.
+- **Banking a narrowed run carries the stored configuration forward.** The
+  partial report has none, and letting that empty section win would wipe the
+  record on every incremental run, which the next run reads as "measured under
+  no configuration" and answers by re-proving everything. One of the two
+  mutants that escaped the first green suite was exactly this, and
+  `testKeepsTheRecordedConfigurationWhenBankingANarrowedRun` kills it.
+
+**A store written by the previous release reads as having no configuration**,
+which needs no migration code and no format version: no recorded configuration
+cannot match the one being measured, so every verdict in it is stale and the
+next run proves the project once. The two sections are also disjoint by
+construction in `Snapshot::of()`, so an old store that kept `composer.json`
+under `watched` does not carry it in both forever.
+
+**What is still deliberately not keyed**, and this is the line worth being
+explicit about rather than leaving to be discovered: the PHP version, and the
+installed versions of PHPUnit, Infection and the coverage driver. Keying them
+would end the property the cache exists for — a laptop on 8.4 and CI on 8.5
+would share nothing, and a `composer update` would discard every verdict. What
+is *committed* is keyed; what is *installed* is not. `mule.json` stays out for
+the same reason in reverse: it is the one file meant to differ per machine, and
+CI deletes it.
+
+## A deleted file used to disable the cache permanently
+
+Found while writing the README section on recovery, by checking a claim rather
+than trusting it. The sentence being checked was "`mule full` is the rebuild",
+and it was not true.
+
+The store is **merged into, never replaced**, so that a run which measured part
+of the project cannot erase the rest. The consequence nobody had followed
+through: a deleted file's entry has nothing to remove it. And a store that
+records a file the tree does not have is precisely what `Freshness::digestsOf()`
+refuses to answer past — it returns `NULL`, and the standing is unusable.
+
+So deleting one file put mule in a state it could not leave:
+
+1. `src/Old.php` is deleted.
+2. Every run from then on finds a recorded file missing and declares the store
+   unusable, so the fast path is dead and coverage runs every time.
+3. `mule full` does not fix it. It mutates everything, banks, and the merge
+   carries the dead entry straight into the new store.
+4. Repeat forever. The only way out was to hand-edit `.mule/verified.json` or
+   delete it.
+
+Measured, not argued: `testStillAnswersFromTheStoreAfterAFileIsDeleted` failed
+with the store running coverage on a tree where nothing had changed since the
+previous full run.
+
+**The fix is in the one place that writes the store.** `Store::pruned()` drops
+every entry whose file is no longer there, from all five sections, just before
+the bytes are written — so the repair happens on any run that banks anything,
+and `mule full` really is the rebuild. It costs one `exists()` per entry,
+charged to a run that has just spent minutes in the engine.
+
+Pruning at *read* time would have been wrong: a read that quietly dropped
+entries would make the store's claims depend on when they were asked for, and
+the file on disk would still be the broken one. Pruning in `merged()` would
+have been wrong too — `merged()` has no filesystem and must not acquire one,
+since its whole job is to combine two snapshots without reference to a tree.
+
+It also means the two review findings and this one share a shape worth naming:
+each was a rule that was correct about the case it was written for and silent
+about a neighbouring one. Watching the configuration without unproving
+verdicts; re-hashing sources without re-hashing tests; merging to preserve
+partial runs without ever removing anything.

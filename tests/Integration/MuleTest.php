@@ -59,8 +59,8 @@ final class MuleTest extends TestCase {
 			],
 		], $store["tests"]);
 		self::assertSame([], $store["unproven"]);
-		self::assertIsArray($store["watched"]);
-		self::assertArrayHasKey("composer.json", $store["watched"]);
+		self::assertIsArray($store["configuration"]);
+		self::assertArrayHasKey("composer.json", $store["configuration"]);
 	}
 
 	public function testAsksTheEngineForNothingWhenTheStoreVouchesForEveryFile(): void {

@@ -28,6 +28,9 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	/** @var array<string, true> Path to nothing; a set of directories. */
 	private array $directories = ["/" => TRUE];
 
+	/** @var array<string, true> Paths that answer `exists()` and nothing else. */
+	private array $phantoms = [];
+
 	/** @var list<string> Every path anything has asked about, in order. */
 	private array $probes = [];
 
@@ -69,6 +72,23 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	}
 
 	/**
+	 * Seeds a path that is there when asked and gone when read.
+	 *
+	 * **This is the only way to state a race in a deterministic suite.** Code
+	 * that checks for a file and then reads it makes two calls, and between
+	 * them the file can be deleted by anything else on the machine; a test
+	 * cannot arrange that with real bytes without becoming a race itself.
+	 *
+	 * @param string $path
+	 * @return self
+	 */
+	public function givenVanishing(string $path): self {
+		$this->phantoms[$path] = TRUE;
+
+		return $this;
+	}
+
+	/**
 	 * What a file holds now, for an assertion.
 	 *
 	 * @param string $path
@@ -96,7 +116,7 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	public function exists(string $path): bool {
 		$this->probes[] = $path;
 
-		return isset($this->files[$path]) || isset($this->directories[$path]);
+		return isset($this->files[$path]) || isset($this->directories[$path]) || isset($this->phantoms[$path]);
 	}
 
 	/**

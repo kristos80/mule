@@ -16,16 +16,16 @@ use Kristos80\Mule\Project;
 final readonly class Keying {
 
 	/**
-	 * What the project declares, watched because changing it changes what a
-	 * run would find — or what a verdict means.
+	 * What the project declares, recorded because changing it changes what a
+	 * verdict means.
 	 *
-	 * **The engine's configuration belongs here.** Adding a mutator profile
-	 * changes what "every mutant died" asserts, and measured before this
-	 * existed: adding `@equal` to `infection.json5` left mule answering
-	 * "30 of 30 verified, nothing to mutate" about a gate that was now
-	 * measuring something materially different. These files are committed and
-	 * byte-identical on every machine, so watching them costs nothing a
-	 * committed store cares about.
+	 * **These are kept apart from what is merely watched**, and the difference
+	 * is what happens when one moves. A watched file changing means the store
+	 * can no longer describe the tree, so a coverage run settles it; one of
+	 * these changing means every verdict in the store answers a question
+	 * nobody asked any more — see {@see Snapshot::supersedes()}. They are
+	 * committed and byte-identical on every machine, so recording them costs
+	 * nothing a committed store cares about.
 	 *
 	 * **`mule.json` is deliberately not here.** It is the one file whose whole
 	 * purpose is to differ between machines — a coverage driver wrapper on a
@@ -97,9 +97,18 @@ final readonly class Keying {
 		$tests = $this->touched($runs);
 		$unproven = $this->unproven($gaps);
 		$known = [...$verified, ...$tests, ...$unproven];
-		$watched = $only === NULL ? $this->watched($known) : [];
+		$whole = $only === NULL;
 
-		return new Reading(Snapshot::of($verified, $tests, $unproven, $watched), $gaps);
+		return new Reading(
+			Snapshot::of(
+				$verified,
+				$tests,
+				$unproven,
+				$whole ? $this->watched($known) : [],
+				$whole ? $this->digestsOf(self::CONFIGURATION) : [],
+			),
+			$gaps,
+		);
 	}
 
 	/**
@@ -147,8 +156,7 @@ final readonly class Keying {
 	/**
 	 * Everything else whose bytes could change what a later run would find:
 	 * every file the project autoloads that the report never mentioned — an
-	 * interface, a file excluded from coverage, a test nothing has run yet —
-	 * and mule's own configuration.
+	 * interface, a file excluded from coverage, a test nothing has run yet.
 	 *
 	 * **Without this a later run could not tell "nothing has changed" from
 	 * "nothing I happen to know about has changed".** A file that appears is
@@ -160,13 +168,36 @@ final readonly class Keying {
 	private function watched(array $known): array {
 		$watched = [];
 
-		foreach([...$this->universe->paths(), ...self::CONFIGURATION] as $path) {
-			if(!isset($known[$path]) && $this->filesystem->exists($this->project->absolute($path))) {
+		foreach($this->universe->paths() as $path) {
+			if(!isset($known[$path])) {
 				$watched[$path] = $this->filesystem->digest($this->project->absolute($path));
 			}
 		}
 
 		return $watched;
+	}
+
+	/**
+	 * Of the paths named, the digest of each one that is there.
+	 *
+	 * A configuration file that does not exist is recorded as absent rather
+	 * than as empty bytes, because a project may have `infection.json5` or
+	 * `infection.json` and never both — and one appearing is a change in what
+	 * the gate means, which a missing entry turning into a present one says.
+	 *
+	 * @param list<string> $paths
+	 * @return array<string, string>
+	 */
+	private function digestsOf(array $paths): array {
+		$digests = [];
+
+		foreach($paths as $path) {
+			if($this->filesystem->exists($this->project->absolute($path))) {
+				$digests[$path] = $this->filesystem->digest($this->project->absolute($path));
+			}
+		}
+
+		return $digests;
 	}
 
 	/**

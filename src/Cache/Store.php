@@ -105,10 +105,38 @@ final readonly class Store {
 
 		$scratch = "{$file}.{$this->random->token()}";
 
-		$this->filesystem->write($scratch, StoreFormat::write($this->read()->merged($banked)));
+		$this->filesystem->write($scratch, StoreFormat::write($this->pruned($this->read()->merged($banked))));
 		$this->filesystem->rename($scratch, $file);
 
 		return $banked->count();
+	}
+
+	/**
+	 * The merged store with every entry for a file that is no longer there
+	 * dropped.
+	 *
+	 * **Because the merge keeps what nobody mentioned.** That is deliberate —
+	 * a run that measured part of the project must not erase the rest — but it
+	 * means a deleted file's entry has nothing to remove it, and a store that
+	 * records a file the tree does not have is one {@see Freshness} will not
+	 * answer from. Nothing would ever repair it either: the next run merges
+	 * onto the same dead entry. So the one place that writes the store is the
+	 * place that checks, which costs an `exists()` per entry after a run that
+	 * has just spent minutes in the engine.
+	 *
+	 * @param Snapshot $snapshot
+	 * @return Snapshot
+	 */
+	private function pruned(Snapshot $snapshot): Snapshot {
+		$gone = [];
+
+		foreach($snapshot->digests() as $path => $digest) {
+			if(!$this->filesystem->exists($this->project->absolute($path))) {
+				$gone[] = $path;
+			}
+		}
+
+		return $snapshot->without($gone);
 	}
 
 	/**

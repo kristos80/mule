@@ -12,7 +12,7 @@ use Kristos80\Mule\Json\Decoded;
  * **Its own class because the shape of the file is not the shape of the
  * decision.** A snapshot answers what is stale; this answers what a person
  * sees in a diff — sorted, one entry per line, slashes as they were written,
- * four named sections — and the two change for entirely different reasons.
+ * five named sections — and the two change for entirely different reasons.
  */
 final readonly class StoreFormat {
 
@@ -24,6 +24,11 @@ final readonly class StoreFormat {
 	 * object at all still stop the run: an older shape is not damage, and a
 	 * truncated file is.
 	 *
+	 * **A store written before `configuration` was a section of its own reads
+	 * as having none**, which is the conservative answer rather than a special
+	 * case: no recorded configuration cannot match the one being measured now,
+	 * so every verdict in it is stale and gets proven again once.
+	 *
 	 * @param string $json
 	 * @return Snapshot
 	 */
@@ -32,6 +37,7 @@ final readonly class StoreFormat {
 		$verified = [];
 		$tests = [];
 		$watched = [];
+		$configuration = [];
 
 		foreach($store->object("verified")->entries() as $path => $entry) {
 			$verified[$path] = $entry->string("digest");
@@ -45,7 +51,11 @@ final readonly class StoreFormat {
 			$watched[$path] = $entry->string("digest");
 		}
 
-		return Snapshot::of($verified, $tests, self::unprovenIn($store), $watched);
+		foreach($store->object("configuration")->entries() as $path => $entry) {
+			$configuration[$path] = $entry->string("digest");
+		}
+
+		return Snapshot::of($verified, $tests, self::unprovenIn($store), $watched, $configuration);
 	}
 
 	/**
@@ -60,6 +70,7 @@ final readonly class StoreFormat {
 		$tests = [];
 		$unproven = [];
 		$watched = [];
+		$configuration = [];
 
 		foreach($snapshot->verified() as $path => $digest) {
 			$verified[] = self::line($path, ["digest" => $digest]);
@@ -77,10 +88,15 @@ final readonly class StoreFormat {
 			$watched[] = self::line($path, ["digest" => $digest]);
 		}
 
+		foreach($snapshot->configuration() as $path => $digest) {
+			$configuration[] = self::line($path, ["digest" => $digest]);
+		}
+
 		return "{\n\t\"verified\": {" . self::block($verified)
 			. "},\n\t\"unproven\": {" . self::block($unproven)
 			. "},\n\t\"tests\": {" . self::block($tests)
-			. "},\n\t\"watched\": {" . self::block($watched) . "}\n}\n";
+			. "},\n\t\"watched\": {" . self::block($watched)
+			. "},\n\t\"configuration\": {" . self::block($configuration) . "}\n}\n";
 	}
 
 	/**

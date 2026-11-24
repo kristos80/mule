@@ -75,6 +75,40 @@ is recorded as the report describes it *today* rather than as a digest over the
 test suite as a whole: a mutant dies when any covering test fails, so a new
 test can only kill more of them.
 
+## What a stored verdict is a verdict *about*
+
+"Every mutant died" is only ever true under some configuration, so the store
+records the configuration too, and the policy is worth stating outright rather
+than leaving you to infer it.
+
+**These unprove every verdict in the store, all at once:**
+
+| | |
+|---|---|
+| `composer.json` | it is what the autoloader, and therefore the universe of files, comes from |
+| `infection.json5`, `infection.json`, and their `.dist` forms | the mutator profiles are *what a passing gate asserts* |
+
+Widening the engine's configuration is the case that makes this necessary and
+it was measured, not imagined: adding `@equal` to `infection.json5` left an
+earlier mule answering "30 of 30 verified, nothing to mutate" about a gate that
+had just been given a new class of mutant to kill. A verdict proven under the
+narrower configuration is not merely old, it answers a different question —
+so all of them go, and the next run proves the project again. Which files a
+newly enabled profile would reach is the engine's business, and guessing it
+is how a cache starts lying.
+
+**These do not, by design:**
+
+| | |
+|---|---|
+| `mule.json` | the one file meant to differ per machine — a coverage-driver wrapper on a laptop, deleted entirely on CI. Watching it would make a committed store unusable on the machine it exists to help. Run `mule full` after changing the coverage command or the engine's options. |
+| the PHP version, and the versions of PHPUnit, Infection and the coverage driver | fingerprinting them would end the thing this cache is for: a laptop on 8.4 and CI on 8.5, or a `composer update` between runs, would each throw away every verdict. The trade is deliberate and it is the usual one for a content-addressed cache — the inputs that are *committed* are keyed, the installed toolchain is not. If a dependency bump could change your score, run `mule full`; CI running `mule full` on `master` is the cheap way to never think about it. |
+
+**A watched file is a third case**: a file your project autoloads that no test
+reached. Changing one means the store can no longer claim to describe the tree,
+so coverage runs again — but it does not unprove anything, because nothing
+executed it and so no verdict depended on it.
+
 ## Both halves are free
 
 Mutation engines cannot start without a coverage report, and each per-file
@@ -93,13 +127,14 @@ test run used.
 
 ## The store is committed, and that is what engine caches cannot do
 
-`.mule/verified.json` belongs in your repository, and holds four sections: the
-files proven, the files the tests do not reach all of, what each test runs, and
-a digest for everything else the project autoloads — the last being how a later
-run can be sure nothing has *appeared* as well as that nothing has changed.
-Only what the project owns is recorded: the autoloader knows a prefix per
-installed dependency, and a store with `vendor/` in it would be invalidated by
-every `composer install` and differ on every machine.
+`.mule/verified.json` belongs in your repository, and holds five sections: the
+files proven, the files the tests do not reach all of, what each test runs, a
+digest for everything else the project autoloads — that one being how a later
+run can be sure nothing has *appeared* as well as that nothing has changed —
+and the configuration the verdicts were measured under. Only what the project
+owns is recorded: the autoloader knows a prefix per installed dependency, and a
+store with `vendor/` in it would be invalidated by every `composer install` and
+differ on every machine.
 
 It belongs in your repository. A content-hash verdict is not
 machine-local state: the same bytes give the same answer on the next machine, so
@@ -112,6 +147,37 @@ eight processes banking two hundred entries between them. The lock file sits in
 your system temporary directory, not in the repository, so there is nothing to
 ignore. The store itself is still replaced by rename rather than edited in
 place: a reader sees one version or the other, never half of one.
+
+### When it goes wrong
+
+A committed cache is a file in your repository, so it gets into the situations
+repository files get into. None of them need a repair tool, because **the store
+holds no information that cannot be re-derived** — the worst outcome available
+is re-proving work you had already proved.
+
+- **A merge or rebase conflict in `.mule/verified.json`.** Take either side
+  whole — `git checkout --ours` or `--theirs`, it does not matter which — and
+  run `mule new`. Whatever the side you kept is wrong about is a digest that no
+  longer matches the tree, which is the one thing the next run checks. Entries
+  are one per line and sorted by path, so resolving it by hand is mechanical
+  too, and a hand-merged store is not dangerous: a wrong entry is a stale
+  entry.
+- **An interrupted run** — `Ctrl-C`, a killed CI job, a crash. The store is
+  replaced by rename, so it is either the old one or the new one and never a
+  partial one. Nothing is banked unless the engine exited clean, so an
+  interrupted run simply records nothing, and the next one picks the work up.
+- **A leftover `.mule/verified.json.{token}`.** That is the scratch file a run
+  writes beside the store before renaming it over. A process killed between the
+  write and the rename leaves one behind; it is inert, and deleting it is safe.
+  Nothing reads it, and the next run writes its own.
+- **A leftover lock file** in your system temporary directory. Expected, not a
+  leak: `flock()` releases when the process dies, and the file is deliberately
+  never removed — deleting it would reintroduce the inode race it exists to
+  prevent. It is empty.
+- **A store you do not trust at all**, for any reason. `mule full` is the
+  rebuild: it ignores what is recorded, mutates everything, and writes the
+  store from scratch. There is no separate repair verb because there is nothing
+  for one to do.
 
 Pest ships mutation testing with two caches of its own, and neither substitutes
 for this. One caches *generated mutations* keyed on file content — the cheap,

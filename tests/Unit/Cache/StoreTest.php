@@ -6,6 +6,8 @@ namespace Kristos80\Mule\Tests\Unit\Cache;
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\StoreFormat;
+use Kristos80\Mule\Cache\Touched;
+use Kristos80\Mule\Cache\Unproven;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\FixedRandom;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
@@ -21,7 +23,11 @@ final class StoreTest extends TestCase {
 	 * @return void
 	 */
 	protected function setUp(): void {
-		$this->filesystem = (new InMemoryFilesystem())->given("/project/composer.json", "{}");
+		$this->filesystem = (new InMemoryFilesystem())
+			->given("/project/composer.json", "{}")
+			->given("/project/src/A.php", "<?php class A {}")
+			->given("/project/src/B.php", "<?php class B {}")
+			->given("/project/src/Old.php", "<?php class Old {}");
 	}
 
 	public function testClaimsNothingBeforeItHasBeenWritten(): void {
@@ -64,11 +70,73 @@ final class StoreTest extends TestCase {
 		self::assertSame(StoreFormat::write(self::verdicts(["src/A.php"])), $this->filesystem->contentsOf(self::FILE));
 	}
 
+	/**
+	 * The merge keeps what nobody mentioned, which is right for a partial run
+	 * and wrong for a deleted file — and a store holding a file the tree does
+	 * not have is one no later run will answer from, with nothing able to
+	 * repair it. So the write drops it.
+	 *
+	 * @return void
+	 */
+	public function testForgetsAFileThatIsNoLongerThere(): void {
+		$this->filesystem->given(self::FILE, StoreFormat::write(self::verdicts(["src/A.php", "src/Old.php"])));
+		$this->filesystem->delete("/project/src/Old.php");
+
+		$this->store()->bank(self::verdicts(["src/A.php"]), ["src/A.php"]);
+
+		self::assertSame(["src/A.php"], $this->store()->read()->paths());
+	}
+
+	/**
+	 * And from every section, not only the proven one: a deleted test, a
+	 * deleted file nothing could prove and a deleted interface each stop the
+	 * store describing the tree just as surely.
+	 *
+	 * What is still there stays, which is the other half of the assertion —
+	 * pruning is for files that are gone, not a wipe.
+	 *
+	 * @return void
+	 */
+	public function testForgetsADeletedFileWhateverSectionItWasIn(): void {
+		$this->filesystem->given("/project/src/Excluded.php", "<?php interface Excluded {}");
+		$this->filesystem->given("/project/tests/ATest.php", "<?php class ATest {}");
+		$this->filesystem->given(self::FILE, StoreFormat::write(Snapshot::of(
+			["src/A.php" => "source-of-src/A.php"],
+			["tests/ATest.php" => new Touched("tt", ["src/A.php"])],
+			["src/B.php" => new Unproven("bb", [])],
+			["src/Excluded.php" => "ee"],
+			["composer.json" => "cc"],
+		)));
+		$this->filesystem->delete("/project/src/Excluded.php");
+		$this->filesystem->delete("/project/src/B.php");
+		$this->filesystem->delete("/project/tests/ATest.php");
+
+		$this->store()->bank(self::verdicts(["src/A.php"]), ["src/A.php"]);
+
+		$stored = $this->store()->read();
+
+		self::assertSame([], $stored->watched(), "the deleted interface is gone.");
+		self::assertSame([], $stored->tests(), "and the deleted test.");
+		self::assertSame([], $stored->unproven(), "and the gap for a file that is not there.");
+		self::assertSame(["src/A.php"], $stored->paths(), "what is still there stays.");
+		self::assertSame(["composer.json" => "cc"], $stored->configuration());
+	}
+
 	public function testLeavesNoScratchFileBehind(): void {
 		$this->store()->bank(self::verdicts(["src/A.php"]), ["src/A.php"]);
 
 		self::assertSame(
-			["/", "/project", "/project/.mule", "/project/composer.json", self::FILE],
+			[
+				"/",
+				"/project",
+				"/project/src",
+				"/project/.mule",
+				"/project/composer.json",
+				"/project/src/A.php",
+				"/project/src/B.php",
+				"/project/src/Old.php",
+				self::FILE,
+			],
 			$this->filesystem->paths(),
 		);
 	}

@@ -9,6 +9,7 @@ use Kristos80\Mule\Cache\Touched;
 use Kristos80\Mule\Cache\Universe;
 use Kristos80\Mule\Cache\Unproven;
 use Kristos80\Mule\Coverage\Unreached;
+use Kristos80\Mule\Failure;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
 use Kristos80\Mule\Tests\Support\MappedClasses;
@@ -51,6 +52,27 @@ final class FreshnessTest extends TestCase {
 		self::assertTrue($standing->isSettled());
 		self::assertSame([], $standing->stale);
 		self::assertSame(1, $standing->total);
+	}
+
+	/**
+	 * A recorded file is checked for and then hashed, which is two calls with
+	 * a gap between them; a file deleted in that gap is indistinguishable from
+	 * a damaged tree, and the run stops rather than recording a digest of
+	 * nothing or quietly treating the store as stale.
+	 *
+	 * @return void
+	 */
+	public function testStopsWhenARecordedFileVanishesWhileItIsBeingHashed(): void {
+		$this->filesystem->givenVanishing("/project/src/Gone.php");
+		$stored = Snapshot::of(
+			["src/A.php" => hash("sha256", self::SOURCE), "src/Gone.php" => "whatever"],
+			["tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"])],
+		);
+
+		$this->expectException(Failure::class);
+		$this->expectExceptionMessage("Cannot read /project/src/Gone.php.");
+
+		$this->freshness()->of($stored);
 	}
 
 	public function testFindsTheFileWhoseOwnBytesMoved(): void {

@@ -114,6 +114,11 @@ final class BankTest extends TestCase {
 	 * One worker: mule's own classes against the real filesystem, banking a
 	 * verdict of its own twenty-five times over.
 	 *
+	 * **Each file is written before it is banked**, because the bank drops
+	 * entries for files that are not there — the repair for a deleted file
+	 * taking its entry with it. A worker banking paths that never existed would
+	 * be measuring that instead of the lock.
+	 *
 	 * @return string
 	 */
 	private function worker(): string {
@@ -131,8 +136,13 @@ final class BankTest extends TestCase {
 			\$store = new Kristos80\\Mule\\Cache\\Store(\$project, \$filesystem, new Kristos80\\Mule\\External\\PhpRandom());
 			\$worker = \$argv[1];
 
+			mkdir(__DIR__ . "/src/W{\$worker}", 0777, TRUE);
+
 			for(\$bank = 0; \$bank < {$banks}; \$bank++) {
 				\$path = "src/W{\$worker}/F{\$bank}.php";
+
+				file_put_contents(__DIR__ . "/{\$path}", "<?php // {\$path}");
+
 				\$snapshot = Kristos80\\Mule\\Cache\\Snapshot::of([\$path => "source-{\$path}"], []);
 
 				\$store->bank(\$snapshot, [\$path]);

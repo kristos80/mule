@@ -166,40 +166,47 @@ final class KeyingTest extends TestCase {
 		$this->filesystem->given("/project/src/Excluded.php", "<?php class Excluded {}");
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
 
-		// Exactly these: what the project declares, plus every autoloaded file
-		// the report never mentioned — a file excluded from coverage, and a
-		// test that ran nothing. Not the proven file, and not its test.
+		// Exactly these: every autoloaded file the report never mentioned — a
+		// file excluded from coverage, and a test that ran nothing. Not the
+		// proven file, not its test, and not what the project declares, which
+		// is recorded apart from this.
 		self::assertSame(
-			["composer.json", "src/Excluded.php", "tests/GateTest.php"],
+			["src/Excluded.php", "tests/GateTest.php"],
 			array_keys($this->decoded()["watched"]),
 		);
 	}
 
 	/**
-	 * mule.json is the one file meant to differ between machines, so watching
+	 * Adding a mutator profile changes what "every mutant died" asserts, so
+	 * the file saying so is recorded — and recorded apart from what is merely
+	 * watched, because the two mean different things when they move: a watched
+	 * file costs a coverage run, and this unproves every verdict there is.
+	 *
+	 * @return void
+	 */
+	public function testRecordsTheEnginesOwnConfigurationApartFromWhatItWatches(): void {
+		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+
+		self::assertSame(
+			["composer.json", "infection.json5"],
+			array_keys($this->decoded()["configuration"]),
+		);
+		self::assertArrayNotHasKey("infection.json5", $this->decoded()["watched"]);
+	}
+
+	/**
+	 * mule.json is the one file meant to differ between machines, so recording
 	 * it would make a committed store unusable wherever it differs.
 	 *
 	 * @return void
 	 */
-	/**
-	 * Adding a mutator profile changes what "every mutant died" asserts, and
-	 * the file saying so is committed, so watching it costs a portable store
-	 * nothing.
-	 *
-	 * @return void
-	 */
-	public function testWatchesTheEnginesOwnConfiguration(): void {
-		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
-		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
-
-		self::assertArrayHasKey("infection.json5", $this->decoded()["watched"]);
-	}
-
-	public function testDoesNotWatchItsOwnConfiguration(): void {
+	public function testDoesNotRecordItsOwnConfiguration(): void {
 		$this->filesystem->given("/project/mule.json", '{"options": []}');
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
 
 		self::assertArrayNotHasKey("mule.json", $this->decoded()["watched"]);
+		self::assertArrayNotHasKey("mule.json", $this->decoded()["configuration"]);
 	}
 
 	public function testRecordsWhereTheTestsStopAgainstTheBytesItMeasured(): void {
@@ -310,7 +317,7 @@ final class KeyingTest extends TestCase {
 	 * The snapshot read back out of the JSON it writes, which is the shape the
 	 * store keeps and therefore the one worth asserting.
 	 *
-	 * @return array{verified: array<mixed>, tests: array<mixed>, unproven: array<mixed>, watched: array<mixed>}
+	 * @return array{verified: array<mixed>, tests: array<mixed>, unproven: array<mixed>, watched: array<mixed>, configuration: array<mixed>}
 	 */
 	private function decoded(): array {
 		$decoded = json_decode(StoreFormat::write($this->reading()->snapshot), TRUE);
@@ -320,12 +327,14 @@ final class KeyingTest extends TestCase {
 		self::assertIsArray($decoded["tests"]);
 		self::assertIsArray($decoded["unproven"]);
 		self::assertIsArray($decoded["watched"]);
+		self::assertIsArray($decoded["configuration"]);
 
 		return [
 			"verified" => $decoded["verified"],
 			"tests" => $decoded["tests"],
 			"unproven" => $decoded["unproven"],
 			"watched" => $decoded["watched"],
+			"configuration" => $decoded["configuration"],
 		];
 	}
 

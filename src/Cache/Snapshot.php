@@ -24,29 +24,47 @@ final readonly class Snapshot {
 	 * @param array<string, string> $verified Project-relative source path to its digest, sorted.
 	 * @param array<string, Touched> $tests Project-relative test path to what it is and runs, sorted.
 	 * @param array<string, Unproven> $unproven Source paths the tests do not reach all of, sorted.
-	 * @param array<string, string> $watched Everything else the project autoloads, and its own config, sorted.
+	 * @param array<string, string> $watched Everything else the project autoloads, sorted.
+	 * @param array<string, string> $configuration What the verdicts were measured under, sorted.
 	 */
 	private function __construct(
 		private array $verified,
 		private array $tests,
 		private array $unproven,
 		private array $watched,
+		private array $configuration,
 	) {}
 
 	/**
+	 * **The last two sections are disjoint by construction.** A path that
+	 * declares what a verdict means is held as configuration and nothing else,
+	 * so a store written before the two were told apart — which kept them
+	 * together under `watched` — does not go on carrying `composer.json` in
+	 * both once it is merged into.
+	 *
 	 * @param array<string, string> $verified
 	 * @param array<string, Touched> $tests
 	 * @param array<string, Unproven> $unproven
 	 * @param array<string, string> $watched
+	 * @param array<string, string> $configuration
 	 * @return self
 	 */
-	public static function of(array $verified, array $tests, array $unproven = [], array $watched = []): self {
+	public static function of(
+		array $verified,
+		array $tests,
+		array $unproven = [],
+		array $watched = [],
+		array $configuration = [],
+	): self {
+		$watched = array_diff_key($watched, $configuration);
+
 		ksort($verified);
 		ksort($tests);
 		ksort($unproven);
 		ksort($watched);
+		ksort($configuration);
 
-		return new self($verified, $tests, $unproven, $watched);
+		return new self($verified, $tests, $unproven, $watched, $configuration);
 	}
 
 	/**
@@ -56,7 +74,7 @@ final readonly class Snapshot {
 	 * @return array<string, string>
 	 */
 	public function digests(): array {
-		$digests = $this->watched;
+		$digests = [...$this->watched, ...$this->configuration];
 
 		foreach($this->verified as $path => $digest) {
 			$digests[$path] = $digest;
@@ -122,13 +140,22 @@ final readonly class Snapshot {
 	}
 
 	/**
-	 * Everything the project autoloads that the report never mentioned, and
-	 * mule's own configuration, with their digests.
+	 * Everything the project autoloads that the report never mentioned, with
+	 * their digests.
 	 *
 	 * @return array<string, string>
 	 */
 	public function watched(): array {
 		return $this->watched;
+	}
+
+	/**
+	 * The files that declare what a verdict means, with their digests.
+	 *
+	 * @return array<string, string>
+	 */
+	public function configuration(): array {
+		return $this->configuration;
 	}
 
 	/**
@@ -211,10 +238,17 @@ final readonly class Snapshot {
 	 * it. A path the store holds and the report does not is a deleted or newly
 	 * excluded file, and nothing needs mutating on its behalf.
 	 *
+	 * **Measured under a different configuration, every verdict is stale** —
+	 * see {@see self::supersedes()}.
+	 *
 	 * @param self $stored
 	 * @return list<string>
 	 */
 	public function staleAgainst(self $stored): array {
+		if($this->supersedes($stored)) {
+			return $this->paths();
+		}
+
 		$moved = $this->moved($stored);
 		$stale = [];
 
@@ -258,7 +292,36 @@ final readonly class Snapshot {
 			[...$this->tests, ...$other->tests],
 			$unproven,
 			[...$this->watched, ...$other->watched],
+			[...$this->configuration, ...$other->configuration],
 		);
+	}
+
+	/**
+	 * This snapshot with the named paths gone from every section.
+	 *
+	 * **For paths that are not there any more.** A store is merged into rather
+	 * than replaced, so an entry nobody mentions again survives — which is
+	 * right for a run that only measured part of the project and wrong for a
+	 * file that has been deleted. Left alone, that entry is a file the store
+	 * records and the tree does not have, which is the one thing
+	 * {@see Freshness} refuses to answer past: the fast path would be dead for
+	 * good, and no amount of re-running would bring it back.
+	 *
+	 * @param list<string> $paths
+	 * @return self
+	 */
+	public function without(array $paths): self {
+		$verified = $this->verified;
+		$tests = $this->tests;
+		$unproven = $this->unproven;
+		$watched = $this->watched;
+		$configuration = $this->configuration;
+
+		foreach($paths as $path) {
+			unset($verified[$path], $tests[$path], $unproven[$path], $watched[$path], $configuration[$path]);
+		}
+
+		return self::of($verified, $tests, $unproven, $watched, $configuration);
 	}
 
 	/**
@@ -287,7 +350,40 @@ final readonly class Snapshot {
 			$wanted[] = $path;
 		}
 
-		return self::of($verified, $this->testsRunning(array_flip($wanted)), $this->unproven, $this->watched);
+		return self::of(
+			$verified,
+			$this->testsRunning(array_flip($wanted)),
+			$this->unproven,
+			$this->watched,
+			$this->configuration,
+		);
+	}
+
+	/**
+	 * Whether this run was measured under a configuration the stored verdicts
+	 * were not, which unproves all of them at once.
+	 *
+	 * **A verdict is only ever a verdict under some configuration.** Adding a
+	 * mutator profile changes what "every mutant died" asserts, so the stored
+	 * answer is not merely old, it is an answer to a different question — and
+	 * none of the source digests move to say so. Measured before this existed:
+	 * adding `@equal` to `infection.json5` left mule reporting "30 of 30
+	 * verified, nothing to mutate" about a gate that had just been widened.
+	 *
+	 * **Everything, rather than working out what the change could reach.**
+	 * Which mutants a newly enabled profile would add to which file is the
+	 * engine's business, and guessing it wrong is a false verdict; re-proving a
+	 * project after its gate is redefined is a thing somebody did on purpose.
+	 *
+	 * **A snapshot with no configuration recorded supersedes nothing.** That is
+	 * a partial report, which is only ever read on a run whose store was usable
+	 * — and a usable store has already had its configuration compared.
+	 *
+	 * @param self $stored
+	 * @return bool
+	 */
+	private function supersedes(self $stored): bool {
+		return $this->configuration !== [] && $this->configuration !== $stored->configuration;
 	}
 
 	/**
