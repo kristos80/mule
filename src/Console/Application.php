@@ -12,6 +12,7 @@ use Kristos80\Mule\External\FilesystemInterface;
 use Kristos80\Mule\External\OutputInterface;
 use Kristos80\Mule\External\ProcessesInterface;
 use Kristos80\Mule\External\RandomInterface;
+use Kristos80\Mule\Failure;
 use Kristos80\Mule\Gate;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Runner\Scratch;
@@ -52,8 +53,12 @@ final readonly class Application {
 	public function run(array $arguments, string $directory): int {
 		try {
 			return $this->dispatch(Cli::verbOf($arguments), $directory);
-		} catch(Throwable $failure) {
+		} catch(Failure $failure) {
 			$this->errors->line(Summary::failed($failure->getMessage()));
+
+			return 1;
+		} catch(Throwable $fault) {
+			$this->errors->line(Summary::crashed($fault::class, $fault->getMessage()));
 
 			return 1;
 		}

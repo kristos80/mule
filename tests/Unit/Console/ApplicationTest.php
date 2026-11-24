@@ -4,11 +4,13 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Console;
 
 use Kristos80\Mule\Console\Application;
+use Kristos80\Mule\External\ProcessesInterface;
 use Kristos80\Mule\Tests\Support\CoveringProcesses;
 use Kristos80\Mule\Tests\Support\FixedRandom;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
 use Kristos80\Mule\Tests\Support\MappedClasses;
 use Kristos80\Mule\Tests\Support\RecordingOutput;
+use Kristos80\Mule\Tests\Support\ThrowingProcesses;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 
@@ -80,16 +82,33 @@ final class ApplicationTest extends TestCase {
 	}
 
 	/**
+	 * A fault in mule is not a mistake in the project being gated, and the two
+	 * read differently: anything that is not a Failure reached the top because
+	 * mule itself broke.
+	 *
+	 * @return void
+	 */
+	public function testSaysWhenAFailureIsMulesOwnFaultRatherThanTheProjects(): void {
+		self::assertSame(1, $this->ran(["full"], "/project", new ThrowingProcesses()));
+
+		self::assertSame(
+			"mule: LogicException: the coverage command was never built — that is a fault in mule rather than in your project, so please report it.",
+			$this->errors->text(),
+		);
+	}
+
+	/**
 	 * @param list<string> $arguments
 	 * @param string $directory
+	 * @param ProcessesInterface|null $processes Something other than the coverage-writing spy.
 	 * @return int
 	 */
-	private function ran(array $arguments, string $directory = "/project"): int {
+	private function ran(array $arguments, string $directory = "/project", ?ProcessesInterface $processes = NULL): int {
 		$this->filesystem->givenDirectory("/elsewhere");
 
 		$application = new Application(
 			$this->filesystem,
-			$this->processes,
+			$processes ?? $this->processes,
 			new MappedClasses(["Acme\\Tests\\KeyTest" => "/project/tests/KeyTest.php"]),
 			new FixedRandom("cafe1234"),
 			$this->output,

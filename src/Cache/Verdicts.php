@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Cache;
 
+use Kristos80\Mule\Failure;
 use Kristos80\Mule\Json\Decoded;
-use RuntimeException;
 
 /**
  * A verdict per source file: either what the tree says right now, or what the
@@ -109,7 +109,7 @@ final readonly class Verdicts {
 
 		foreach($paths as $path) {
 			$verdicts[$path] = $this->verdicts[$path]
-				?? throw new RuntimeException("{$path} is not in this run's verdicts, so mule cannot bank it.");
+				?? throw new Failure("{$path} is not in this run's verdicts, so mule cannot bank it.");
 		}
 
 		return self::of($verdicts);

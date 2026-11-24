@@ -5,7 +5,7 @@ namespace Kristos80\Mule\Coverage;
 
 use Dom\Element;
 use Dom\XMLDocument;
-use RuntimeException;
+use Kristos80\Mule\Failure;
 
 /**
  * One source file as a coverage report describes it: where it is, and which
@@ -37,7 +37,7 @@ final readonly class CoveredFile {
 	public static function of(string $xml, string $sourceRoot, string $subject): self {
 		$document = XMLDocument::createFromString($xml, LIBXML_NOERROR);
 		$file = $document->getElementsByTagNameNS("*", "file")->item(0)
-			?? throw new RuntimeException("The coverage report {$subject} names no file.");
+			?? throw new Failure("The coverage report {$subject} names no file.");
 		$path = rtrim(self::attribute($file, "path", $subject), "/");
 		$tests = [];
 
@@ -64,6 +64,6 @@ final readonly class CoveredFile {
 	 */
 	private static function attribute(Element $element, string $name, string $subject): string {
 		return $element->getAttribute($name)
-			?? throw new RuntimeException("The coverage report {$subject} has a {$element->localName} with no {$name}.");
+			?? throw new Failure("The coverage report {$subject} has a {$element->localName} with no {$name}.");
 	}
 }

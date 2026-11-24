@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Json;
 
-use RuntimeException;
+use Kristos80\Mule\Failure;
 
 /**
  * Decoded JSON, narrowed to types once.
@@ -49,7 +49,7 @@ final readonly class Decoded {
 		$decoded = json_decode($json);
 
 		if(!is_object($decoded)) {
-			throw new RuntimeException("Cannot read {$subject}: mule needs it to be a JSON object.");
+			throw new Failure("Cannot read {$subject}: mule needs it to be a JSON object.");
 		}
 
 		return new self(self::propertiesOf($decoded), $subject);
@@ -65,7 +65,7 @@ final readonly class Decoded {
 		$value = $this->values[$key] ?? NULL;
 
 		if(!is_string($value) || $value === "") {
-			throw new RuntimeException("The {$key} in {$this->subject} must be a non-empty string.");
+			throw new Failure("The {$key} in {$this->subject} must be a non-empty string.");
 		}
 
 		return $value;
@@ -94,12 +94,12 @@ final readonly class Decoded {
 		$items = [];
 
 		if(!is_array($value)) {
-			throw new RuntimeException("The {$key} in {$this->subject} must be a list of strings.");
+			throw new Failure("The {$key} in {$this->subject} must be a list of strings.");
 		}
 
 		foreach($value as $item) {
 			if(!is_string($item)) {
-				throw new RuntimeException("The {$key} in {$this->subject} must be a list of strings.");
+				throw new Failure("The {$key} in {$this->subject} must be a list of strings.");
 			}
 
 			$items[] = $item;
@@ -119,7 +119,7 @@ final readonly class Decoded {
 
 		foreach($this->values as $key => $value) {
 			if(!is_object($value)) {
-				throw new RuntimeException("The entry for {$key} in {$this->subject} is malformed.");
+				throw new Failure("The entry for {$key} in {$this->subject} is malformed.");
 			}
 
 			$entries[$key] = new self(self::propertiesOf($value), "{$this->subject} entry for {$key}");

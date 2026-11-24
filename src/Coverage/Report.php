@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Coverage;
 
 use Dom\XMLDocument;
-use RuntimeException;
+use Kristos80\Mule\Failure;
 
 /**
  * A PHPUnit `--coverage-xml` report, read for the two things mule needs: which
@@ -38,9 +38,9 @@ final readonly class Report {
 	public static function sourceRoot(string $indexXml): string {
 		$document = XMLDocument::createFromString($indexXml, LIBXML_NOERROR);
 		$project = $document->getElementsByTagNameNS("*", "project")->item(0)
-			?? throw new RuntimeException("The coverage report names no project.");
+			?? throw new Failure("The coverage report names no project.");
 
-		return rtrim($project->getAttribute("source") ?? throw new RuntimeException("The coverage report names no source root."), "/");
+		return rtrim($project->getAttribute("source") ?? throw new Failure("The coverage report names no source root."), "/");
 	}
 
 	/**

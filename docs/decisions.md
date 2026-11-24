@@ -189,6 +189,43 @@ is a property of the code and its tests, not of the runtime, and the store is
 keyed on file digests no PHP version changes. Running it on both legs would
 prove the same thing twice and have two runs writing one store.
 
+## One exception type, so a bug does not read like a misconfiguration
+
+`src/Failure.php` is a `final class Failure extends RuntimeException` with
+nothing in it, and it is what every deliberate throw in `src/` raises.
+
+SonarCloud asked for this thirty-five times — "define and throw a dedicated
+exception instead of using a generic one" — and the rule would have been worth
+declining if the only answer were ceremony. A hierarchy would have been: nothing
+catches these selectively, because the command line catches everything. One
+class is not, because it lets `Application` say which kind of wrong this is:
+
+- a `Failure` → `mule: <message>`, which means the project, its configuration
+  or its filesystem is not something mule can work with;
+- anything else → `mule: <class>: <message> — that is a fault in mule rather
+  than in your project, so please report it`.
+
+Before it, both printed `mule: <message>` and exited 1, so a `TypeError` in
+mule's own code was indistinguishable from a `mule.json` with a typo. The exit
+status is still 1 either way: what changed is what the human reads. And because
+`Failure` *is* a `RuntimeException`, every existing test that expected one kept
+passing untouched.
+
+## A method is only covered by its own class's test
+
+Adding `Summary::crashed()` above dropped the coverage gate to 266 of 267
+statements while the test asserting its exact output passed — which looks
+impossible until you remember that coverage here is attributed by
+`#[CoversClass]`. `ApplicationTest` exercises the method but credits only
+`Application`, and `SummaryTest` is what credits `Summary`, so a method tested
+only from somewhere else reads as uncovered. The mutation gate would then have
+counted its mutants as uncovered too, failing for a reason that looks like a
+lie.
+
+Worth knowing because the failure is confusing rather than obvious: a canary
+string proved the method really did run before the actual cause turned up. The
+fix is always the same — give the new method a case in its own class's test.
+
 ## The analyser is pinned to the versions composer.json declares
 
 The first run of the release workflow found something neither local gate could:

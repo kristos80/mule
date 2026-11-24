@@ -52,6 +52,15 @@ in-memory fakes of the five interfaces.
   place that turns decoded JSON into typed values; nothing downstream re-checks.
 - **No test exists for a guard an analyser asked for.** A test proves a
   behaviour somebody can ask for.
+- **Everything mule throws on purpose is a `Failure`.** Anything else reaching
+  the top of `Application` is reported as a fault in mule rather than a mistake
+  in the project being gated, so never throw a bare `RuntimeException` from
+  `src/`.
+- **A new method needs a case in its own class's test.** Coverage is attributed
+  by `#[CoversClass]`, so exercising a method from another class's test credits
+  nothing: the line reads as uncovered, and the mutation gate then counts its
+  mutants as uncovered too. Exercising it from both is fine; exercising it only
+  from elsewhere fails the gates for a reason that looks like a lie.
 - **Unit tests never touch the disk, never `chmod`, never skip.** A test that
   skips when the suite runs as root (as CI does) silently measures a different
   line set than the same gate on this machine.

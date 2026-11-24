@@ -35,4 +35,11 @@ final class SummaryTest extends TestCase {
 	public function testPrefixesAFailureWithTheProgramsName(): void {
 		self::assertSame("mule: No composer.json above here.", Summary::failed("No composer.json above here."));
 	}
+
+	public function testSaysWhoseFaultAFaultInMuleIs(): void {
+		self::assertSame(
+			"mule: TypeError: argument #1 must be a string — that is a fault in mule rather than in your project, so please report it.",
+			Summary::crashed("TypeError", "argument #1 must be a string"),
+		);
+	}
 }

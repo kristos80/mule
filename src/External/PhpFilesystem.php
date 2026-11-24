@@ -7,7 +7,7 @@ use Closure;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
-use RuntimeException;
+use Kristos80\Mule\Failure;
 
 /**
  * The filesystem, as PHP offers it.
@@ -48,7 +48,7 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 		$contents = @file_get_contents($path);
 
 		if($contents === FALSE) {
-			throw new RuntimeException("Cannot read {$path}.");
+			throw new Failure("Cannot read {$path}.");
 		}
 
 		return $contents;
@@ -61,7 +61,7 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 	 */
 	public function write(string $path, string $contents): void {
 		if(@file_put_contents($path, $contents) === FALSE) {
-			throw new RuntimeException("Cannot write {$path}.");
+			throw new Failure("Cannot write {$path}.");
 		}
 	}
 
@@ -72,7 +72,7 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 	 */
 	public function rename(string $from, string $to): void {
 		if(!@rename($from, $to)) {
-			throw new RuntimeException("Cannot move {$from} to {$to}.");
+			throw new Failure("Cannot move {$from} to {$to}.");
 		}
 	}
 
@@ -82,7 +82,7 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 	 */
 	public function delete(string $path): void {
 		if(!@unlink($path)) {
-			throw new RuntimeException("Cannot remove the file {$path}.");
+			throw new Failure("Cannot remove the file {$path}.");
 		}
 	}
 
@@ -92,7 +92,7 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 	 */
 	public function createDirectory(string $path): void {
 		if(!@mkdir($path, 0o777, TRUE)) {
-			throw new RuntimeException("Cannot create the directory {$path}.");
+			throw new Failure("Cannot create the directory {$path}.");
 		}
 	}
 
@@ -102,7 +102,7 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 	 */
 	public function createDirectoryExclusively(string $path): void {
 		if(!@mkdir($path, 0o700)) {
-			throw new RuntimeException("Cannot create the directory {$path}.");
+			throw new Failure("Cannot create the directory {$path}.");
 		}
 	}
 
@@ -112,7 +112,7 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 	 */
 	public function deleteDirectory(string $path): void {
 		if(!@rmdir($path)) {
-			throw new RuntimeException("Cannot remove the directory {$path}.");
+			throw new Failure("Cannot remove the directory {$path}.");
 		}
 	}
 
@@ -135,7 +135,7 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 		$digest = @hash_file("sha256", $path);
 
 		if($digest === FALSE) {
-			throw new RuntimeException("Cannot hash {$path}.");
+			throw new Failure("Cannot hash {$path}.");
 		}
 
 		return $digest;
@@ -149,7 +149,7 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 		$resolved = realpath($path);
 
 		if($resolved === FALSE) {
-			throw new RuntimeException("Cannot resolve {$path}: no such directory.");
+			throw new Failure("Cannot resolve {$path}: no such directory.");
 		}
 
 		return $resolved;
@@ -178,11 +178,11 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 		$handle = @fopen($path, "c");
 
 		if($handle === FALSE) {
-			throw new RuntimeException("Cannot open {$path} to lock it.");
+			throw new Failure("Cannot open {$path} to lock it.");
 		}
 
 		if(!flock($handle, LOCK_EX)) {
-			throw new RuntimeException("Cannot take an exclusive lock on {$path}.");
+			throw new Failure("Cannot take an exclusive lock on {$path}.");
 		}
 
 		$result = $critical();

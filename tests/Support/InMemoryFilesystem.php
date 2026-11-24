@@ -5,7 +5,7 @@ namespace Kristos80\Mule\Tests\Support;
 
 use Closure;
 use Kristos80\Mule\External\FilesystemInterface;
-use RuntimeException;
+use Kristos80\Mule\Failure;
 
 /**
  * A filesystem in an array, failing where the real one fails.
@@ -124,7 +124,7 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	public function read(string $path): string {
 		$this->record("read {$path}");
 
-		return $this->files[$path] ?? throw new RuntimeException("Cannot read {$path}.");
+		return $this->files[$path] ?? throw new Failure("Cannot read {$path}.");
 	}
 
 	/**
@@ -136,7 +136,7 @@ final class InMemoryFilesystem implements FilesystemInterface {
 		$this->record("write {$path}");
 
 		if(!isset($this->directories[dirname($path)])) {
-			throw new RuntimeException("Cannot write {$path}.");
+			throw new Failure("Cannot write {$path}.");
 		}
 
 		$this->files[$path] = $contents;
@@ -150,7 +150,7 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	public function rename(string $from, string $to): void {
 		$this->record("rename {$from} to {$to}");
 
-		$this->files[$to] = $this->files[$from] ?? throw new RuntimeException("Cannot move {$from} to {$to}.");
+		$this->files[$to] = $this->files[$from] ?? throw new Failure("Cannot move {$from} to {$to}.");
 
 		unset($this->files[$from]);
 	}
@@ -161,7 +161,7 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	 */
 	public function delete(string $path): void {
 		if(!isset($this->files[$path])) {
-			throw new RuntimeException("Cannot remove the file {$path}.");
+			throw new Failure("Cannot remove the file {$path}.");
 		}
 
 		unset($this->files[$path]);
@@ -173,7 +173,7 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	 */
 	public function createDirectory(string $path): void {
 		if($this->exists($path)) {
-			throw new RuntimeException("Cannot create the directory {$path}.");
+			throw new Failure("Cannot create the directory {$path}.");
 		}
 
 		$this->directories[$path] = TRUE;
@@ -193,7 +193,7 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	 */
 	public function deleteDirectory(string $path): void {
 		if(!isset($this->directories[$path]) || $this->entriesUnder($path) !== []) {
-			throw new RuntimeException("Cannot remove the directory {$path}.");
+			throw new Failure("Cannot remove the directory {$path}.");
 		}
 
 		unset($this->directories[$path]);
@@ -226,7 +226,7 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	 */
 	public function resolve(string $path): string {
 		if(!$this->exists($path)) {
-			throw new RuntimeException("Cannot resolve {$path}: no such directory.");
+			throw new Failure("Cannot resolve {$path}: no such directory.");
 		}
 
 		return $path;

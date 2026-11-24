@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\External;
 
-use RuntimeException;
+use Kristos80\Mule\Failure;
 
 /**
  * Real child processes, inheriting this one's streams so that a test runner's
@@ -28,7 +28,7 @@ final readonly class ShellProcesses implements ProcessesInterface {
 		$process = @proc_open($command, self::DESCRIPTORS, $pipes, $directory);
 
 		if($process === FALSE) {
-			throw new RuntimeException("Cannot run " . implode(" ", $command) . ".");
+			throw new Failure("Cannot run " . implode(" ", $command) . ".");
 		}
 
 		return proc_close($process);

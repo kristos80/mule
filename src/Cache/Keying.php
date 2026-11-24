@@ -7,8 +7,8 @@ use Kristos80\Mule\Coverage\CoveredFile;
 use Kristos80\Mule\Coverage\Report;
 use Kristos80\Mule\External\ClassesInterface;
 use Kristos80\Mule\External\FilesystemInterface;
+use Kristos80\Mule\Failure;
 use Kristos80\Mule\Project;
-use RuntimeException;
 
 /**
  * Turns a coverage report into the verdict every covered file has right now.
@@ -97,7 +97,7 @@ final readonly class Keying {
 		$file = $this->classes->fileOf($class);
 
 		if($file === FALSE) {
-			throw new RuntimeException("The project's autoloader cannot place the covering test {$class}, so mule cannot find its file.");
+			throw new Failure("The project's autoloader cannot place the covering test {$class}, so mule cannot find its file.");
 		}
 
 		return $this->project->relative($file);

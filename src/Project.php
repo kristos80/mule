@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace Kristos80\Mule;
 
 use Kristos80\Mule\External\FilesystemInterface;
-use RuntimeException;
 
 /**
  * The project mule is caching verdicts for, and the one thing every path in and
@@ -42,7 +41,7 @@ final readonly class Project {
 			}
 		}
 
-		throw new RuntimeException("No composer.json at or above {$directory}: mule needs a project root.");
+		throw new Failure("No composer.json at or above {$directory}: mule needs a project root.");
 	}
 
 	/**
@@ -99,7 +98,7 @@ final readonly class Project {
 		$prefix = "{$this->root}/";
 
 		if(!str_starts_with($path, $prefix)) {
-			throw new RuntimeException("{$path} is outside the project root {$this->root}, so mule cannot record it.");
+			throw new Failure("{$path} is outside the project root {$this->root}, so mule cannot record it.");
 		}
 
 		return substr($path, strlen($prefix));

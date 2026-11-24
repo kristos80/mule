@@ -4,9 +4,9 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Config;
 
 use Kristos80\Mule\External\FilesystemInterface;
+use Kristos80\Mule\Failure;
 use Kristos80\Mule\Json\Decoded;
 use Kristos80\Mule\Project;
-use RuntimeException;
 
 /**
  * What mule needs to know about a project, inferred where it can be and
@@ -86,7 +86,7 @@ final readonly class Configuration {
 
 		foreach([self::COVERAGE_PLACEHOLDER, self::JUNIT_PLACEHOLDER] as $placeholder) {
 			if(!str_contains(implode(" ", $coverage), $placeholder)) {
-				throw new RuntimeException("The coverage command in {$file} must pass {$placeholder} to the test runner, so mule can tell it where to write.");
+				throw new Failure("The coverage command in {$file} must pass {$placeholder} to the test runner, so mule can tell it where to write.");
 			}
 		}
 

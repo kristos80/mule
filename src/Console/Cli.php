@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Console;
 
-use RuntimeException;
+use Kristos80\Mule\Failure;
 
 /**
  * The command line: one verb, no options.
@@ -25,10 +25,10 @@ final readonly class Cli {
 		$extra = $arguments[1] ?? "";
 
 		if($extra !== "") {
-			throw new RuntimeException("Unexpected argument {$extra}. " . Summary::USAGE);
+			throw new Failure("Unexpected argument {$extra}. " . Summary::USAGE);
 		}
 
-		return Verb::tryFrom($verb) ?? throw new RuntimeException(self::complaintAbout($verb) . " " . Summary::USAGE);
+		return Verb::tryFrom($verb) ?? throw new Failure(self::complaintAbout($verb) . " " . Summary::USAGE);
 	}
 
 	/**
