@@ -37,49 +37,76 @@ final class KeyingTest extends TestCase {
 	public function testKeysACoveredFileAgainstItsOwnDigest(): void {
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
 
-		self::assertSame(hash("sha256", self::SOURCE), $this->sourceOf("src/Cache/Key.php"));
+		self::assertSame(hash("sha256", self::SOURCE), $this->verifiedDigestOf("src/Cache/Key.php"));
 	}
 
-	public function testKeysACoveredFileAgainstTheFileOfEveryTestCoveringIt(): void {
+	public function testRecordsEachCoveringTestWithItsOwnDigest(): void {
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
 
+		self::assertSame(hash("sha256", self::KEY_TEST), $this->testEntry("tests/KeyTest.php")["source"]);
+	}
+
+	public function testRecordsWhatEachTestWasSeenToRun(): void {
+		$this->filesystem->given("/project/src/Project.php", "<?php class Project {}");
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\GateTest::testOne"]);
+		$this->givenReport("Project.php", "Project.php", "/", ["Acme\\Tests\\GateTest::testTwo"]);
+
 		self::assertSame(
-			hash("sha256", "tests/KeyTest.php:" . hash("sha256", self::KEY_TEST)),
-			$this->testsOf("src/Cache/Key.php"),
+			["src/Cache/Key.php", "src/Project.php"],
+			$this->testEntry("tests/GateTest.php")["touches"],
 		);
 	}
 
-	public function testCountsOneCoveringFileOnceHoweverManyOfItsMethodsCover(): void {
+	public function testNamesEachFileATestRunsOnceHoweverManyOfItsMethodsRunIt(): void {
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", [
 			"Acme\\Tests\\KeyTest::testOne",
 			"Acme\\Tests\\KeyTest::testTwo",
 		]);
 
-		self::assertSame(
-			hash("sha256", "tests/KeyTest.php:" . hash("sha256", self::KEY_TEST)),
-			$this->testsOf("src/Cache/Key.php"),
-		);
+		self::assertSame(["src/Cache/Key.php"], $this->testEntry("tests/KeyTest.php")["touches"]);
 	}
 
-	public function testSortsTheCoveringFilesSoTheReportsOwnOrderCannotChangeTheDigest(): void {
+	/**
+	 * The report is read in report-path order, so the two are decoupled here on
+	 * purpose: what a test runs is recorded sorted by *source* path, not in the
+	 * order the files happened to be read.
+	 *
+	 * @return void
+	 */
+	public function testSortsWhatATestRunsSoTheReportsOwnOrderCannotChangeTheStore(): void {
+		$this->filesystem->given("/project/src/Aaa.php", "<?php class Aaa {}");
+		$this->filesystem->given("/project/src/Zzz.php", "<?php class Zzz {}");
+		// The report named aaa is the one about Zzz.php, so the files are read
+		// in the opposite order to the one they are recorded in.
+		$this->givenReport("aaa.php", "Zzz.php", "/", ["Acme\\Tests\\GateTest::testOne"]);
+		$this->givenReport("zzz.php", "Aaa.php", "/", ["Acme\\Tests\\GateTest::testOne"]);
+
+		self::assertSame(["src/Aaa.php", "src/Zzz.php"], $this->testEntry("tests/GateTest.php")["touches"]);
+	}
+
+	public function testRecordsEveryTestRatherThanTheFirst(): void {
+		$this->filesystem->given("/project/src/Project.php", "<?php class Project {}");
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+		$this->givenReport("Project.php", "Project.php", "/", ["Acme\\Tests\\GateTest::testOne"]);
+
+		self::assertSame(["tests/GateTest.php", "tests/KeyTest.php"], array_keys($this->decoded()["tests"]));
+	}
+
+	public function testRecordsEveryTestThatRunsOneFileRatherThanTheFirst(): void {
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", [
 			"Acme\\Tests\\KeyTest::testOne",
 			"Acme\\Tests\\GateTest::testOne",
 		]);
 
-		self::assertSame(
-			hash("sha256", implode("\n", [
-				"tests/GateTest.php:" . hash("sha256", self::GATE_TEST),
-				"tests/KeyTest.php:" . hash("sha256", self::KEY_TEST),
-			])),
-			$this->testsOf("src/Cache/Key.php"),
-		);
+		$tests = $this->decoded()["tests"];
+
+		self::assertSame(["tests/GateTest.php", "tests/KeyTest.php"], array_keys($tests));
 	}
 
-	public function testKeysAFileNoTestCoversAgainstAnEmptyCoveringSet(): void {
+	public function testRecordsNoTestForAFileNothingCovers(): void {
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", []);
 
-		self::assertSame(hash("sha256", ""), $this->testsOf("src/Cache/Key.php"));
+		self::assertSame([], $this->decoded()["tests"]);
 	}
 
 	public function testKeysEveryFileTheReportHolds(): void {
@@ -87,7 +114,7 @@ final class KeyingTest extends TestCase {
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
 		$this->givenReport("Project.php", "Project.php", "/", ["Acme\\Tests\\GateTest::testOne"]);
 
-		self::assertSame(["src/Cache/Key.php", "src/Project.php"], $this->reading()->verdicts->paths());
+		self::assertSame(["src/Cache/Key.php", "src/Project.php"], $this->reading()->snapshot->paths());
 	}
 
 	public function testKeysNothingFromAReportHoldingNoFiles(): void {
@@ -97,59 +124,38 @@ final class KeyingTest extends TestCase {
 	public function testReadsACoveringTestNamedWithoutAMethod(): void {
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest"]);
 
-		self::assertSame(
-			hash("sha256", "tests/KeyTest.php:" . hash("sha256", self::KEY_TEST)),
-			$this->testsOf("src/Cache/Key.php"),
-		);
+		self::assertSame(["src/Cache/Key.php"], $this->testEntry("tests/KeyTest.php")["touches"]);
 	}
 
 	public function testKeepsAFileTheTestsDoNotReachAllOfOutOfTheVerdicts(): void {
-		$this->filesystem->given("/run/coverage-xml/Cache/Key.php.xml", CoverageXml::partialFile(
-			"Key.php",
-			"/Cache",
-			["Acme\\Tests\\KeyTest::testOne"],
-			4,
-			1,
-			[["name" => "one", "start" => 12, "end" => 19, "executable" => 3, "executed" => 0]],
-		));
+		$this->givenPartialReport();
 
 		$reading = $this->reading();
 
-		self::assertSame([], $reading->verdicts->paths());
+		self::assertSame([], $reading->snapshot->paths());
 		self::assertSame(["src/Cache/Key.php"], $reading->unproven());
-		self::assertSame(
-			"one() lines 12-19, 3 unreached",
-			$reading->gaps["src/Cache/Key.php"][0]->described(),
-		);
+		self::assertSame("one() lines 12-19, 3 unreached", $reading->gaps["src/Cache/Key.php"][0]->described());
+	}
+
+	public function testStillRecordsWhatTheTestsOfAnUnprovenFileRun(): void {
+		$this->givenPartialReport();
+
+		self::assertSame(["src/Cache/Key.php"], $this->testEntry("tests/KeyTest.php")["touches"]);
 	}
 
 	public function testCarriesOnPastAFileItCannotProve(): void {
 		$this->filesystem->given("/project/src/Project.php", "<?php class Project {}");
-		$this->filesystem->given("/run/coverage-xml/Cache/Key.php.xml", CoverageXml::partialFile(
-			"Key.php",
-			"/Cache",
-			["Acme\\Tests\\KeyTest::testOne"],
-			4,
-			1,
-			[],
-		));
+		$this->givenPartialReport();
 		$this->givenReport("Project.php", "Project.php", "/", ["Acme\\Tests\\GateTest::testOne"]);
 
 		$reading = $this->reading();
 
 		self::assertSame(["src/Cache/Key.php"], $reading->unproven());
-		self::assertSame(["src/Project.php"], $reading->verdicts->paths());
+		self::assertSame(["src/Project.php"], $reading->snapshot->paths());
 	}
 
 	public function testStillCountsAFileItCannotProve(): void {
-		$this->filesystem->given("/run/coverage-xml/Cache/Key.php.xml", CoverageXml::partialFile(
-			"Key.php",
-			"/Cache",
-			["Acme\\Tests\\KeyTest::testOne"],
-			4,
-			1,
-			[],
-		));
+		$this->givenPartialReport();
 
 		self::assertSame(1, $this->reading()->count());
 	}
@@ -175,6 +181,22 @@ final class KeyingTest extends TestCase {
 	}
 
 	/**
+	 * A report for a `Key.php` with a method the tests do not enter.
+	 *
+	 * @return void
+	 */
+	private function givenPartialReport(): void {
+		$this->filesystem->given("/run/coverage-xml/Cache/Key.php.xml", CoverageXml::partialFile(
+			"Key.php",
+			"/Cache",
+			["Acme\\Tests\\KeyTest::testOne"],
+			4,
+			1,
+			[["name" => "one", "start" => 12, "end" => 19, "executable" => 3, "executed" => 0]],
+		));
+	}
+
+	/**
 	 * @return Reading
 	 */
 	private function reading(): Reading {
@@ -188,37 +210,55 @@ final class KeyingTest extends TestCase {
 	}
 
 	/**
-	 * The source digest recorded for one path, read back out of the JSON the
-	 * verdicts write.
+	 * The snapshot read back out of the JSON it writes, which is the shape the
+	 * store keeps and therefore the one worth asserting.
 	 *
-	 * @param string $path
-	 * @return string
+	 * @return array{verified: array<mixed>, tests: array<mixed>}
 	 */
-	private function sourceOf(string $path): string {
-		return $this->digestOf($path, "source");
-	}
-
-	/**
-	 * @param string $path
-	 * @return string
-	 */
-	private function testsOf(string $path): string {
-		return $this->digestOf($path, "tests");
-	}
-
-	/**
-	 * @param string $path
-	 * @param string $half
-	 * @return string
-	 */
-	private function digestOf(string $path, string $half): string {
-		$decoded = json_decode($this->reading()->verdicts->toJson(), TRUE);
+	private function decoded(): array {
+		$decoded = json_decode($this->reading()->snapshot->toJson(), TRUE);
 
 		self::assertIsArray($decoded);
-		self::assertArrayHasKey($path, $decoded);
-		self::assertIsArray($decoded[$path]);
-		self::assertIsString($decoded[$path][$half]);
+		self::assertIsArray($decoded["verified"]);
+		self::assertIsArray($decoded["tests"]);
 
-		return $decoded[$path][$half];
+		return ["verified" => $decoded["verified"], "tests" => $decoded["tests"]];
+	}
+
+	/**
+	 * @param string $path
+	 * @return string
+	 */
+	private function verifiedDigestOf(string $path): string {
+		$verified = $this->decoded()["verified"];
+
+		self::assertArrayHasKey($path, $verified);
+		self::assertIsArray($verified[$path]);
+		self::assertIsString($verified[$path]["digest"]);
+
+		return $verified[$path]["digest"];
+	}
+
+	/**
+	 * @param string $path
+	 * @return array{source: string, touches: list<string>}
+	 */
+	private function testEntry(string $path): array {
+		$tests = $this->decoded()["tests"];
+
+		self::assertArrayHasKey($path, $tests);
+		self::assertIsArray($tests[$path]);
+		self::assertIsString($tests[$path]["source"]);
+		self::assertIsArray($tests[$path]["touches"]);
+
+		$touches = [];
+
+		foreach($tests[$path]["touches"] as $touched) {
+			self::assertIsString($touched);
+
+			$touches[] = $touched;
+		}
+
+		return ["source" => $tests[$path]["source"], "touches" => $touches];
 	}
 }

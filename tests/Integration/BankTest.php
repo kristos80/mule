@@ -51,11 +51,16 @@ final class BankTest extends TestCase {
 		$store = json_decode((string) file_get_contents($this->path(".mule/verified.json")), TRUE);
 
 		self::assertIsArray($store);
-		self::assertCount(self::WORKERS * self::BANKS_EACH, $store, "An entry was lost: a merge overwrote another process's.");
+		self::assertIsArray($store["verified"]);
+		self::assertCount(
+			self::WORKERS * self::BANKS_EACH,
+			$store["verified"],
+			"An entry was lost: a merge overwrote another process's.",
+		);
 
 		foreach($this->expectedPaths() as $path) {
-			self::assertArrayHasKey($path, $store);
-			self::assertSame(["source" => "source-{$path}", "tests" => "tests-{$path}"], $store[$path]);
+			self::assertArrayHasKey($path, $store["verified"]);
+			self::assertSame(["digest" => "source-{$path}"], $store["verified"][$path]);
 		}
 	}
 
@@ -128,11 +133,9 @@ final class BankTest extends TestCase {
 
 			for(\$bank = 0; \$bank < {$banks}; \$bank++) {
 				\$path = "src/W{\$worker}/F{\$bank}.php";
-				\$verdicts = Kristos80\\Mule\\Cache\\Verdicts::of([
-					\$path => new Kristos80\\Mule\\Cache\\Verdict("source-{\$path}", "tests-{\$path}"),
-				]);
+				\$snapshot = Kristos80\\Mule\\Cache\\Snapshot::of([\$path => "source-{\$path}"], []);
 
-				\$store->bank(\$verdicts, [\$path]);
+				\$store->bank(\$snapshot, [\$path]);
 			}
 			PHP;
 	}

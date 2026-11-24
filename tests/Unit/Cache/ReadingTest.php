@@ -4,8 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Reading;
-use Kristos80\Mule\Cache\Verdict;
-use Kristos80\Mule\Cache\Verdicts;
+use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Coverage\Unreached;
 use PHPUnit\Framework\TestCase;
 
@@ -35,17 +34,17 @@ final class ReadingTest extends TestCase {
 	 * @return Reading
 	 */
 	private static function reading(array $proven, array $gaps): Reading {
-		$verdicts = [];
+		$verified = [];
 		$unreached = [];
 
 		foreach($proven as $path) {
-			$verdicts[$path] = new Verdict("source-of-{$path}", "tests-of-{$path}");
+			$verified[$path] = "source-of-{$path}";
 		}
 
 		foreach($gaps as $path) {
 			$unreached[$path] = [new Unreached("one", 1, 9, 2)];
 		}
 
-		return new Reading(Verdicts::of($verdicts), $unreached);
+		return new Reading(Snapshot::of($verified, []), $unreached);
 	}
 }

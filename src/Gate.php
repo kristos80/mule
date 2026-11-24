@@ -129,7 +129,7 @@ final readonly class Gate {
 				return $status;
 			}
 
-			$banked = $this->store->bank($reading->verdicts, $this->bankable($reading, $scope));
+			$banked = $this->store->bank($reading->snapshot, $this->bankable($reading, $scope));
 
 			$this->output->line(Summary::banked($banked, Store::PATH));
 
@@ -162,7 +162,7 @@ final readonly class Gate {
 	 * @return list<string> Everything that still needs the engine: stale, plus never bankable.
 	 */
 	private function report(Reading $reading): array {
-		$stale = $reading->verdicts->staleAgainst($this->store->read());
+		$stale = $reading->snapshot->staleAgainst($this->store->read());
 		$unproven = $reading->unproven();
 		$unfinished = [...$stale, ...$unproven];
 
@@ -189,6 +189,6 @@ final readonly class Gate {
 	 * @return list<string>
 	 */
 	private function bankable(Reading $reading, ?array $scope): array {
-		return $scope === NULL ? $reading->verdicts->paths() : $reading->verdicts->knownOf($scope);
+		return $scope === NULL ? $reading->snapshot->paths() : $reading->snapshot->knownOf($scope);
 	}
 }

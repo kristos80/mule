@@ -4,8 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Store;
-use Kristos80\Mule\Cache\Verdict;
-use Kristos80\Mule\Cache\Verdicts;
+use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\FixedRandom;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
@@ -57,7 +56,7 @@ final class StoreTest extends TestCase {
 	}
 
 	public function testWritesOverWhatAnEarlierRunRecordedAboutTheSameFile(): void {
-		$this->filesystem->given(self::FILE, Verdicts::of(["src/A.php" => new Verdict("old", "old")])->toJson());
+		$this->filesystem->given(self::FILE, Snapshot::of(["src/A.php" => "old"], [])->toJson());
 
 		$this->store()->bank(self::verdicts(["src/A.php"]), ["src/A.php"]);
 
@@ -127,15 +126,15 @@ final class StoreTest extends TestCase {
 
 	/**
 	 * @param list<string> $paths
-	 * @return Verdicts
+	 * @return Snapshot
 	 */
-	private static function verdicts(array $paths): Verdicts {
-		$verdicts = [];
+	private static function verdicts(array $paths): Snapshot {
+		$verified = [];
 
 		foreach($paths as $path) {
-			$verdicts[$path] = new Verdict("source-of-{$path}", "tests-of-{$path}");
+			$verified[$path] = "source-of-{$path}";
 		}
 
-		return Verdicts::of($verdicts);
+		return Snapshot::of($verified, []);
 	}
 }

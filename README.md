@@ -37,32 +37,43 @@ composer test:mutate:new      #   5 mutants,  3s   — one file edited
 
 Those are this package gating itself.
 
-## The record is a pair of hashes, and the second one is the point
+## The record is what was proven, and what each test runs
 
 A file's mutation score is not a property of the file. It is a property of the
-file **and the tests that cover it**. Weaken an assertion in one test and a
-mutant in an untouched class starts surviving — so a cache keyed on the source
-hash alone would answer "verified" in precisely the case the gate exists to
-catch.
+file **and of everything the tests proving it execute** — weaken an assertion
+and a mutant in an untouched class starts surviving; change a collaborator and
+a mutant that used to die stops dying, with the file that holds it untouched.
 
-Every entry therefore carries two digests: the source file's, and one taken over
-the test files that cover it. Either moving makes the file stale.
+So the store records two things: a digest per proven source file, and per test
+file its digest and the source files the coverage report credits it with.
 
 ```json
 {
-	"src/Cache/Verdicts.php": {"source": "35030ccb…", "tests": "b7ca9700…"}
+	"verified": {
+		"src/Cache/Snapshot.php": {"digest": "68cf64b9…"}
+	},
+	"tests": {
+		"tests/Unit/GateTest.php": {"source": "a1b2c3…", "touches": ["src/Gate.php", "src/Cache/Snapshot.php"]}
+	}
 }
 ```
 
-Comment out a single assertion in this package's own `SummaryTest`, and mule
-marks exactly the one source file that test covers as stale.
+A file is stale when its own bytes change, when a test that runs it changes, or
+**when anything else that test runs changes**. That last clause is why the
+reach is a list rather than a digest: a digest answers "has something moved",
+and only a list answers "which files share a test with this one".
 
-**Adding a covering test cannot invalidate anything**, which is why the test
-digest is taken over the files covering the source *today* rather than over the
-test suite as a whole: a mutant dies when any covering test fails, so a new test
-can only kill more of them. Removing or weakening one is what matters, and that
-moves the digest. A whole-tree digest would have been sound too, and useless —
-nearly every change touches some test.
+The cost is real and worth seeing before you expect miracles. In this
+repository, editing `src/Cache/Touched.php` marks **18 of 25 files stale**,
+because the tests that prove them run straight through it. A suite of narrow
+unit tests narrows far better than one of near-end-to-end tests — and that is
+not a flaw in the measurement, it is what a broad test's verdict actually
+depends on.
+
+**Adding a covering test cannot invalidate anything**, which is why the reach
+is recorded as the report describes it *today* rather than as a digest over the
+test suite as a whole: a mutant dies when any covering test fails, so a new
+test can only kill more of them.
 
 ## Both halves are free
 

@@ -109,8 +109,35 @@ final readonly class Decoded {
 	}
 
 	/**
+	 * A nested object, or an empty one where the key is absent.
+	 *
+	 * **Absent reads as empty on purpose.** The store is written by mule and
+	 * read by a later mule, which may want a section the writer had never heard
+	 * of; a missing section means "nothing recorded under that heading yet",
+	 * and the run re-proves what it cannot find. A section that is there and is
+	 * not an object is damage, and says so.
+	 *
+	 * @param string $key
+	 * @return self
+	 */
+	public function object(string $key): self {
+		$value = $this->values[$key] ?? NULL;
+		$subject = "{$this->subject} {$key}";
+
+		if($value === NULL) {
+			return new self([], $subject);
+		}
+
+		if(!is_object($value)) {
+			throw new Failure("The {$key} in {$this->subject} must be an object.");
+		}
+
+		return new self(self::propertiesOf($value), $subject);
+	}
+
+	/**
 	 * Every key of this object, each of whose values is itself an object. This
-	 * is the shape of the store: a path to the pair of digests proven for it.
+	 * is the shape of the store: a path to what was recorded for it.
 	 *
 	 * @return array<string, self>
 	 */

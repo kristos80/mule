@@ -18,11 +18,11 @@ use Kristos80\Mule\Coverage\Unreached;
 final readonly class Reading {
 
 	/**
-	 * @param Verdicts $verdicts The files every line of which ran, with their keys.
+	 * @param Snapshot $snapshot What the run proved, and what its tests run.
 	 * @param array<string, list<Unreached>> $gaps Project-relative path to where the tests stop.
 	 */
 	public function __construct(
-		public Verdicts $verdicts,
+		public Snapshot $snapshot,
 		public array $gaps,
 	) {}
 
@@ -32,7 +32,7 @@ final readonly class Reading {
 	 * @return int
 	 */
 	public function count(): int {
-		return $this->verdicts->count() + count($this->gaps);
+		return $this->snapshot->count() + count($this->gaps);
 	}
 
 	/**

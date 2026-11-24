@@ -81,8 +81,8 @@ method and 40 per class — both of them dependencies, neither of them mine.
 
 ## The project's autoloader, not a PSR-4 resolver
 
-Half of every key is a digest over the test files covering a source file, and a
-coverage report names those tests as classes. The old implementation read
+Half of every key is the test files covering a source file, and a coverage
+report names those tests as classes. The old implementation read
 `composer.json` and reimplemented Composer's prefix resolution — 237 lines, and
 227 more testing the reimplementation.
 
@@ -239,6 +239,41 @@ mule's own code was indistinguishable from a `mule.json` with a typo. The exit
 status is still 1 either way: what changed is what the human reads. And because
 `Failure` *is* a `RuntimeException`, every existing test that expected one kept
 passing untouched.
+
+## The store records what each test runs, not a digest of it
+
+The store used to keep, per source file, a digest over the files covering it.
+That answers "has anything about my tests changed" and nothing else, and it
+left a hole: editing `Verdicts.php` marked `Verdicts.php` stale and left
+`Gate.php` verified, although `GateTest` runs straight through `Verdicts`, so a
+`Gate` mutant could start surviving with nothing marked stale at all.
+
+So the store keeps a list instead — per test file, its digest and every source
+file the report credits it with — and a file is stale when its own bytes move,
+when a test that runs it moves, or when anything else that test runs moves.
+
+**Measured here after the change:** editing `src/Cache/Touched.php` marks 18 of
+25 files stale, where the old key marked 1. That is the cost of the stronger
+claim, and it is the honest one: those eighteen really are proven by tests that
+execute the file that changed. How wide it spreads is a property of the test
+suite rather than of mule — `GateTest` alone is credited with 16 source files,
+because it drives the whole program over in-memory ports.
+
+Three implementation notes worth keeping, all of them forced by the mutation
+gate rather than by taste:
+
+- **Set markers are never `TRUE`.** `$set[$path] = TRUE` is unkillable when
+  only `isset()` reads it, because `FALSE` behaves identically. The sets here
+  are built as lists and flipped, so dropping the flip turns every lookup false
+  and a test notices.
+- **Deduplication is by key, and the keys are sorted before `array_keys()`.**
+  `array_unique()` paired with `array_values()` leaves the second call
+  unobservable; keying by path makes uniqueness inherent, and unwrapping the
+  `array_keys()` turns the list into a map, which the store then writes as a
+  JSON object instead of an array — visible in a golden assertion.
+- **A store written before these sections existed reads as empty**, so the next
+  run proves everything once. Bytes that are not a JSON object at all still
+  stop the run; an older shape is not damage.
 
 ## No covers metadata, because the cache keys on what the report says
 

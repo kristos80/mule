@@ -57,24 +57,24 @@ final readonly class Store {
 	/**
 	 * What the store claims, or nothing where it has not been written yet.
 	 *
-	 * @return Verdicts
+	 * @return Snapshot
 	 */
-	public function read(): Verdicts {
+	public function read(): Snapshot {
 		$file = $this->project->absolute(self::PATH);
 
 		return $this->filesystem->exists($file)
-			? Verdicts::fromJson($this->filesystem->read($file))
-			: Verdicts::of([]);
+			? Snapshot::fromJson($this->filesystem->read($file))
+			: Snapshot::of([], []);
 	}
 
 	/**
 	 * Records the given files' verdicts over what is already there.
 	 *
-	 * @param Verdicts $current The run's own verdicts, which the banked paths come from.
+	 * @param Snapshot $current The run's own snapshot, which the banked paths come from.
 	 * @param list<string> $paths
 	 * @return int How many files were recorded.
 	 */
-	public function bank(Verdicts $current, array $paths): int {
+	public function bank(Snapshot $current, array $paths): int {
 		$banked = $current->only($paths);
 		$file = $this->project->absolute(self::PATH);
 
@@ -92,11 +92,11 @@ final readonly class Store {
 	 * an integration test with eight workers failed before the lock covered
 	 * this too.
 	 *
-	 * @param Verdicts $banked
+	 * @param Snapshot $banked
 	 * @param string $file
 	 * @return int
 	 */
-	private function merge(Verdicts $banked, string $file): int {
+	private function merge(Snapshot $banked, string $file): int {
 		$directory = dirname($file);
 
 		if(!$this->filesystem->exists($directory)) {

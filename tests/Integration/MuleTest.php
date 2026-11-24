@@ -45,12 +45,16 @@ final class MuleTest extends TestCase {
 		self::assertSame(1, $this->engineRuns());
 	}
 
-	public function testRecordsTheDigestsOfTheSourceAndOfTheTestCoveringIt(): void {
+	public function testRecordsTheSourceItProvedAndTheTestThatRunsIt(): void {
 		$this->mule("full");
 
 		self::assertSame(
-			"{\n\t\"src/A.php\": {\"source\":\"" . hash("sha256", self::SOURCE) . "\",\"tests\":\""
-				. hash("sha256", "tests/ATest.php:" . hash_file("sha256", $this->path("tests/ATest.php"))) . "\"}\n}\n",
+			"{\n\t\"verified\": {\n"
+			. "\t\t\"src/A.php\": {\"digest\":\"" . hash("sha256", self::SOURCE) . "\"}\n"
+			. "\t},\n\t\"tests\": {\n"
+			. "\t\t\"tests/ATest.php\": {\"source\":\"" . hash_file("sha256", $this->path("tests/ATest.php"))
+			. "\",\"touches\":[\"src/A.php\"]}\n"
+			. "\t}\n}\n",
 			file_get_contents($this->path(".mule/verified.json")),
 		);
 	}

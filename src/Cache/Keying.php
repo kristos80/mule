@@ -35,60 +35,69 @@ final readonly class Keying {
 	 */
 	public function of(string $coverageXml): Reading {
 		$root = Report::sourceRoot($this->filesystem->read("{$coverageXml}/index.xml"));
-		$verdicts = [];
+		$verified = [];
 		$gaps = [];
+		$runs = [];
 
 		foreach(Report::reports($this->filesystem->entriesUnder($coverageXml)) as $report) {
 			$file = CoveredFile::of($this->filesystem->read($report), $root, $report);
 			$path = $this->project->relative($file->path);
 
-			if(!$file->isFullyCovered()) {
-				$gaps[$path] = $file->unreached;
+			foreach($this->testFilesOf($file) as $test) {
+				$runs[$test][] = $path;
+			}
+
+			if($file->isFullyCovered()) {
+				$verified[$path] = $this->filesystem->digest($file->path);
 
 				continue;
 			}
 
-			$verdicts[$path] = new Verdict(
-				$this->filesystem->digest($file->path),
-				$this->coveringDigest($file),
-			);
+			$gaps[$path] = $file->unreached;
 		}
 
-		return new Reading(Verdicts::of($verdicts), $gaps);
+		return new Reading(Snapshot::of($verified, $this->touched($runs)), $gaps);
 	}
 
 	/**
-	 * One digest over every test file covering a source file, sorted so that
-	 * the order the report happens to list them in cannot change it.
+	 * Each test file, with its digest and everything it was seen to run.
 	 *
-	 * **A new covering test cannot invalidate anything**, which is why this is
-	 * taken over the files covering the source *today* rather than over the
-	 * test suite as a whole: a mutant dies when any covering test fails, so
-	 * adding a test can only kill more of them. Removing or weakening one is
-	 * what matters, and that moves this digest. A whole-tree digest would have
-	 * been sound too, and useless — nearly every change touches some test.
-	 *
-	 * **The paths in it are relative**, because the digest is written to a
-	 * committed store and has to mean the same thing on the next machine.
+	 * @param array<string, list<string>> $runs Test path to the source paths credited to it.
+	 * @return array<string, Touched>
+	 */
+	private function touched(array $runs): array {
+		$tests = [];
+
+		foreach($runs as $test => $paths) {
+			$touches = [];
+
+			foreach($paths as $path) {
+				$touches[$path] = $path;
+			}
+
+			ksort($touches);
+
+			$tests[$test] = new Touched($this->filesystem->digest($this->project->absolute($test)), array_keys($touches));
+		}
+
+		return $tests;
+	}
+
+	/**
+	 * The file of every test the report credits with this one, repeats and
+	 * all: one per covering method, deduplicated where they are recorded.
 	 *
 	 * @param CoveredFile $file
-	 * @return string
+	 * @return list<string>
 	 */
-	private function coveringDigest(CoveredFile $file): string {
+	private function testFilesOf(CoveredFile $file): array {
 		$paths = [];
 
 		foreach($file->coveringTests as $covering) {
 			$paths[] = $this->testFileOf($covering);
 		}
 
-		$paths = array_unique($paths);
-
-		sort($paths);
-
-		return hash("sha256", implode("\n", array_map(
-			fn(string $path): string => "{$path}:" . $this->filesystem->digest($this->project->absolute($path)),
-			$paths,
-		)));
+		return $paths;
 	}
 
 	/**
