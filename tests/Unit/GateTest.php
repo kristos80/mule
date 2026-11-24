@@ -85,7 +85,9 @@ final class GateTest extends TestCase {
 
 		self::assertSame(["src/Gate.php", "src/Key.php"], $this->stored());
 		self::assertSame(
-			"mule: 0 of 2 files verified, 2 stale.\nmule: 2 file(s) recorded at the full score in .mule/verified.json.",
+			"mule: 0 of 2 files verified, 2 stale.\n"
+			. "mule: every test here covers exactly one file, so no change can mark another file stale — see the README on coverage attribution.\n"
+			. "mule: 2 file(s) recorded at the full score in .mule/verified.json.",
 			$this->output->text(),
 		);
 	}
@@ -111,7 +113,9 @@ final class GateTest extends TestCase {
 		// Not one process: no coverage run, no engine. The store answered.
 		self::assertSame(0, $this->processes->count());
 		self::assertSame(
-			"mule: 2 of 2 files verified, 0 stale.\nmule: nothing to mutate, every file is verified against its own tests.",
+			"mule: 2 of 2 files verified, 0 stale.\n"
+			. "mule: every test here covers exactly one file, so no change can mark another file stale — see the README on coverage attribution.\n"
+			. "mule: nothing to mutate, every file is verified against its own tests.",
 			$this->output->text(),
 		);
 	}
@@ -137,7 +141,9 @@ final class GateTest extends TestCase {
 
 		self::assertSame(1, $this->processes->count(), "coverage should have run, and only coverage.");
 		self::assertSame(
-			"mule: 2 of 2 files verified, 0 stale.\nmule: nothing to mutate, every file is verified against its own tests.",
+			"mule: 2 of 2 files verified, 0 stale.\n"
+			. "mule: every test here covers exactly one file, so no change can mark another file stale — see the README on coverage attribution.\n"
+			. "mule: nothing to mutate, every file is verified against its own tests.",
 			$this->output->text(),
 		);
 	}
@@ -354,6 +360,29 @@ final class GateTest extends TestCase {
 		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->processes->command(3)[5] ?? "");
 	}
 
+	/**
+	 * The gate keys the tree, then spends minutes mutating it. A file saved in
+	 * between was proven as one thing and would be recorded as another.
+	 *
+	 * @return void
+	 */
+	public function testDoesNotBankAFileThatChangedWhileTheEngineRan(): void {
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		], "/project/src", [], [], [
+			"/project/src/Key.php" => "<?php class Key { public function savedMidRun() {} }",
+		]);
+
+		self::assertSame(0, $this->gate()->full());
+
+		self::assertSame(["src/Gate.php"], $this->stored());
+		self::assertStringContainsString(
+			"mule: 1 file(s) changed while the gate ran and were not recorded.",
+			$this->output->text(),
+		);
+	}
+
 	public function testGivesUpWhenCoverageFailsAndBanksNothing(): void {
 		$this->processes = new CoveringProcesses($this->filesystem, [], "/project/src", [2]);
 
@@ -380,7 +409,7 @@ final class GateTest extends TestCase {
 
 		self::assertSame(0, $this->gate()->status());
 
-		self::assertSame("mule: 2 of 2 files verified, 0 stale.", $this->output->text());
+		self::assertSame("mule: 2 of 2 files verified, 0 stale.\n" . "mule: every test here covers exactly one file, so no change can mark another file stale — see the README on coverage attribution.", $this->output->text());
 		self::assertSame(2, $this->processes->count(), "status generated coverage it did not need.");
 	}
 

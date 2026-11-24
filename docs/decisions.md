@@ -240,6 +240,43 @@ status is still 1 either way: what changed is what the human reads. And because
 `Failure` *is* a `RuntimeException`, every existing test that expected one kept
 passing untouched.
 
+## Three things a review found, and what each turned into
+
+An outside review of v1.3.0 raised four concerns. Two were already answered in
+the code, one was right and larger than it looked, and one was right and cheap.
+
+**The engine's configuration is now watched, and the hole was real.** Only
+`composer.json` was. Measured before fixing it: adding `@equal` to the mutator
+set in `infection.json5` — a whole new class of mutants — left mule answering
+*"30 of 30 verified, nothing to mutate"* about a gate that was now measuring
+something materially different. Unlike `mule.json`, these files are committed
+and byte-identical everywhere, so there is no portability argument against
+watching them. `infection.json`, `.json5` and their `.dist` variants are all
+watched where they exist.
+
+**The PHP version is still not fingerprinted, deliberately.** The review
+mentioned it without weighing the cost: a laptop on 8.4 and a CI on 8.5 would
+re-prove everything on every push, which destroys the property the committed
+store exists for. It stays a documented limit, beside timeouts.
+
+**Normalising the engine's options out of `mule.json` was declined.** It would
+mean mule parsing Infection's flags to judge which ones change meaning, and CI
+deletes that file anyway, so the fingerprint would differ between machines.
+
+**Nothing is banked whose bytes moved while the engine ran.** The gate keys the
+tree, then spends minutes mutating it; a file saved in between was proven as
+one thing and would have been recorded as another. The files about to be banked
+are re-hashed first, and any that moved are dropped and said out loud. It is a
+handful of digests after a run measured in minutes.
+
+**And mule now says when a report cannot describe a dependency.** Where every
+test is credited with exactly one file, no change can ever mark another file
+stale, and the narrowing looks exactly as trustworthy as it would on a report
+that had measured everything. That is what `#[CoversClass]` does, and it is the
+single biggest risk in installing mule into an existing project — so it is a
+line of output and an installation note, not a silent property. Mule does not
+touch anyone's tests or configuration to fix it.
+
 ## A coverage run can be narrowed, and the rule for it took two goes
 
 `{tests}` in the coverage command expands in place to the tests a run needs.

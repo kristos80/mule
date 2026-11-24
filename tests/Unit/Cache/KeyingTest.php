@@ -181,6 +181,20 @@ final class KeyingTest extends TestCase {
 	 *
 	 * @return void
 	 */
+	/**
+	 * Adding a mutator profile changes what "every mutant died" asserts, and
+	 * the file saying so is committed, so watching it costs a portable store
+	 * nothing.
+	 *
+	 * @return void
+	 */
+	public function testWatchesTheEnginesOwnConfiguration(): void {
+		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+
+		self::assertArrayHasKey("infection.json5", $this->decoded()["watched"]);
+	}
+
 	public function testDoesNotWatchItsOwnConfiguration(): void {
 		$this->filesystem->given("/project/mule.json", '{"options": []}');
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);

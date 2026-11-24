@@ -46,6 +46,29 @@ final class SummaryTest extends TestCase {
 		], Summary::unreached(["src/A.php" => []]));
 	}
 
+	public function testSaysNothingWhenNothingChangedUnderTheGate(): void {
+		self::assertSame([], Summary::moved(0));
+	}
+
+	public function testSaysWhatChangedUnderTheGate(): void {
+		self::assertSame(
+			["mule: 2 file(s) changed while the gate ran and were not recorded."],
+			Summary::moved(2),
+		);
+	}
+
+	public function testSaysNothingAboutAttributionWhenTheReportIsNotBoundByIt(): void {
+		self::assertSame([], Summary::attributionBound(FALSE));
+	}
+
+	public function testSaysSoWhenTheReportCannotDescribeADependency(): void {
+		self::assertSame(
+			["mule: every test here covers exactly one file, so no change can mark another file stale — "
+				. "see the README on coverage attribution."],
+			Summary::attributionBound(TRUE),
+		);
+	}
+
 	public function testSaysThereIsNothingToMutate(): void {
 		self::assertSame(
 			"mule: nothing to mutate, every file is verified against its own tests.",

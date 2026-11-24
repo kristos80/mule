@@ -17,7 +17,15 @@ final readonly class Keying {
 
 	/**
 	 * What the project declares, watched because changing it changes what a
-	 * run would find.
+	 * run would find — or what a verdict means.
+	 *
+	 * **The engine's configuration belongs here.** Adding a mutator profile
+	 * changes what "every mutant died" asserts, and measured before this
+	 * existed: adding `@equal` to `infection.json5` left mule answering
+	 * "30 of 30 verified, nothing to mutate" about a gate that was now
+	 * measuring something materially different. These files are committed and
+	 * byte-identical on every machine, so watching them costs nothing a
+	 * committed store cares about.
 	 *
 	 * **`mule.json` is deliberately not here.** It is the one file whose whole
 	 * purpose is to differ between machines — a coverage driver wrapper on a
@@ -27,8 +35,16 @@ final readonly class Keying {
 	 * the engine's options does not invalidate anything, so run `mule full`
 	 * after changing one.
 	 *
+	 *
+	 * @var list<string>
 	 */
-	private const string CONFIGURATION = "composer.json";
+	private const array CONFIGURATION = [
+		"composer.json",
+		"infection.json5",
+		"infection.json",
+		"infection.json5.dist",
+		"infection.json.dist",
+	];
 
 	/**
 	 * @param Project $project
@@ -144,7 +160,7 @@ final readonly class Keying {
 	private function watched(array $known): array {
 		$watched = [];
 
-		foreach([...$this->universe->paths(), self::CONFIGURATION] as $path) {
+		foreach([...$this->universe->paths(), ...self::CONFIGURATION] as $path) {
 			if(!isset($known[$path]) && $this->filesystem->exists($this->project->absolute($path))) {
 				$watched[$path] = $this->filesystem->digest($this->project->absolute($path));
 			}

@@ -141,6 +141,22 @@ Then add whichever verbs you want to `composer.json`:
 
 Commit `.mule/verified.json`.
 
+**One thing to check before relying on `mule new`.** If your tests declare
+`#[CoversClass]` or `#[CoversMethod]`, your coverage report credits each test
+with the class it names and hides everything else it runs — and mule builds its
+key from that credit, so the incremental gate is weaker than the full one in a
+way no amount of care inside mule can fix. It is worth deciding about
+deliberately: see
+[The key is only as complete as your coverage attribution](#the-key-is-only-as-complete-as-your-coverage-attribution).
+
+Mule says so when it sees a report of that shape, rather than leaving you to
+find out:
+
+```
+mule: every test here covers exactly one file, so no change can mark another
+      file stale — see the README on coverage attribution.
+```
+
 ## Verbs
 
 | | |

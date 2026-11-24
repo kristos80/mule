@@ -6,6 +6,7 @@ namespace Kristos80\Mule;
 use Kristos80\Mule\Cache\Freshness;
 use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Reading;
+use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Standing;
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Config\Configuration;
@@ -76,9 +77,9 @@ final readonly class Gate {
 	 * @return int
 	 */
 	public function narrowed(): int {
-		$standing = $this->freshness->of($this->store->read());
+		$stored = $this->store->read();
 
-		return $this->settled($standing) ?? $this->gated(TRUE, $standing);
+		return $this->settled($this->freshness->of($stored), $stored) ?? $this->gated(TRUE, $this->freshness->of($stored));
 	}
 
 	/**
@@ -87,7 +88,9 @@ final readonly class Gate {
 	 * @return int
 	 */
 	public function status(): int {
-		return $this->recalled() ?? $this->measured();
+		$stored = $this->store->read();
+
+		return $this->recalled($this->freshness->of($stored), $stored) ?? $this->measured();
 	}
 
 	/**
@@ -100,14 +103,16 @@ final readonly class Gate {
 	 * cache exists to remove.
 	 *
 	 * @param Standing $standing
+	 * @param Snapshot $stored
 	 * @return int|null NULL where the store cannot answer, and the run proceeds.
 	 */
-	private function settled(Standing $standing): ?int {
+	private function settled(Standing $standing, Snapshot $stored): ?int {
 		if(!$standing->isSettled()) {
 			return NULL;
 		}
 
 		$this->announce($standing->total, 0, []);
+		$this->caution($stored);
 		$this->output->line(Summary::nothingToMutate());
 
 		return 0;
@@ -120,16 +125,17 @@ final readonly class Gate {
 	 * of what it claims: a file nothing reaches all of is still where the tests
 	 * last stopped, and saying so costs no coverage run.
 	 *
+	 * @param Standing $standing
+	 * @param Snapshot $stored
 	 * @return int|null
 	 */
-	private function recalled(): ?int {
-		$standing = $this->freshness->of($this->store->read());
-
+	private function recalled(Standing $standing, Snapshot $stored): ?int {
 		if(!$standing->isCurrent()) {
 			return NULL;
 		}
 
 		$this->announce($standing->total, 0, $standing->gaps);
+		$this->caution($stored);
 
 		return 0;
 	}
@@ -189,9 +195,15 @@ final readonly class Gate {
 				return $status;
 			}
 
-			$banked = $this->store->bank($reading->snapshot, $this->bankable($reading, $scope));
+			$proven = $this->bankable($reading, $scope);
+			$unmoved = $this->freshness->unmoved($reading->snapshot, $proven);
+			$banked = $this->store->bank($reading->snapshot, $unmoved);
 
 			$this->output->line(Summary::banked($banked, Store::PATH));
+
+			foreach(Summary::moved(count($proven) - count($unmoved)) as $line) {
+				$this->output->line($line);
+			}
 
 			return 0;
 		} finally {
@@ -280,6 +292,7 @@ final readonly class Gate {
 		$total = $standing->usable ? $standing->total : $reading->count();
 
 		$this->announce($total, count($stale), $reading->gaps);
+		$this->caution($reading->snapshot);
 
 		sort($unfinished);
 
@@ -299,6 +312,16 @@ final readonly class Gate {
 		$this->output->line(Summary::verified($total, $stale, count($gaps)));
 
 		foreach(Summary::unreached($gaps) as $line) {
+			$this->output->line($line);
+		}
+	}
+
+	/**
+	 * @param Snapshot $snapshot
+	 * @return void
+	 */
+	private function caution(Snapshot $snapshot): void {
+		foreach(Summary::attributionBound($snapshot->isAttributionBound()) as $line) {
 			$this->output->line($line);
 		}
 	}

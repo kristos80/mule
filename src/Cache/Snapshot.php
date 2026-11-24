@@ -155,6 +155,34 @@ final readonly class Snapshot {
 	}
 
 	/**
+	 * Whether every test in it was credited with exactly one file.
+	 *
+	 * **A report like this cannot describe a dependency.** Changing one file
+	 * can never mark another stale, because nothing in the data says any two
+	 * are connected — which is what `#[CoversClass]` does to a coverage
+	 * report. It is worth saying out loud, because the narrowing then looks
+	 * exactly as trustworthy as it would on a report that had measured
+	 * everything.
+	 *
+	 * Fewer than two tests is not evidence of anything, so it is not reported.
+	 *
+	 * @return bool
+	 */
+	public function isAttributionBound(): bool {
+		if(count($this->tests) < 2) {
+			return FALSE;
+		}
+
+		foreach($this->tests as $test) {
+			if(count($test->touches) !== 1) {
+				return FALSE;
+			}
+		}
+
+		return TRUE;
+	}
+
+	/**
 	 * Of the paths given, the ones this snapshot holds a verdict for, in the
 	 * order they were given.
 	 *

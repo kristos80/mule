@@ -59,6 +59,32 @@ final readonly class Freshness {
 	}
 
 	/**
+	 * Of the paths given, those whose bytes are still what the snapshot says.
+	 *
+	 * **Asked after the engine has run, not before.** A gate keys the tree,
+	 * then spends minutes mutating it; a file edited in between was proven as
+	 * one thing and would be recorded as another. Re-reading the handful of
+	 * files about to be banked turns that from a wrong verdict into a skipped
+	 * one.
+	 *
+	 * @param Snapshot $snapshot
+	 * @param list<string> $paths
+	 * @return list<string>
+	 */
+	public function unmoved(Snapshot $snapshot, array $paths): array {
+		$digests = $snapshot->digests();
+		$unmoved = [];
+
+		foreach($paths as $path) {
+			if(($digests[$path] ?? NULL) === $this->digestOf($path)) {
+				$unmoved[] = $path;
+			}
+		}
+
+		return $unmoved;
+	}
+
+	/**
 	 * Every recorded file as it hashes now, or NULL where one has gone.
 	 *
 	 * **Hashed once, here.** Everything below is derived from this map rather

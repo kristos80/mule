@@ -85,6 +85,32 @@ final readonly class Summary {
 	}
 
 	/**
+	 * Files that changed under the gate's feet.
+	 *
+	 * @param int $files
+	 * @return list<string> Empty when nothing moved.
+	 */
+	public static function moved(int $files): array {
+		return $files === 0
+			? []
+			: ["mule: {$files} file(s) changed while the gate ran and were not recorded."];
+	}
+
+	/**
+	 * Said when the coverage report credits every test with one file, so that
+	 * narrowing looks stronger than the data behind it.
+	 *
+	 * @param bool $bounded
+	 * @return list<string>
+	 */
+	public static function attributionBound(bool $bounded): array {
+		return $bounded
+			? ["mule: every test here covers exactly one file, so no change can mark another file stale — "
+				. "see the README on coverage attribution."]
+			: [];
+	}
+
+	/**
 	 * A failure mule predicted: something about the project, its configuration
 	 * or its filesystem that it cannot work with.
 	 *

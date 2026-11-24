@@ -100,6 +100,30 @@ final class SnapshotTest extends TestCase {
 		self::assertSame(["src/A.php"], $current->staleAgainst($stored));
 	}
 
+	public function testKnowsWhenEveryTestInItCoversExactlyOneFile(): void {
+		$snapshot = Snapshot::of([], [
+			"tests/ATest.php" => new Touched("tt", ["src/A.php"]),
+			"tests/BTest.php" => new Touched("uu", ["src/B.php"]),
+		]);
+
+		self::assertTrue($snapshot->isAttributionBound());
+	}
+
+	public function testKnowsWhenATestRunsMoreThanOneFile(): void {
+		$snapshot = Snapshot::of([], [
+			"tests/ATest.php" => new Touched("tt", ["src/A.php", "src/B.php"]),
+			"tests/BTest.php" => new Touched("uu", ["src/B.php"]),
+		]);
+
+		self::assertFalse($snapshot->isAttributionBound());
+	}
+
+	public function testTreatsTooFewTestsAsEvidenceOfNothing(): void {
+		$snapshot = Snapshot::of([], ["tests/ATest.php" => new Touched("tt", ["src/A.php"])]);
+
+		self::assertFalse($snapshot->isAttributionBound());
+	}
+
 	public function testNamesWhichOfThePathsGivenItHoldsAVerdictFor(): void {
 		$snapshot = self::snapshot(["src/A.php" => "aa", "src/B.php" => "bb", "src/C.php" => "cc"]);
 

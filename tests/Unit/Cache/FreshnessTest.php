@@ -195,6 +195,21 @@ final class FreshnessTest extends TestCase {
 		self::assertSame("two() lines 3-8, 2 unreached", $standing->gaps["src/B.php"][0]->described());
 	}
 
+	public function testKeepsThePathsWhoseBytesAreStillWhatWasRecorded(): void {
+		$stored = $this->stored();
+
+		self::assertSame(["src/A.php"], $this->freshness()->unmoved($stored, ["src/A.php"]));
+	}
+
+	public function testDropsThePathThatMovedSinceItWasRecorded(): void {
+		$stored = $this->stored();
+
+		$this->filesystem->given("/project/src/A.php", "<?php class A { public function one() {} }");
+
+		self::assertSame([], $this->freshness()->unmoved($stored, ["src/A.php"]));
+	}
+
+
 	/**
 	 * @return Freshness
 	 */

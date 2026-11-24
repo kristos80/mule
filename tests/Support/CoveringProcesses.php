@@ -28,6 +28,7 @@ final class CoveringProcesses implements ProcessesInterface {
 	 * @param list<int> $statuses One exit status per run, in order; 0 once they run out.
 	 * @param array<string, array{executable: int, executed: int, methods: list<array{name: string, start: int, end: int, executable: int, executed: int}>}> $gaps
 	 *        Source paths the tests do not reach all of, keyed as in $covered.
+	 * @param array<string, string> $duringEngine Absolute path to contents, written while the engine runs.
 	 */
 	public function __construct(
 		private InMemoryFilesystem $filesystem,
@@ -35,6 +36,7 @@ final class CoveringProcesses implements ProcessesInterface {
 		private string $sourceRoot = "/project/src",
 		private array $statuses = [],
 		private array $gaps = [],
+		private array $duringEngine = [],
 	) {}
 
 	/**
@@ -45,9 +47,14 @@ final class CoveringProcesses implements ProcessesInterface {
 	public function run(array $command, string $directory): int {
 		$this->runs[] = ["command" => $command, "directory" => $directory];
 		$status = array_shift($this->statuses) ?? 0;
+		$covering = FALSE;
 
 		foreach($command as $argument) {
-			$this->cover($argument, $status);
+			$covering = $this->cover($argument, $status) || $covering;
+		}
+
+		if(!$covering) {
+			$this->edit();
 		}
 
 		return $status;
@@ -88,13 +95,17 @@ final class CoveringProcesses implements ProcessesInterface {
 	 *
 	 * @param string $argument
 	 * @param int $status
-	 * @return void
+	 * @return bool Whether this argument was the one naming the report.
 	 */
-	private function cover(string $argument, int $status): void {
+	private function cover(string $argument, int $status): bool {
 		$flag = "--coverage-xml=";
 
-		if($status !== 0 || !str_starts_with($argument, $flag)) {
-			return;
+		if(!str_starts_with($argument, $flag)) {
+			return FALSE;
+		}
+
+		if($status !== 0) {
+			return TRUE;
 		}
 
 		$directory = substr($argument, strlen($flag));
@@ -115,6 +126,19 @@ final class CoveringProcesses implements ProcessesInterface {
 				);
 
 			$this->filesystem->given("{$directory}/{$path}.xml", $report);
+		}
+
+		return TRUE;
+	}
+
+	/**
+	 * Somebody saving a file while the gate is mid-run.
+	 *
+	 * @return void
+	 */
+	private function edit(): void {
+		foreach($this->duringEngine as $path => $contents) {
+			$this->filesystem->given($path, $contents);
 		}
 	}
 }
