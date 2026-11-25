@@ -7,10 +7,19 @@
 # conventional fails nothing. It silently produces no release, which is the
 # hardest kind of problem to notice.
 #
-# `edited` is in the trigger on purpose: retitling has to re-run this, or a
-# title fixed after a red check stays red and one broken after a green check
-# stays green.
-name: PR Title
+# The second job guards the *description* for the same reason. A squash commit
+# takes its body from the pull request description — `squash_merge_commit_message`
+# is PR_BODY — and GitHub honours a CI skip directive anywhere in a commit
+# message. So a description that merely *mentions* one skips the whole run on
+# merge: no gates on the merge commit, and no release. Measured rather than
+# imagined, on the pull request that moved the release off a direct push: its
+# description explained the directive it was removing, and the post-merge run
+# recorded zero checks.
+#
+# `edited` is in the trigger on purpose: retitling or rewording has to re-run
+# these, or a title fixed after a red check stays red and one broken after a
+# green check stays green.
+name: PR
 
 on:
   pull_request:
@@ -46,3 +55,27 @@ jobs:
             test
             chore
             ci
+
+  skips:
+    name: Refuse CI skip directives
+    runs-on: ubuntu-latest
+
+    steps:
+      # Through the environment rather than an expression in the script: a
+      # description is untrusted input, and interpolating it into a shell would
+      # be a script injection.
+      - name: Check the description
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          # GitHub's five, case-insensitive, with a hyphen tolerated where it
+          # takes a space. Matching more than GitHub honours is the safe
+          # direction to be wrong in.
+          if printf '%s' "$BODY" | grep -qiE '\[(skip[ -]ci|ci[ -]skip|no[ -]ci|skip[ -]actions|actions[ -]skip)\]'; then
+            echo "::error::This description carries a CI skip directive. A squash commit takes its body from the description, so merging would skip the gates and the release. Write the directive without its brackets, or in a code block that does not reproduce it verbatim."
+            exit 1
+          fi
+
+          echo "No skip directive in the description."
