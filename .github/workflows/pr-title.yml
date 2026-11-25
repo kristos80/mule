@@ -25,13 +25,16 @@ on:
   pull_request:
     types: [opened, edited, synchronize, reopened]
 
-permissions:
-  pull-requests: read
-
 jobs:
   lint:
     name: Validate PR title
     runs-on: ubuntu-latest
+
+    # Per job rather than for the whole file: a workflow-level grant hands the
+    # token to every job in it, including ones added later that have no business
+    # with it. Named by SonarQube as githubactions:S8264.
+    permissions:
+      pull-requests: read
 
     steps:
       - uses: amannn/action-semantic-pull-request@66e72920af32222769c386d81f89656ebcb6d6d5 # v6.1.4
@@ -60,22 +63,19 @@ jobs:
     name: Refuse CI skip directives
     runs-on: ubuntu-latest
 
+    permissions:
+      pull-requests: read
+
     steps:
-      # The description is fetched rather than interpolated. Passing it through
-      # `env:` would be safe too — that is GitHub's own hardening advice, and
-      # unsafe is only ever `${{ }}` inside a `run:` line — but a workflow
-      # expression carrying untrusted data is a pattern a scanner cannot tell
-      # apart from the unsafe one, and it earned a security finding here. Asking
-      # the API keeps the data out of the template altogether, which costs
-      # nothing and leaves nothing to argue about.
+      # Through the environment rather than an expression inside the `run:`
+      # script. A description is untrusted input, and `${{ }}` in a shell line
+      # is the script injection; binding it to a variable first is what
+      # GitHub's own hardening guide prescribes.
       - name: Check the description
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR: ${{ github.event.pull_request.number }}
+          BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
-
-          BODY="$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
 
           # GitHub's five, case-insensitive, with a hyphen tolerated where it
           # takes a space. Matching more than GitHub honours is the safe
