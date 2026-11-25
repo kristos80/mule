@@ -1,0 +1,48 @@
+# Validates that a pull request's title is a Conventional Commits subject.
+#
+# Why this is load-bearing rather than tidiness: master allows only squash
+# merges and takes the commit subject from the pull request's title, so **the
+# title becomes the commit subject on master** — and that subject is the only
+# thing semantic-release reads to decide the next version. A title that is not
+# conventional fails nothing. It silently produces no release, which is the
+# hardest kind of problem to notice.
+#
+# `edited` is in the trigger on purpose: retitling has to re-run this, or a
+# title fixed after a red check stays red and one broken after a green check
+# stays green.
+name: PR Title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  lint:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: amannn/action-semantic-pull-request@66e72920af32222769c386d81f89656ebcb6d6d5 # v6.1.4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Of these, only `feat` and `fix` release anything — `!` or a
+          # BREAKING CHANGE footer makes it major. The other five are valid
+          # subjects that deliberately ship nothing, which is why this checks
+          # the *format* and never "will this release".
+          #
+          # `perf` and `revert` are deliberately absent. Both *would* release a
+          # patch under semantic-release's defaults, so admitting either is a
+          # decision about what this repository releases rather than an
+          # addition to a list.
+          types: |
+            feat
+            fix
+            refactor
+            docs
+            test
+            chore
+            ci

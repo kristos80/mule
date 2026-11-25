@@ -111,7 +111,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: gates
 
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # Merging the release PR is itself a push to master, so without the subject
+    # guard the run would start again on its own output. `[skip ci]` used to do
+    # this when the bump was pushed straight here; a PR's squash commit carries
+    # the title verbatim instead, which is what this switches on.
+    if: >-
+      github.event_name == 'push' && github.ref == 'refs/heads/master'
+      && !startsWith(github.event.head_commit.message, 'chore(release):')
 
     permissions:
       contents: write
@@ -137,7 +143,74 @@ jobs:
       # writes CHANGELOG.md, tags, and publishes the GitHub release. Packagist
       # picks the tag up through its GitHub integration; nothing here talks to
       # it directly.
+      #
+      # The tag and the release are published from here; the changelog is not.
+      # `@semantic-release/git` would have pushed it straight to master, which
+      # the branch ruleset rejects twice over — a pull request is required, and
+      # a runner's unsigned commit would fail `required_signatures` on top of
+      # that. A tag is not a branch, so publishing one needs no exception.
       - name: Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx semantic-release
+
+      # A `ci:`/`chore:`/`docs:`/`refactor:`/`test:` merge is no release at all:
+      # semantic-release prepares nothing and the tree stays clean. Said out
+      # loud rather than left for create-pull-request to no-op silently.
+      #
+      # The version comes from the tag semantic-release has just pushed, which
+      # is the source of truth it computes from. composer.json carries no
+      # version field on purpose, and this repository's package.json is a
+      # holder for the release tooling rather than something the release writes.
+      - name: Did a release happen?
+        id: prepared
+        run: |
+          set -euo pipefail
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No release was prepared for this push. Nothing to open."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch --tags --quiet
+          echo "version=$(git describe --tags --abbrev=0 | sed 's/^v//')" >> "$GITHUB_OUTPUT"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          git status --porcelain
+
+      # The changelog arrives the way every other change to master does.
+      #
+      # `sign-commits` commits through the GitHub API, so the branch commit is
+      # verified rather than showing as unsigned. That is hygiene and not what
+      # makes the PR mergeable: what lands on master is GitHub's own squash
+      # commit, signed with the web-flow key, which is why `required_signatures`
+      # is satisfied without anybody configuring a key locally.
+      - name: Open the release pull request
+        if: steps.prepared.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
+        with:
+          sign-commits: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: master
+          branch: chore/release-${{ steps.prepared.outputs.version }}
+          delete-branch: true
+          # Both strings are the bare subject, and the title is the one that
+          # matters: `squash_merge_commit_title` is PR_TITLE, so this lands on
+          # master verbatim and is what the guard above switches on.
+          title: "chore(release): ${{ steps.prepared.outputs.version }}"
+          commit-message: "chore(release): ${{ steps.prepared.outputs.version }}"
+          labels: release
+          add-paths: CHANGELOG.md
+          body: |
+            Changelog for **v${{ steps.prepared.outputs.version }}**, prepared by `semantic-release`.
+
+            The git tag and the GitHub release are already published — this PR carries only
+            the file `@semantic-release/git` would have pushed straight to `master`, which
+            the branch ruleset rejects: a pull request is required, and a runner's unsigned
+            push would fail `required_signatures` regardless.
+
+            So a tag's tree does not contain its own changelog entry. Accepted: the tag
+            marks the released commit, and Packagist reads the version from the tag.
+
+            Merging this triggers no further release — the squash commit's subject starts
+            with `chore(release):`, which the `release` job skips.
