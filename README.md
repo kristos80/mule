@@ -333,7 +333,7 @@ not, and mule says so rather than reading past them:
 | `exclude` | Project-relative paths left out of mutation **and** out mule's reading of the coverage report, so the two cannot drift apart. The engine applies its exclude list to every source directory at once, and mule asks a file the same question the engine will — so with several source roots, excluding `lib/Generated` excludes `src/Generated` too. Name them differently if you want one and not the other. |
 | `tests` | Which suite coverage is worked out from. Omit for all of them. |
 | `narrow` | May a coverage run execute only the tests of what is outstanding? Off by default: narrowing a test run is sound only where tests do not depend on each other having run, and mule will not assume that for you. |
-| `mutators` | Mule's own names — no `@`, no underscores. Defaults to `default` and `identical`. An unknown family is refused rather than forwarded. |
+| `mutators` | A family in mule's words — lower case, no `@`, no underscores — or a single mutator in the engine's, like `ArrayFind`. Case tells them apart, and the engine's names are PascalCase without exception. An unknown *family* is refused; a single mutator is passed through for the engine to validate. Defaults to `default` and `identical`. |
 | `mutate-uncovered` | Mutate code no test reaches. Below full coverage this makes the gate fail rather than report, which is a choice you are entitled to make. |
 | `min-coverage` | Fail the run below this percentage of covered lines. Omit and mule reports coverage without asserting anything about it. |
 | `timeout` | Seconds a single mutant may run for. |
@@ -474,22 +474,42 @@ See `CLAUDE.md` for the rules and `docs/decisions.md` for why each of them.
 
 PHP 8.4+, a coverage driver, and PHPUnit or Pest to run your tests.
 
-**The engine is a dependency, so its constraints become yours.** Mule requires
-`infection/infection ^0.32`, which Composer resolves alongside the rest of your
-project. That is deliberate — it is what removes the `binary` key, makes the
-engine's version pinnable by your lock file, and lets mule promise the engine is
-there at all. Infection and a current PHPUnit share a `composer.json` without
-trouble (its `sebastian/diff ^4.0 || … || ^8.0` spans PHPUnit 9 through 12), but
-it does bring:
+**Both tools are dependencies, so their constraints become yours.** Mule
+requires `infection/infection ^0.32` and `phpunit/phpunit ^12.0 || ^13.0`, which
+Composer resolves alongside the rest of your project. That is what removes the
+`binary` key, makes both versions pinnable by your lock file, and lets mule
+promise they are there at all.
+
+**One line of `composer.json` is needed on your side.** Infection ships a
+Composer plugin, so installing mule requires allowing it, or a non-interactive
+`composer install` stops with `contains a Composer plugin which is blocked by
+your allow-plugins config`:
+
+```json
+{
+	"config": {
+		"allow-plugins": { "infection/extension-installer": true }
+	}
+}
+```
+
+**The PHPUnit range is the narrowing to watch.** A project on PHPUnit 10 or 11
+cannot install mule, and neither can a Pest release that pins below 12. There is
+no conflict between the two tools themselves — Infection's
+`sebastian/diff ^4.0 || … || ^8.0` spans PHPUnit 9 through 13, verified by
+resolving 13.1.14 against Infection 0.32.7 — the limit is mule's own range, and
+widening it means running mule's gates against the older majors.
+
+Infection also brings:
 
 - `symfony/console`, `symfony/filesystem`, `symfony/finder` at `^6.4 || ^7.0 || ^8.0`
 - `nikic/php-parser ^5.6.2`
 - `justinrainbow/json-schema ^6.0`
 
 A project pinned below any of those — Symfony 5.4, say — will not resolve. If
-that is you, install mule as a tool of its own rather than as a dev dependency
-of the project it gates; the store it writes is keyed on file digests and does
-not care where mule came from.
+that is you, or if you are on a PHPUnit older than 12, install mule as a tool of
+its own rather than as a dev dependency of the project it gates; the store it
+writes is keyed on file digests and does not care where mule came from.
 
 ## Licence
 

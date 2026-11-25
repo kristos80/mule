@@ -74,7 +74,6 @@ final readonly class Declaration {
 	private function document(): array {
 		$document = [
 			"source" => ["directories" => $this->directories()],
-			"mutators" => $this->mutators(),
 			"phpUnit" => ["configDir" => $this->root],
 			"minMsi" => self::FULL_SCORE,
 			"minCoveredMsi" => self::FULL_SCORE,
@@ -105,19 +104,4 @@ final readonly class Declaration {
 		return $directories;
 	}
 
-	/**
-	 * The families asked for, as the engine's own map of name to whether it is
-	 * on.
-	 *
-	 * @return array<string, bool>
-	 */
-	private function mutators(): array {
-		$mutators = [];
-
-		foreach($this->configuration->mutators as $mutator) {
-			$mutators[$mutator] = TRUE;
-		}
-
-		return $mutators;
-	}
 }

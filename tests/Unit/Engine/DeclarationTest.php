@@ -25,21 +25,24 @@ final class DeclarationTest extends TestCase {
 	public function testRendersWhatTheEngineNeedsAndNothingElse(): void {
 		self::assertSame([
 			"source" => ["directories" => ["/project/src", "/project/lib"]],
-			"mutators" => ["@default" => TRUE],
 			"phpUnit" => ["configDir" => "/project"],
 			"minMsi" => 100,
 			"minCoveredMsi" => 100,
 		], $this->decoded($this->configuration(source: ["src", "lib"])));
 	}
 
-	public function testTurnsOnEveryFamilyItWasGiven(): void {
-		self::assertSame([
-			"source" => ["directories" => ["/project/src"]],
-			"mutators" => ["@default" => TRUE, "@identical" => TRUE],
-			"phpUnit" => ["configDir" => "/project"],
-			"minMsi" => 100,
-			"minCoveredMsi" => 100,
-		], $this->decoded($this->configuration(mutators: ["@default", "@identical"])));
+	/**
+	 * The engine's schema forbids properties it does not define and defines
+	 * fewer mutator names than the engine accepts, so naming them here failed
+	 * whole runs. They are an argument now — see InfectionTest.
+	 *
+	 * @return void
+	 */
+	public function testSaysNothingAboutMutators(): void {
+		self::assertArrayNotHasKey(
+			"mutators",
+			$this->decoded($this->configuration(mutators: ["@default", "@identical"])),
+		);
 	}
 
 	/**
@@ -54,7 +57,6 @@ final class DeclarationTest extends TestCase {
 				"directories" => ["/project/src"],
 				"excludes" => ["External/Disk.php"],
 			],
-			"mutators" => ["@default" => TRUE],
 			"phpUnit" => ["configDir" => "/project"],
 			"minMsi" => 100,
 			"minCoveredMsi" => 100,
@@ -80,7 +82,6 @@ final class DeclarationTest extends TestCase {
 	public function testAsksForTheTimeoutTheProjectWanted(): void {
 		self::assertSame([
 			"source" => ["directories" => ["/project/src"]],
-			"mutators" => ["@default" => TRUE],
 			"phpUnit" => ["configDir" => "/project"],
 			"minMsi" => 100,
 			"minCoveredMsi" => 100,

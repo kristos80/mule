@@ -79,6 +79,7 @@ final class GateTest extends TestCase {
 			"--coverage=" . self::RUN,
 			"--skip-initial-tests",
 			"--no-interaction",
+			"--mutators=@default,@identical",
 		], $this->processes->command(1));
 	}
 
@@ -466,7 +467,7 @@ final class GateTest extends TestCase {
 		$this->gate()->full();
 
 		self::assertSame(
-			'{"source":{"directories":["/project/src"]},"mutators":{"@boolean":true},"phpUnit":{"configDir":"/project"},"minMsi":100,"minCoveredMsi":100}',
+			'{"source":{"directories":["/project/src"]},"phpUnit":{"configDir":"/project"},"minMsi":100,"minCoveredMsi":100}',
 			str_replace(["\n", "\t", " "], "", $this->processes->declaration),
 		);
 	}
