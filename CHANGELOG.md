@@ -1,3 +1,20 @@
+# [2.0.0](https://github.com/kristos80/mule/compare/v1.4.3...v2.0.0) (2026-11-25)
+
+
+* feat!: report coverage, gate on it, and configure it all through mule.json ([4a5e80a](https://github.com/kristos80/mule/commit/4a5e80a2e155c45d33f06ee558f1227a1dab1b43))
+
+
+### BREAKING CHANGES
+
+* mule.json's keys are entirely new. `coverage`, `binary` and
+`options` are gone, and the {coverage-xml}, {junit} and {tests} placeholders
+with them; narrowed coverage runs are now opted into with `narrow`. An
+`infection.json5` is no longer read, and `infection/infection` moved from
+require-dev to require. Projects configure mule and nothing else, and enable a
+coverage driver by wrapping mule rather than by configuring it.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+
 ## [1.4.3](https://github.com/kristos80/mule/compare/v1.4.2...v1.4.3) (2026-11-24)
 
 
