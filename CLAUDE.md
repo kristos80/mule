@@ -123,7 +123,15 @@ pushed it straight to master, which the ruleset rejects twice over, so it
 arrives through `peter-evans/create-pull-request` like any other change. The
 consequence, accepted: a tag's tree does not contain its own changelog entry.
 The `release` job skips a head commit whose subject starts with
-`chore(release):`, which is what keeps merging that PR from releasing again.
+`chore(release):`, which is what keeps merging that PR from releasing again —
+verified on v3.0.0's own release merge, where that job reported `skipped`.
+
+**That pull request merges itself** once the gates go green, through
+`gh pr merge --auto`. It is the one thing that reaches master without a human
+reading it, and it is a changelog the release has already published. Nothing is
+bypassed: GitHub still waits for the ruleset, the waiting is simply nobody's job.
+Left unmerged it would be harmless, since the tag and the GitHub release are out
+and Packagist reads the tag.
 
 **Packagist takes the version from the tag**, through its GitHub integration.
 Nothing in the workflow talks to Packagist, and `composer.json` carries no
