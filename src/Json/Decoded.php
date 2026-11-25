@@ -41,12 +41,22 @@ final readonly class Decoded {
 	 * business, and a file that *is* there and says nothing mule understands is
 	 * damage worth stopping for.
 	 *
+	 * **Bytes that will not parse are a different complaint from valid JSON
+	 * that is not an object**, and worth telling apart now that `mule.json` is
+	 * the only file a project writes. A comment or a trailing comma in it is an
+	 * easy thing to reach for and nothing about "mule needs it to be a JSON
+	 * object" points at the syntax.
+	 *
 	 * @param string $json
 	 * @param string $subject
 	 * @return self
 	 */
 	public static function of(string $json, string $subject): self {
 		$decoded = json_decode($json);
+
+		if(json_last_error() !== JSON_ERROR_NONE) {
+			throw new Failure("Cannot read {$subject}: " . lcfirst(json_last_error_msg()) . ". It must be plain JSON — comments and trailing commas are not.");
+		}
 
 		if(!is_object($decoded)) {
 			throw new Failure("Cannot read {$subject}: mule needs it to be a JSON object.");
@@ -75,10 +85,10 @@ final readonly class Decoded {
 	 * A key that need not be there, as a non-empty string.
 	 *
 	 * @param string $key
-	 * @param string $fallback
-	 * @return string
+	 * @param string|null $fallback
+	 * @return string|null
 	 */
-	public function stringOr(string $key, string $fallback): string {
+	public function stringOr(string $key, ?string $fallback): ?string {
 		return array_key_exists($key, $this->values) ? $this->string($key) : $fallback;
 	}
 
@@ -122,6 +132,117 @@ final readonly class Decoded {
 		}
 
 		return $value;
+	}
+
+	/**
+	 * A key that need not be there, as a whole number.
+	 *
+	 * @param string $key
+	 * @param int|null $fallback
+	 * @return int|null
+	 */
+	public function numberOr(string $key, ?int $fallback): ?int {
+		return array_key_exists($key, $this->values) ? $this->number($key) : $fallback;
+	}
+
+	/**
+	 * A key that need not be there, as a flag.
+	 *
+	 * @param string $key
+	 * @param bool $fallback
+	 * @return bool
+	 */
+	public function flag(string $key, bool $fallback): bool {
+		$value = $this->values[$key] ?? $fallback;
+
+		if(!is_bool($value)) {
+			throw new Failure("The {$key} in {$this->subject} must be true or false.");
+		}
+
+		return $value;
+	}
+
+	/**
+	 * A nested object read as a set of flags: every name whose value is `true`.
+	 *
+	 * **The names are not checked here.** Which of them mean anything is the
+	 * caller's business, and this is the layer that knows types rather than
+	 * vocabulary.
+	 *
+	 * @param string $key
+	 * @return list<string>
+	 */
+	public function enabled(string $key): array {
+		$enabled = [];
+
+		foreach($this->object($key)->values as $name => $value) {
+			if(!is_bool($value)) {
+				throw new Failure("The {$name} in {$this->subject} {$key} must be true or false.");
+			}
+
+			if($value) {
+				$enabled[] = "{$name}";
+			}
+		}
+
+		return $enabled;
+	}
+
+	/**
+	 * A nested object's *values* as a flat list of paths, trailing separators
+	 * trimmed.
+	 *
+	 * **The shape Composer's `autoload.psr-4` is in**: a namespace to one
+	 * directory or to several. The names are of no interest here — what is
+	 * wanted is where the project says its code lives.
+	 *
+	 * @param string $key
+	 * @return list<string>
+	 */
+	public function paths(string $key): array {
+		$paths = [];
+
+		foreach($this->object($key)->values as $name => $value) {
+			foreach(self::listed($value) as $path) {
+				$paths[] = $this->path($path, "{$name}", $key);
+			}
+		}
+
+		return $paths;
+	}
+
+	/**
+	 * One entry, whether it was written as a path or as a list of them.
+	 *
+	 * @param mixed $value
+	 * @return array<mixed>
+	 */
+	private static function listed(mixed $value): array {
+		return is_array($value) ? $value : [$value];
+	}
+
+	/**
+	 * @param mixed $path
+	 * @param string $name
+	 * @param string $key
+	 * @return string
+	 */
+	private function path(mixed $path, string $name, string $key): string {
+		if(!is_string($path) || $path === "") {
+			throw new Failure("The {$name} in {$this->subject} {$key} must be a path or a list of them.");
+		}
+
+		return rtrim($path, "/");
+	}
+
+	/**
+	 * Every key this object actually carries, so that a caller which owns its
+	 * whole vocabulary can refuse one it does not recognise.
+	 *
+	 * @return list<string>
+	 */
+	public function names(): array {
+		return array_keys($this->values);
 	}
 
 	/**

@@ -8,11 +8,14 @@ use Kristos80\Mule\Cache\Freshness;
 use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Store;
+use Kristos80\Mule\Cache\StoreFormat;
 use Kristos80\Mule\Cache\Universe;
 use Kristos80\Mule\Config\Configuration;
+use Kristos80\Mule\Engine\Declaration;
 use Kristos80\Mule\Engine\Infection;
 use Kristos80\Mule\Gate;
 use Kristos80\Mule\Project;
+use Kristos80\Mule\Runner\Measurement;
 use Kristos80\Mule\Runner\Scratch;
 use Kristos80\Mule\Tests\Support\CoveringProcesses;
 use Kristos80\Mule\Tests\Support\FixedRandom;
@@ -30,6 +33,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class GateTest extends TestCase {
 
+	private const string COMPOSER = '{"autoload": {"psr-4": {"Acme\\\\": "src"}}}';
+
 	private const string RUN = "/tmp/mule.cafe1234";
 
 	private const string STORE = "/project/.mule/verified.json";
@@ -45,7 +50,7 @@ final class GateTest extends TestCase {
 	 */
 	protected function setUp(): void {
 		$this->filesystem = (new InMemoryFilesystem())
-			->given("/project/composer.json", "{}")
+			->given("/project/composer.json", self::COMPOSER)
 			->given("/project/src/Key.php", "<?php class Key {}")
 			->given("/project/src/Gate.php", "<?php class Gate {}")
 			->given("/project/tests/KeyTest.php", "<?php class KeyTest {}")
@@ -62,16 +67,18 @@ final class GateTest extends TestCase {
 
 		self::assertSame(2, $this->processes->count());
 		self::assertSame([
+			PHP_BINARY,
 			"./vendor/bin/phpunit",
 			"--coverage-xml=" . self::RUN . "/coverage-xml",
 			"--log-junit=" . self::RUN . "/junit.xml",
 		], $this->processes->command(0));
 		self::assertSame([
-			"infection",
+			"./vendor/bin/infection",
+			"run",
+			"--configuration=" . self::RUN . "/infection.json",
 			"--coverage=" . self::RUN,
 			"--skip-initial-tests",
-			"--min-msi=100",
-			"--min-covered-msi=100",
+			"--no-interaction",
 		], $this->processes->command(1));
 	}
 
@@ -88,6 +95,7 @@ final class GateTest extends TestCase {
 		self::assertSame(["src/Gate.php", "src/Key.php"], $this->stored());
 		self::assertSame(
 			"mule: 0 of 2 files verified, 2 stale.\n"
+			. "mule: 2 of 2 lines covered (100.0%).\n"
 			. "mule: every test here covers exactly one file, so no change can mark another file stale — see the README on coverage attribution.\n"
 			. "mule: 2 file(s) recorded at the full score in .mule/verified.json.",
 			$this->output->text(),
@@ -97,8 +105,8 @@ final class GateTest extends TestCase {
 	public function testNarrowsToEveryFileWhenTheStoreVouchesForNothing(): void {
 		self::assertSame(0, $this->gate()->narrowed());
 
-		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->processes->command(1)[5] ?? "");
-		self::assertSame("--ignore-msi-with-no-mutations", $this->processes->command(1)[6] ?? "");
+		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->filterOf(1));
+		self::assertContains("--ignore-msi-with-no-mutations", $this->processes->command(1));
 		self::assertStringContainsString("mule: 0 of 2 files verified, 2 stale.", $this->output->text());
 	}
 
@@ -116,6 +124,7 @@ final class GateTest extends TestCase {
 		self::assertSame(0, $this->processes->count());
 		self::assertSame(
 			"mule: 2 of 2 files verified, 0 stale.\n"
+			. "mule: 2 of 2 lines covered (100.0%).\n"
 			. "mule: every test here covers exactly one file, so no change can mark another file stale — see the README on coverage attribution.\n"
 			. "mule: nothing to mutate, every file is verified against its own tests.",
 			$this->output->text(),
@@ -127,7 +136,7 @@ final class GateTest extends TestCase {
 	 * source files are.
 	 *
 	 * This is the case that was measured wrong before it was fixed: adding a
-	 * mutator profile to `infection.json5` left mule reporting "nothing to
+	 * mutator family to `mule.json` left mule reporting "nothing to
 	 * mutate" about a gate it had just widened, because the store was
 	 * re-examined for staleness and no source digest had moved. The engine must
 	 * be handed the whole project.
@@ -135,9 +144,9 @@ final class GateTest extends TestCase {
 	 * @return void
 	 */
 	public function testMutatesEverythingAgainWhenTheEnginesConfigurationChanged(): void {
-		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
+		$this->filesystem->given("/project/mule.json", '{"mutators": {"default": true}}');
 		$this->gate()->full();
-		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true, "@equal": true}}');
+		$this->filesystem->given("/project/mule.json", '{"mutators": {"default": true, "equal": true}}');
 		$this->output = new RecordingOutput();
 		$this->processes = new CoveringProcesses($this->filesystem, [
 			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
@@ -147,7 +156,7 @@ final class GateTest extends TestCase {
 		self::assertSame(0, $this->gate()->narrowed());
 
 		self::assertSame(2, $this->processes->count(), "the engine should have run.");
-		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->processes->command(1)[5] ?? "");
+		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->filterOf(1));
 		self::assertStringContainsString("mule: 0 of 2 files verified, 2 stale.", $this->output->text());
 	}
 
@@ -158,9 +167,9 @@ final class GateTest extends TestCase {
 	 * @return void
 	 */
 	public function testReportsEverythingStaleWhenTheEnginesConfigurationChanged(): void {
-		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
+		$this->filesystem->given("/project/mule.json", '{"mutators": {"default": true}}');
 		$this->gate()->full();
-		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true, "@equal": true}}');
+		$this->filesystem->given("/project/mule.json", '{"mutators": {"default": true, "equal": true}}');
 		$this->output = new RecordingOutput();
 
 		self::assertSame(0, $this->gate()->status());
@@ -194,6 +203,7 @@ final class GateTest extends TestCase {
 		self::assertSame(1, $this->processes->count(), "coverage should have run, and only coverage.");
 		self::assertSame(
 			"mule: 2 of 2 files verified, 0 stale.\n"
+			. "mule: 2 of 2 lines covered (100.0%).\n"
 			. "mule: every test here covers exactly one file, so no change can mark another file stale — see the README on coverage attribution.\n"
 			. "mule: nothing to mutate, every file is verified against its own tests.",
 			$this->output->text(),
@@ -206,7 +216,7 @@ final class GateTest extends TestCase {
 
 		$this->gate()->narrowed();
 
-		self::assertSame("--filter=src/Key.php", $this->processes->command(3)[5] ?? "");
+		self::assertSame("--filter=src/Key.php", $this->filterOf(3));
 		self::assertStringContainsString("mule: 1 of 2 files verified, 1 stale.", $this->output->text());
 		self::assertStringContainsString("mule: 1 file(s) recorded at the full score", $this->output->text());
 	}
@@ -217,7 +227,7 @@ final class GateTest extends TestCase {
 
 		$this->gate()->narrowed();
 
-		self::assertSame("--filter=src/Gate.php", $this->processes->command(3)[5] ?? "");
+		self::assertSame("--filter=src/Gate.php", $this->filterOf(3));
 	}
 
 	public function testKeepsWhatTheStoreAlreadyVouchedForWhenBankingANarrowedRun(): void {
@@ -253,7 +263,7 @@ final class GateTest extends TestCase {
 
 		$this->gate()->narrowed();
 
-		self::assertSame("--filter=src/Key.php", $this->processes->command(3)[5] ?? "");
+		self::assertSame("--filter=src/Key.php", $this->filterOf(3));
 		self::assertStringContainsString("mule: 1 of 2 files verified, 0 stale, 1 not covered in full.", $this->output->text());
 	}
 
@@ -274,9 +284,209 @@ final class GateTest extends TestCase {
 		$this->gate()->narrowed();
 
 		self::assertSame(
-			["composer.json"],
+			["composer.json", "mule.json"],
 			array_keys($this->storedSnapshot()->configuration()),
 		);
+	}
+
+	/**
+	 * A narrowed run measures the files it needs and no others, so the lines in
+	 * the rest of the project have to come from the store. `Gate.php` has twenty
+	 * of them and is not re-measured; reporting the subset's own report alone
+	 * would say the project is one line long.
+	 *
+	 * @return void
+	 */
+	public function testReportsTheWholeProjectsCoverageAfterANarrowedRun(): void {
+		$this->givenTheCoverageCommandSaysWhereTestsGo();
+		$this->givenGateIsTwentyLinesLong();
+		$this->gate()->full();
+		$this->filesystem->given("/project/src/Key.php", "<?php class Key { public function one() {} }");
+		$this->output = new RecordingOutput();
+
+		$this->gate()->narrowed();
+
+		self::assertSame(
+			["tests/KeyTest.php"],
+			array_slice($this->processes->command(2), 4),
+			"only the one test should have run.",
+		);
+		self::assertStringContainsString("mule: 21 of 21 lines covered (100.0%).", $this->output->text());
+	}
+
+	public function testReportsTheCoverageItMeasuredWhenTheStoreCannotBeUsed(): void {
+		$this->givenGateIsTwentyLinesLong();
+
+		$this->gate()->full();
+
+		self::assertStringContainsString("mule: 21 of 21 lines covered (100.0%).", $this->output->text());
+	}
+
+	public function testReportsTheLinesTheTestsDoNotReach(): void {
+		$this->givenKeyIsHalfCovered();
+
+		$this->gate()->full();
+
+		self::assertStringContainsString("mule: 2 of 5 lines covered (40.0%).", $this->output->text());
+	}
+
+	/**
+	 * The store answers with no coverage run and no engine, so the lines it
+	 * reports are the ones it recorded the last time anything measured them.
+	 *
+	 * @return void
+	 */
+	public function testReportsTheStoredCoverageWithoutMeasuringAnything(): void {
+		$this->givenGateIsTwentyLinesLong();
+		$this->gate()->full();
+		$this->output = new RecordingOutput();
+		$started = $this->processes->count();
+
+		$this->gate()->status();
+
+		self::assertSame($started, $this->processes->count(), "the store should have answered alone.");
+		self::assertStringContainsString("mule: 21 of 21 lines covered (100.0%).", $this->output->text());
+	}
+
+	/**
+	 * A store from before mule recorded any of this still answers for the files
+	 * it vouches for, and says nothing about lines it never measured.
+	 *
+	 * @return void
+	 */
+	public function testSaysNothingAboutCoverageWhenTheStoreRecordedNone(): void {
+		$this->gate()->full();
+		$this->givenTheStoreRecordedNoCoverage();
+		$this->output = new RecordingOutput();
+
+		self::assertSame(0, $this->gate()->status());
+
+		self::assertSame(
+			"mule: 2 of 2 files verified, 0 stale.\n"
+			. "mule: every test here covers exactly one file, so no change can mark another file stale — see the README on coverage attribution.",
+			$this->output->text(),
+		);
+	}
+
+	/**
+	 * The one assertion mule makes about coverage, and it is a project's to ask
+	 * for. Reported after the verdicts are banked, never instead of them: the
+	 * mutation work was done and proven, and discarding it because a separate
+	 * assertion failed would mean paying for it again next run.
+	 *
+	 * @return void
+	 */
+	public function testFailsWhenCoverageIsBelowWhatTheProjectAsksFor(): void {
+		$this->filesystem->given("/project/mule.json", '{"min-coverage": 100}');
+		$this->givenKeyIsHalfCovered();
+
+		self::assertSame(1, $this->gate()->full());
+
+		self::assertStringContainsString("mule: 2 of 5 lines covered (40.0%).", $this->output->text());
+		self::assertStringContainsString("mule: that is below the 100% this project asks for.", $this->output->text());
+		self::assertSame(["src/Gate.php"], $this->stored(), "and it still banks what it proved.");
+	}
+
+	public function testPassesWhenCoverageIsAtWhatTheProjectAsksFor(): void {
+		$this->filesystem->given("/project/mule.json", '{"min-coverage": 100}');
+
+		self::assertSame(0, $this->gate()->full());
+
+		self::assertStringNotContainsString("below the", $this->output->text());
+	}
+
+	/**
+	 * The store records how much of each file was reached, so the cheapest verb
+	 * holds a project to its own minimum without measuring anything.
+	 *
+	 * @return void
+	 */
+	public function testHoldsAProjectToItsMinimumFromTheStoreAlone(): void {
+		$this->filesystem->given("/project/mule.json", '{"min-coverage": 100}');
+		$this->givenKeyIsHalfCovered();
+		$this->gate()->full();
+		$this->output = new RecordingOutput();
+
+		self::assertSame(1, $this->gate()->status());
+	}
+
+	public function testAssertsNothingAboutCoverageWhenTheProjectAsksForNothing(): void {
+		$this->givenKeyIsHalfCovered();
+
+		self::assertSame(0, $this->gate()->full());
+	}
+
+	public function testWorksCoverageOutFromTheSuiteTheProjectNamed(): void {
+		$this->filesystem->given("/project/mule.json", '{"tests": "unit"}');
+
+		$this->gate()->full();
+
+		self::assertSame([
+			PHP_BINARY,
+			"./vendor/bin/phpunit",
+			"--coverage-xml=" . self::RUN . "/coverage-xml",
+			"--log-junit=" . self::RUN . "/junit.xml",
+			"--testsuite=unit",
+		], $this->processes->command(0));
+	}
+
+	/**
+	 * The files are the stricter instruction of the two — they are the tests of
+	 * whatever is outstanding, whichever suite they sit in — and a runner given
+	 * both a suite and a file list has no sensible reading of them.
+	 *
+	 * @return void
+	 */
+	public function testDropsTheNamedSuiteOnceParticularTestsAreNamed(): void {
+		$this->filesystem->given("/project/mule.json", '{"tests": "unit", "narrow": true}');
+		$this->gate()->full();
+		$this->filesystem->given("/project/src/Key.php", "<?php class Key { public function one() {} }");
+
+		$this->gate()->narrowed();
+
+		self::assertSame([
+			PHP_BINARY,
+			"./vendor/bin/phpunit",
+			"--coverage-xml=" . self::RUN . "/coverage-xml",
+			"--log-junit=" . self::RUN . "/junit.xml",
+			"tests/KeyTest.php",
+		], $this->processes->command(2));
+	}
+
+	/**
+	 * The engine cannot be driven by flags alone — it has no option for the
+	 * directories to mutate — so a run that wrote no configuration would be a
+	 * run the engine could not have worked from.
+	 *
+	 * @return void
+	 */
+	public function testHandsTheEngineAConfigurationRenderedFromMuleJson(): void {
+		$this->filesystem->given("/project/mule.json", '{"mutators": {"boolean": true}}');
+
+		$this->gate()->full();
+
+		self::assertSame(
+			'{"source":{"directories":["/project/src"]},"mutators":{"@boolean":true},"phpUnit":{"configDir":"/project"},"minMsi":100,"minCoveredMsi":100}',
+			str_replace(["\n", "\t", " "], "", $this->processes->declaration),
+		);
+	}
+
+	/**
+	 * The engine's exclude list cannot be scoped to one source root, so a file
+	 * sharing a relative path with an excluded one is mutated by nothing. It
+	 * must not be banked as though something had been.
+	 *
+	 * @return void
+	 */
+	public function testBanksNothingForAFileTheEngineCannotBeAskedToMutate(): void {
+		$this->filesystem
+			->given("/project/composer.json", '{"autoload": {"psr-4": {"Acme\\\\": ["src", "lib"]}}}')
+			->given("/project/mule.json", '{"exclude": ["lib/Key.php"]}')
+			->given("/project/lib/Key.php", "<?php class LibKey {}");
+
+		$this->gate()->full();
+
+		self::assertSame(["src/Gate.php"], $this->stored());
 	}
 
 	public function testHasSomethingToMutateWhileAnythingIsNotCoveredInFull(): void {
@@ -303,7 +513,7 @@ final class GateTest extends TestCase {
 
 		// Stale finds Key.php, unproven finds Gate.php, and the engine is told
 		// about them in path order rather than in the order they turned up.
-		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->processes->command(1)[5] ?? "");
+		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->filterOf(1));
 	}
 
 	public function testBanksOnlyTheProvenFilesOfANarrowedScope(): void {
@@ -329,6 +539,7 @@ final class GateTest extends TestCase {
 		$this->gate()->narrowed();
 
 		self::assertSame([
+			PHP_BINARY,
 			"./vendor/bin/phpunit",
 			"--coverage-xml=" . self::RUN . "/coverage-xml",
 			"--log-junit=" . self::RUN . "/junit.xml",
@@ -342,6 +553,7 @@ final class GateTest extends TestCase {
 		$this->gate()->full();
 
 		self::assertSame([
+			PHP_BINARY,
 			"./vendor/bin/phpunit",
 			"--coverage-xml=" . self::RUN . "/coverage-xml",
 			"--log-junit=" . self::RUN . "/junit.xml",
@@ -360,13 +572,14 @@ final class GateTest extends TestCase {
 		// Gate.php changed; Key.php was never provable. Both need the engine,
 		// so both their tests have to run again.
 		self::assertSame([
+			PHP_BINARY,
 			"./vendor/bin/phpunit",
 			"--coverage-xml=" . self::RUN . "/coverage-xml",
 			"--log-junit=" . self::RUN . "/junit.xml",
 			"tests/GateTest.php",
 			"tests/KeyTest.php",
 		], $this->processes->command(2));
-		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->processes->command(3)[5] ?? "");
+		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->filterOf(3));
 	}
 
 	/**
@@ -416,6 +629,7 @@ final class GateTest extends TestCase {
 		$this->gate()->narrowed();
 
 		self::assertSame([
+			PHP_BINARY,
 			"./vendor/bin/phpunit",
 			"--coverage-xml=" . self::RUN . "/coverage-xml",
 			"--log-junit=" . self::RUN . "/junit.xml",
@@ -431,7 +645,7 @@ final class GateTest extends TestCase {
 
 		$this->gate()->narrowed();
 
-		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->processes->command(3)[5] ?? "");
+		self::assertSame("--filter=src/Gate.php,src/Key.php", $this->filterOf(3));
 	}
 
 	/**
@@ -590,7 +804,7 @@ final class GateTest extends TestCase {
 
 		self::assertSame(0, $this->gate()->status());
 
-		self::assertSame("mule: 2 of 2 files verified, 0 stale.\n" . "mule: every test here covers exactly one file, so no change can mark another file stale — see the README on coverage attribution.", $this->output->text());
+		self::assertSame("mule: 2 of 2 files verified, 0 stale.\nmule: 2 of 2 lines covered (100.0%).\n" . "mule: every test here covers exactly one file, so no change can mark another file stale — see the README on coverage attribution.", $this->output->text());
 		self::assertSame(2, $this->processes->count(), "status generated coverage it did not need.");
 	}
 
@@ -611,7 +825,10 @@ final class GateTest extends TestCase {
 
 	public function testLeavesNoScratchDirectoryBehindWhenStatusHasToMeasure(): void {
 		$this->gate()->full();
-		$this->filesystem->given("/project/composer.json", '{"name": "acme/thing"}');
+		$this->filesystem->given(
+			"/project/composer.json",
+			'{"name": "acme/thing", "autoload": {"psr-4": {"Acme\\\\": "src"}}}',
+		);
 		$this->processes = new CoveringProcesses($this->filesystem, [
 			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
 			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
@@ -638,7 +855,7 @@ final class GateTest extends TestCase {
 	 */
 	private function givenTheCoverageCommandSaysWhereTestsGo(): void {
 		$this->filesystem->given("/project/mule.json", json_encode([
-			"coverage" => ["./vendor/bin/phpunit", "--coverage-xml={coverage-xml}", "--log-junit={junit}", "{tests}"],
+			"narrow" => TRUE,
 		], JSON_THROW_ON_ERROR));
 	}
 
@@ -662,6 +879,57 @@ final class GateTest extends TestCase {
 	}
 
 	/**
+	 * Takes the section back out of the store, which is the shape every store
+	 * written before mule recorded coverage is in.
+	 *
+	 * @return void
+	 */
+	private function givenTheStoreRecordedNoCoverage(): void {
+		$stored = $this->storedSnapshot();
+
+		$this->filesystem->given(self::STORE, StoreFormat::write(Snapshot::of(
+			$stored->verified(),
+			$stored->tests(),
+			$stored->unproven(),
+			$stored->watched(),
+			$stored->configuration(),
+		)));
+	}
+
+	/**
+	 * Re-states the coverage run so that `Gate.php` is twenty executable lines
+	 * every one of which ran, and `Key.php` the one line it was.
+	 *
+	 * @return void
+	 */
+	private function givenGateIsTwentyLinesLong(): void {
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		], "/project/src", [], [
+			"Gate.php" => ["executable" => 20, "executed" => 20, "methods" => []],
+		]);
+	}
+
+	/**
+	 * The scope one engine run was narrowed to, found rather than counted to:
+	 * the engine's command line is long and its order is not what is being
+	 * asserted.
+	 *
+	 * @param int $index
+	 * @return string
+	 */
+	private function filterOf(int $index): string {
+		foreach($this->processes->command($index) as $argument) {
+			if(str_starts_with($argument, "--filter=")) {
+				return $argument;
+			}
+		}
+
+		return "";
+	}
+
+	/**
 	 * @return Gate
 	 */
 	private function gate(): Gate {
@@ -673,13 +941,17 @@ final class GateTest extends TestCase {
 		], ["/project/src", "/project/tests"]);
 		$universe = new Universe($project, $this->filesystem, $classes);
 
+		$configuration = Configuration::load($project, $this->filesystem, $this->processes);
+
 		return new Gate(
 			$project,
-			Configuration::load($project, $this->filesystem),
-			new Keying($project, $this->filesystem, $classes, $universe, $this->declared()),
+			$configuration,
+			new Keying($project, $this->filesystem, $classes, $universe, $this->declared(), $configuration),
 			new Freshness($project, $this->filesystem, $universe, $this->declared()),
 			new Store($project, $this->filesystem, $random),
-			new Infection("infection"),
+			new Measurement($configuration),
+			new Infection($configuration),
+			new Declaration($configuration, $project->root),
 			new Scratch($this->filesystem, $random),
 			$this->processes,
 			$this->output,

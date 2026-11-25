@@ -59,8 +59,24 @@ final class MuleTest extends TestCase {
 			],
 		], $store["tests"]);
 		self::assertSame([], $store["unproven"]);
+		self::assertSame(["src/A.php" => ["executable" => 1, "executed" => 1]], $store["coverage"]);
 		self::assertIsArray($store["configuration"]);
 		self::assertArrayHasKey("composer.json", $store["configuration"]);
+	}
+
+	/**
+	 * The one thing a committed store buys that a coverage run cannot: the
+	 * project's line coverage, out of a verb that starts no process at all.
+	 *
+	 * @return void
+	 */
+	public function testReportsTheProjectsCoverageWithoutMeasuringItAgain(): void {
+		$this->mule("full");
+
+		$run = $this->mule("status");
+
+		self::assertStringContainsString("mule: 1 of 1 lines covered (100.0%).", $run["output"]);
+		self::assertSame(1, $this->engineRuns());
 	}
 
 	public function testAsksTheEngineForNothingWhenTheStoreVouchesForEveryFile(): void {
@@ -177,17 +193,10 @@ final class MuleTest extends TestCase {
 		$this->write("src/A.php", self::SOURCE);
 		$this->write("tests/ATest.php", "<?php\n\nnamespace Fixture\\Tests;\n\nfinal class ATest {}\n");
 		$this->write("vendor/autoload.php", $this->autoloader());
-		$this->write("bin/coverage.php", $this->coverageRun());
-		$this->write("bin/engine", "#!/bin/sh\necho \"\$@\" >> \"\$(dirname \"\$0\")/../engine.log\"\nexit 0\n", 0o700);
-		$this->write("mule.json", json_encode([
-			"coverage" => [
-				PHP_BINARY,
-				$this->path("bin/coverage.php"),
-				"--coverage-xml={coverage-xml}",
-				"--log-junit={junit}",
-			],
-			"binary" => $this->path("bin/engine"),
-		], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+		// Both stand where mule infers them, which is the point: nothing here
+		// tells mule what runs the tests or what mutates them.
+		$this->write("vendor/bin/phpunit", $this->coverageRun());
+		$this->write("vendor/bin/infection", "#!/bin/sh\necho \"\$@\" >> \"\$(dirname \"\$0\")/../../engine.log\"\nexit 0\n", 0o700);
 	}
 
 	/**
@@ -243,7 +252,7 @@ final class MuleTest extends TestCase {
 
 			mkdir($coverage, 0700, TRUE);
 
-			$source = realpath(__DIR__ . "/../src");
+			$source = realpath(__DIR__ . "/../../src");
 
 			file_put_contents("{$coverage}/index.xml", <<<XML
 				<?xml version="1.0"?>

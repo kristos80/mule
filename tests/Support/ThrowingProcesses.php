@@ -23,4 +23,14 @@ final class ThrowingProcesses implements ProcessesInterface {
 	public function run(array $command, string $directory): int {
 		throw new LogicException("the coverage command was never built");
 	}
+
+	/**
+	 * No ini, which is a machine with its coverage driver already loaded — and
+	 * the one answer a test can state without naming a path off this machine.
+	 *
+	 * @return string|false
+	 */
+	public function iniFile(): string|false {
+		return FALSE;
+	}
 }

@@ -660,7 +660,7 @@ with the store running coverage on a tree where nothing had changed since the
 previous full run.
 
 **The fix is in the one place that writes the store.** `Store::pruned()` drops
-every entry whose file is no longer there, from all five sections, just before
+every entry whose file is no longer there, from every section, just before
 the bytes are written — so the repair happens on any run that banks anything,
 and `mule full` really is the rebuild. It costs one `exists()` per entry,
 charged to a run that has just spent minutes in the engine.
@@ -676,3 +676,305 @@ each was a rule that was correct about the case it was written for and silent
 about a neighbouring one. Watching the configuration without unproving
 verdicts; re-hashing sources without re-hashing tests; merging to preserve
 partial runs without ever removing anything.
+
+## Coverage is reported, which means a sixth section rather than a passthrough
+
+Asked for directly: the point of mule is that a project runs one tool, and a
+tool that holds a coverage report and says nothing about it sends people back to
+a second one.
+
+The cheap answer was to let the test runner say it — add `--coverage-text` to
+the coverage command and let the bytes through, exactly as Infection's own report
+is let through. It was rejected for a reason specific to this cache: **the paths
+where mule is worth using are the paths where no coverage run happens.**
+`Gate::recalled()` and `Gate::settled()` answer from the store and start no
+process, so a flag on a command nobody runs prints nothing. It would also only
+have reached projects on the inferred command — a declared `coverage` is run as
+given, and both this repository and the project mule was written for declare one
+to get a coverage driver.
+
+The numbers were already being parsed and thrown away. `CoveredFile` read the
+per-file totals and only ever answered `isFullyCovered()` with them, so what was
+needed was to stop discarding them: they became a `Coverage\Reach`, which is the
+same value for one file and for a whole project because adding two of them is
+all the aggregation there is.
+
+**Recorded per file, in a section of its own.** Three alternatives were weighed:
+
+- *A number in the existing `verified` entries.* Nicer to read in a diff, and it
+  would have made `Snapshot::verified` an object per path rather than a digest
+  per path — rippling through `moved()`, `staleAgainst()`, `digests()`, `only()`
+  and `Freshness`. Worse, `Decoded::number()` is strict by design, so a required
+  key inside an existing entry would make every store already in the world a
+  hard failure rather than an upgrade.
+- *A project total.* Cannot survive a narrowed run: the run measures a handful
+  of files and would report those files' coverage as the project's.
+- *The coverage report's own index totals.* Wrong for the same reason and less
+  obviously so. PHPUnit's `index.xml` totals every source file in the tree
+  against only the tests that ran, so a subset run's index reports a project
+  that has mostly stopped being covered.
+
+So `coverage` is a sixth store section, keyed by path, following the precedent
+`configuration` set: an absent section reads as empty, and an old store reports
+its file counts and says nothing about lines until a run measures some. The
+alternative — treating a store with no line counts as not describing the tree —
+would spend a coverage pass, and for a settled store the whole engine, to obtain
+a number that is only ever printed.
+
+**The aggregate is the store's picture with the run's written over it.** In
+`Gate::report()` that is `$stored->merged($reading->snapshot)->reach()` wherever
+the store is usable, which is the same arithmetic the file count already used
+and for the same reason. `testReportsTheWholeProjectsCoverageAfterANarrowedRun`
+is what holds it: twenty of the project's twenty-one lines are in a file the
+narrowed run never re-measures.
+
+**The proportion is integer arithmetic, rounded down.** `intdiv($executed *
+1000, $executable)` rather than a float, because `0.29 * 1000` is `289.999…` in
+binary and a project at 29 % should not be reported at 28.9 %. Down rather than
+nearest, so that a project one line short of complete cannot read as 100 %.
+
+What this deliberately does **not** do is report mutation scores or escaped
+mutants. Mule reads the engine's exit code and nothing else, and a verdict in
+this store means "every mutant in this file died" — a proof, which is why
+skipping the file is sound. An MSI below 100 is a measurement: cacheable, but
+never something a later run could skip work on the strength of. Reporting one
+would be a second kind of entry with different rules, and the gate is pinned at
+`--min-msi=100` anyway, so a passing run has no survivors to name.
+
+## The gate's thresholds are refused in `mule.json`, and `--with-uncovered` is not
+
+Asked while working out whether mule could support arbitrary coverage and
+mutation thresholds. The answer separated into three parts, and only one of them
+was mule's business.
+
+**A coverage threshold is not.** Mule reports coverage and gates on none of it.
+The rule the cache depends on is per-file and a different question from any
+project threshold: a file is bankable when the engine saw all of it, because an
+unreached line produces no mutant and a clean exit therefore says nothing about
+it. That holds at any project-level target.
+
+**A mutation threshold below 100 cannot work, for an arithmetic reason rather
+than a strict one.** A score is an aggregate over the run's scope; skipping a
+file needs a fact about that file. At 100 %, exit 0 decomposes — every mutant in
+every file died — so a per-file record is justified and a narrowed run asks the
+same question as a whole one. At 90 % it does not: exit 0 is compatible with one
+file at 100 % and another at 60 %, and a narrowed run over one changed file would
+demand 90 % of that file while a full run demands 90 % of everything. The two
+verbs then disagree in *both* directions, which destroys the only property the
+cache sells. Supporting it means storing killed-and-total per file and
+recomputing the project figure — a measurement cache rather than a proof cache,
+needing per-file numbers from an engine whose CLI does not offer them.
+
+**Which made an existing hole worth closing.** `Infection::command()` spreads a
+project's `options` in *after* mule's own flags, and the last occurrence of an
+option is the one Infection honours — verified rather than assumed, with
+`--min-msi=101 --min-msi=0` exiting 0 and the reverse order exiting 1. So
+`"options": ["--min-msi=90"]` silently replaced the gate the entire store is
+keyed on, and mule went on recording "every mutant in this file died" about
+files where some had lived. Nothing warned, and the store is committed, so the
+next machine inherited the claim with nothing left to say it had never been
+true.
+
+`Configuration::optionsOf()` now refuses both threshold flags by name, at
+configuration load, before a coverage run is spent. **By name, whatever follows
+them**: Infection accepts `--min-msi 90` as two arguments as readily as
+`--min-msi=90`, so matching on the value would miss half the ways of writing it.
+A project that passes `--min-msi=100` redundantly is told to delete a line,
+which is a better trade than a parser for a number mule intends to ignore.
+
+**Refused, not warned about**, because the consequence of an unread warning is a
+committed file full of verdicts nothing proved. Mule has one channel for a
+configuration it cannot work with, and this is a `Failure` like every other.
+
+**`--with-uncovered` is accepted**, which was the correction to a first draft
+that refused it too. It is not unsound: at full coverage it generates nothing
+extra and is a no-op; below full coverage its uncovered mutants enter the
+denominator, the run fails, and nothing is banked — strict, self-defeating if
+unintended, and never false. "My gate fails if anything is uncovered" is a
+legitimate thing to want, and mule already prints which files are not covered in
+full, so the failure explains itself. Refusing a flag that is merely strict
+would have been mule being opinionated about something that is not its
+invariant.
+
+Worth recording from the same session, because it had been asserted in this
+repository and never checked: **Infection does not mutate uncovered code by
+default.** Measured on one file — default, 9 mutants and 0 uncovered; with
+`--with-uncovered`, 17 mutants and 8 uncovered. So the README's claim that an
+unreached line produces no mutant is correct, and the reason mule's own
+`unproven` logic exists is a second, independent guard rather than the only one.
+Infection 0.32 also has no `--logger-json` option at all, which closes the
+partial-banking path more completely than the argument given for it.
+
+## mule.json became mule's own vocabulary, and the engine stopped being visible
+
+Asked directly, and the reasoning was the user's rather than mine: if the point
+is that a project runs one tool, then a configuration file naming PHPUnit's flags
+and Infection's schema keys is two tools wearing one coat. An earlier draft of
+this change had `mule.json` carry an opaque `infection` object passed straight
+through; it was rejected for exactly that reason, and rightly.
+
+**What the reshape rests on, measured rather than assumed:**
+
+- **The engine cannot be driven by flags alone.** It has no option for the
+  directories to mutate, and with no configuration file it tries to generate one
+  interactively and aborts under `--no-interaction`. So mule had *already* been
+  requiring every project to hand-write the one file it claimed to infer around.
+- **A configuration file is read from anywhere, and its relative paths resolve
+  against its own directory.** A generated config in `/tmp` sent the engine
+  looking for `phpunit.xml` in `/tmp`. Hence `Engine\Declaration` writing
+  absolute `source.directories` and an explicit `phpUnit.configDir`.
+- **The engine and a current PHPUnit share a `composer.json` perfectly well.**
+  This repository had `infection/infection ^0.32` and `phpunit/phpunit ^12.0` in
+  `require-dev` with one `sebastian/diff` between them. The README's standing
+  claim that they "cannot always share" was stale, and it was the only argument
+  for treating the engine as a command found on a path. It moved to `require`,
+  which is also what makes its version pinnable.
+- **`source.excludes` is relative to each source root and refuses an empty
+  list.** So `exclude` is project-relative in mule's vocabulary and translated,
+  and the key is omitted entirely when there is nothing in it.
+
+**`exclude` drives both halves, and that is the point of it.** Excluded from
+mutation alone, a file still arrives in the coverage report, is still covered in
+full, and is still banked — recording that every mutant in it died when nothing
+ever made one. `Keying` therefore drops excluded paths from the report as it
+reads it, so such a file is not in mule's universe at all: not verified, not
+watched, not counted in the lines covered. This is the duplication `CLAUDE.md`
+used to manage by asking for two lists kept "visibly in step"; one list is
+better than a rule about two.
+
+**Unknown keys are refused.** Mule owns the whole vocabulary, so a key it does
+not recognise is a mistake every time. That replaced a narrower guard written
+days earlier, which had refused `--min-msi` inside a passthrough `options` array
+— a guard that is simply unnecessary once there is no passthrough to guard.
+
+**`min-coverage` is mule's, and `min-mutation` cannot be.** Coverage is a number
+mule already measures, sums and caches, so asserting a floor on it changes
+nothing about what gets banked and removes the last reason to run a second tool;
+this repository deleted a `php -r` clover-parsing composer script for it. A
+mutation threshold is a different kind of thing: mule reads the engine's *exit
+code* and never its report, so there is no figure to compare against — and the
+full score is what makes that exit code decompose into a per-file fact at all.
+
+**Banking happens before the coverage assertion, never instead of it.** The
+mutation work was done and proven; discarding it because a separate assertion
+failed would mean paying for it again next run. Put the other way round: a
+failing `min-coverage` still leaves the store richer than it found it.
+
+**The runner is handed mule's own interpreter *and its ini*.** This was the one
+thing that nearly sank the model. The intended usage is to wrap mule — `herd
+coverage bin/mule new` — so that whatever enables a coverage driver is in force
+for mule's process. But measured on this machine: under that wrapper the parent
+loads `…/config/php/84/debug/debug.ini` and has Xdebug, and a child started as
+plain `PHP_BINARY` loads no ini and has none, so mule's coverage run found no
+driver. The same binary, a different configuration. `PHP_BINARY -c <the parent's
+ini>` restores it, which is why `ProcessesInterface::iniFile()` exists — the raw
+`string|false` returned rather than resolved, like `ClassesInterface::fileOf()`,
+because "there is no ini" is a case the command line has to decide about.
+
+**CI stopped deleting anything.** It used to `rm mule.json` before the gate,
+because the committed file named a wrapper CI does not have; the workflow
+comment made a virtue of it ("one more thing proved"). With nothing
+machine-local left in the file there is nothing to remove, and the inference path
+is now exercised by *absence* — the way a consumer actually meets it — rather
+than by a deletion only this repository performs.
+
+**What it cost:** every setting worth having must be given a name here, and there
+is no escape hatch. A project wanting `maxTimeouts` needs mule to grow a key.
+That is the deliberate trade for a vocabulary mule can keep stable and make
+promises about, and it is the opposite of the trade the rejected passthrough
+made.
+
+## Neither tool is behind an interface, and what was done instead
+
+Asked for during review: Infection and PHPUnit should be proxied by interfaces
+so they can be swapped later and so their dependents can be tested without them.
+The second half turned out to be already true, and the first half was answered
+by injection rather than by an interface — but the question found a real flaw on
+the way.
+
+**Nothing in the unit suite ever runs either program.** The seam that matters is
+`ProcessesInterface`, which is an interface and is faked by
+`tests/Support/CoveringProcesses`: it writes a coverage report where it is told
+and records what the engine was asked. `Engine\Infection` and `Runner\Measurement`
+are not proxies to anything — they are pure functions returning `list<string>`,
+and `Engine\Declaration` returns a string of JSON. There is nothing to stub: a
+test states the command or document it expects and compares it. The 349 unit
+tests run with no PHPUnit binary, no engine binary and no disk.
+
+**An interface over them would be a false seam**, which is worse than none
+because it reads as insurance. It would be shaped entirely around this engine —
+`command(Run, ?array): list<string>` plus a configuration document in the
+engine's own schema — so a genuinely different engine, one needing no config
+file or scoping differently, would not fit it anyway. The abstraction has also
+been here before: see "One engine" above, where an `Engine` interface, a `Scope`
+value object and a `name()` method no production code called were removed for
+being kept alive by their own tests. And `CLAUDE.md` is explicit that an
+interface in this repository wraps **I/O**; these two perform none.
+
+**The flaw the question did find** was asymmetry, not missing abstraction.
+`Gate` built the runner's command line inline — `--coverage-xml`,
+`--log-junit`, `--testsuite` sat next to the decision about *what* was stale,
+while the engine's spelling lived in a class of its own — and it constructed
+`new Declaration(...)` inside the method that used it, a dependency the
+composition root never wired and no test could replace.
+
+So the runner's command line became `Runner\Measurement`, the sibling of
+`Engine\Infection`, and both it and `Declaration` are constructor dependencies
+wired in `Application`. The gate now holds two command builders and knows
+neither tool's vocabulary; swapping either is one line in the composition root.
+That the whole suite passed on the extraction with only the wiring changed is
+the evidence it was behaviour-preserving.
+
+**It covers both runners deliberately.** Pest takes the arguments PHPUnit takes,
+so what varies is the binary — which `Configuration` resolves — and not the
+spelling. Naming the class for the job rather than for either tool is what keeps
+that true, and is the same reason `mule.json` names no tool either.
+
+**The full score moved off the command line and into that document**, caught in
+the same review. `--min-msi=100 --min-covered-msi=100` were flags; `minMsi` and
+`minCoveredMsi` are schema keys, and a threshold is what the gate *means* rather
+than what a particular run is doing. What stayed on the command line is what
+varies per run: the scope, the coverage directory, and a narrowed run's tolerance
+for a filter that matched nothing. Verified rather than assumed, because moving a
+threshold is exactly the change that could stop a gate failing silently: with a
+known-escaping mutant present the run exits 1 and reports the same error from the
+config as it did from the flags.
+
+**`minCoveredMsi` is not `min-coverage`**, however alike they read, and the
+resemblance is worth a sentence because it invites the mistake. The engine's key
+is a mutation score over the code the tests reach. Mule's key is the proportion
+of lines they reach at all, asserted by mule from the coverage report it already
+holds — it is never passed to the engine, which is asked no question about
+coverage at all.
+
+**An external review found a real hole in `exclude`, and it was the same hole
+again.** The engine's collector builds
+`Finder::create()->in($sourceDirectories)->exclude($excludes)->notPath($excludes)`,
+and Symfony's finder applies those relative to *each* directory it was given. So
+a project with `source: ["src", "lib"]` excluding `lib/Foo.php` hands the engine
+`Foo.php`, which also drops `src/Foo.php` — while mule's own check matched the
+exact project-relative path and let `src/Foo.php` through. Mutated by nothing,
+present in the coverage report, covered in full, banked as proven: the very trap
+`exclude` was introduced to close, reappearing the moment there are two source
+roots.
+
+Fixed by making mule ask the question in the engine's terms rather than its own.
+`Configuration::excludes()` compares a path as it reads *inside its source root*,
+so a file the engine will not mutate is a file mule will not read a verdict for,
+whichever root the exclusion was written under. The consequence is adopted rather
+than fought: excluding `lib/Generated` excludes `src/Generated` too, because that
+is what the engine's own list means, and a project wanting one and not the other
+has to name them differently. Documented in the README's key table instead of
+guarded against. Two regression tests, both confirmed to fail without the fix.
+
+The review's other two points were checked and answered rather than taken on
+faith. The dependency surface is real but narrower than feared — Infection's
+`sebastian/diff ^4.0 || … || ^8.0` spans PHPUnit 9 through 12, so nothing there
+conflicts; what it does impose is Symfony `^6.4` console, filesystem and finder,
+`nikic/php-parser ^5.6.2` and `justinrainbow/json-schema ^6.0`, which the
+README now names along with the way out. And the README's `json5` example with
+explanatory comments was a trap: a commented `mule.json` fails, and it failed
+with "mule needs it to be a JSON object" — a message pointing nowhere near the
+syntax. The example is plain JSON with the annotations beside it now, and
+unparseable bytes say so distinctly from valid JSON that is not an object.
+

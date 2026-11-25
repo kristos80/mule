@@ -59,4 +59,31 @@ final class ScratchTest extends TestCase {
 
 		self::assertSame(["/"], $filesystem->paths());
 	}
+
+	public function testWritesTheEnginesConfigurationIntoTheRunsOwnDirectory(): void {
+		$filesystem = (new InMemoryFilesystem())->givenDirectory("/tmp/mule.cafe1234");
+		$run = new Run("/tmp/mule.cafe1234");
+
+		(new Scratch($filesystem, new FixedRandom()))->declare($run, "{\"source\": {}}\n");
+
+		self::assertSame("{\"source\": {}}\n", $filesystem->read($run->engineJson()));
+	}
+
+	/**
+	 * The engine resolves a configuration's relative paths against that file's
+	 * own directory, so what mule writes there belongs to the run and is swept
+	 * up with the rest of it.
+	 *
+	 * @return void
+	 */
+	public function testTakesTheEnginesConfigurationAwayWithEverythingElse(): void {
+		$filesystem = (new InMemoryFilesystem())->givenDirectory("/tmp/mule.cafe1234");
+		$run = new Run("/tmp/mule.cafe1234");
+		$scratch = new Scratch($filesystem, new FixedRandom());
+
+		$scratch->declare($run, "{}");
+		$scratch->remove($run);
+
+		self::assertFalse($filesystem->exists($run->engineJson()));
+	}
 }

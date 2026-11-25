@@ -52,21 +52,21 @@ final class CoveredFileTest extends TestCase {
 		$xml = CoverageXml::partialFile("Key.php", "/", ["Acme\\Tests\\KeyTest::testOne"], 4, 1, []);
 		$file = CoveredFile::of($xml, "/project/src", "Key.php.xml");
 
-		self::assertSame(4, $file->executable);
-		self::assertSame(1, $file->executed);
-		self::assertFalse($file->isFullyCovered());
+		self::assertSame(4, $file->reach->executable);
+		self::assertSame(1, $file->reach->executed);
+		self::assertFalse($file->reach->isComplete());
 	}
 
 	public function testCountsAFileEveryLineOfWhichRanAsCoveredInFull(): void {
 		$xml = CoverageXml::file("Key.php", "/", ["Acme\\Tests\\KeyTest::testOne"]);
 
-		self::assertTrue(CoveredFile::of($xml, "/project/src", "Key.php.xml")->isFullyCovered());
+		self::assertTrue(CoveredFile::of($xml, "/project/src", "Key.php.xml")->reach->isComplete());
 	}
 
 	public function testCountsAFileWithNoExecutableLinesAsCoveredInFull(): void {
 		$xml = CoverageXml::partialFile("Key.php", "/", [], 0, 0, []);
 
-		self::assertTrue(CoveredFile::of($xml, "/project/src", "Key.php.xml")->isFullyCovered());
+		self::assertTrue(CoveredFile::of($xml, "/project/src", "Key.php.xml")->reach->isComplete());
 	}
 
 	public function testNamesTheMethodsTheTestsDoNotReachAllOf(): void {

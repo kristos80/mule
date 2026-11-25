@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Cache;
 
+use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Coverage\CoveredFile;
 use Kristos80\Mule\Coverage\Report;
 use Kristos80\Mule\External\ClassesInterface;
@@ -21,6 +22,7 @@ final readonly class Keying {
 	 * @param ClassesInterface $classes
 	 * @param Universe $universe
 	 * @param Declared $declared
+	 * @param Configuration $configuration
 	 */
 	public function __construct(
 		private Project $project,
@@ -28,6 +30,7 @@ final readonly class Keying {
 		private ClassesInterface $classes,
 		private Universe $universe,
 		private Declared $declared,
+		private Configuration $configuration,
 	) {}
 
 	/**
@@ -41,6 +44,11 @@ final readonly class Keying {
 	 * watched either: what the whole tree looks like is not something a
 	 * partial report can say.
 	 *
+	 * **How much of a file was reached is recorded whether the report is whole
+	 * or not.** It is a fact about one file, measured from that file's own
+	 * report, so a subset run holds the truth about every path it was given —
+	 * and the store already holds it about the rest.
+	 *
 	 * @param string $coverageXml The report directory.
 	 * @param list<string>|null $only The paths this report is authoritative about.
 	 * @return Reading
@@ -50,13 +58,16 @@ final readonly class Keying {
 		$verified = [];
 		$gaps = [];
 		$runs = [];
+		$coverage = [];
 
 		foreach($this->filesIn($coverageXml, $root, $only) as $path => $file) {
 			foreach($this->testFilesOf($file) as $test) {
 				$runs[$test][] = $path;
 			}
 
-			if($file->isFullyCovered()) {
+			$coverage[$path] = $file->reach;
+
+			if($file->reach->isComplete()) {
 				$verified[$path] = $this->filesystem->digest($file->path);
 
 				continue;
@@ -77,6 +88,7 @@ final readonly class Keying {
 				$unproven,
 				$whole ? $this->watched($known) : [],
 				$whole ? $this->declared->digests() : [],
+				$coverage,
 			),
 			$gaps,
 		);
@@ -99,7 +111,7 @@ final readonly class Keying {
 			$file = CoveredFile::of($this->filesystem->read($report), $root, $report);
 			$path = $this->project->relative($file->path);
 
-			if($authoritative === NULL || isset($authoritative[$path])) {
+			if(($authoritative === NULL || isset($authoritative[$path])) && !$this->configuration->excludes($path)) {
 				$files[$path] = $file;
 			}
 		}

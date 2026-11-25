@@ -3,35 +3,43 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Engine;
 
+use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Runner\Run;
 
 /**
- * Infection, as a command line and nothing else.
+ * The engine, as a command line and nothing else.
  *
  * **The engine builds a string and does not run it.** Mule's decision — which
  * files are worth mutating — is the whole of what this tool contributes, and
  * spelling "mutate these files, fail below a hundred" is all that is left. That
- * keeps it testable with the engine not installed, and keeps process handling in
- * one place.
+ * keeps process handling in one place.
  *
- * **Coverage is passed in and the initial test run skipped.** Infection refuses
+ * **Coverage is passed in and the initial test run skipped.** The engine refuses
  * to run without coverage, and mule has to generate it anyway to key the files;
  * generating it twice would hand back the time the cache saves.
  *
- * **The binary is named, never required.** Infection and a current PHPUnit
- * cannot always share a `composer.json` — it pins `sebastian/diff` and so does
- * the test runner — so projects in that position install it globally or with
- * PHIVE, and mule treats it as a command rather than a dependency it autoloads.
+ * **The engine ships with mule**, so there is no binary to configure and no
+ * version a project can pick. It is a dependency rather than a command found on
+ * a path, which is what lets its version be recorded as part of what a verdict
+ * means. The `run` verb is named explicitly: the configuration option has to
+ * follow a command rather than precede one.
+ *
+ * **What varies per run is here, and what the gate *means* is not.** The scope,
+ * the coverage directory and this run's tolerance for a filter that matched
+ * nothing belong on a command line; the full score does not change between runs
+ * and is stated in {@see Declaration} instead. Neither is configurable, and
+ * neither appears in `mule.json`.
  */
 final readonly class Infection {
 
+	/** Where the engine lives, relative to whatever installed mule. */
+	private const string BINARY = "./vendor/bin/infection";
+
 	/**
-	 * @param string $binary
-	 * @param list<string> $options Project options, such as `--threads=max`.
+	 * @param Configuration $configuration
 	 */
 	public function __construct(
-		private string $binary,
-		private array $options = [],
+		private Configuration $configuration,
 	) {}
 
 	/**
@@ -48,12 +56,13 @@ final readonly class Infection {
 	 */
 	public function command(Run $run, ?array $files): array {
 		$command = [
-			$this->binary,
+			self::BINARY,
+			"run",
+			"--configuration={$run->engineJson()}",
 			"--coverage={$run->directory}",
 			"--skip-initial-tests",
-			"--min-msi=100",
-			"--min-covered-msi=100",
-			...$this->options,
+			"--no-interaction",
+			...$this->chosen(),
 		];
 
 		if($files === NULL) {
@@ -61,5 +70,24 @@ final readonly class Infection {
 		}
 
 		return [...$command, "--filter=" . implode(",", $files), "--ignore-msi-with-no-mutations"];
+	}
+
+	/**
+	 * The options a project asked for, in the engine's spelling.
+	 *
+	 * @return list<string>
+	 */
+	private function chosen(): array {
+		$chosen = [];
+
+		if($this->configuration->threads !== NULL) {
+			$chosen[] = "--threads={$this->configuration->threads}";
+		}
+
+		if($this->configuration->mutateUncovered) {
+			$chosen[] = "--with-uncovered";
+		}
+
+		return $chosen;
 	}
 }

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Cache;
 
+use Kristos80\Mule\Coverage\Reach;
 use Kristos80\Mule\Failure;
 
 /**
@@ -26,6 +27,7 @@ final readonly class Snapshot {
 	 * @param array<string, Unproven> $unproven Source paths the tests do not reach all of, sorted.
 	 * @param array<string, string> $watched Everything else the project autoloads, sorted.
 	 * @param array<string, string> $configuration What the verdicts were measured under, sorted.
+	 * @param array<string, Reach> $coverage How much of each source file the tests reached, sorted.
 	 */
 	private function __construct(
 		private array $verified,
@@ -33,6 +35,7 @@ final readonly class Snapshot {
 		private array $unproven,
 		private array $watched,
 		private array $configuration,
+		private array $coverage,
 	) {}
 
 	/**
@@ -47,6 +50,7 @@ final readonly class Snapshot {
 	 * @param array<string, Unproven> $unproven
 	 * @param array<string, string> $watched
 	 * @param array<string, string> $configuration
+	 * @param array<string, Reach> $coverage
 	 * @return self
 	 */
 	public static function of(
@@ -55,6 +59,7 @@ final readonly class Snapshot {
 		array $unproven = [],
 		array $watched = [],
 		array $configuration = [],
+		array $coverage = [],
 	): self {
 		$watched = array_diff_key($watched, $configuration);
 
@@ -63,8 +68,9 @@ final readonly class Snapshot {
 		ksort($unproven);
 		ksort($watched);
 		ksort($configuration);
+		ksort($coverage);
 
-		return new self($verified, $tests, $unproven, $watched, $configuration);
+		return new self($verified, $tests, $unproven, $watched, $configuration, $coverage);
 	}
 
 	/**
@@ -156,6 +162,35 @@ final readonly class Snapshot {
 	 */
 	public function configuration(): array {
 		return $this->configuration;
+	}
+
+	/**
+	 * How much of each source file the tests reached when it was measured.
+	 *
+	 * @return array<string, Reach>
+	 */
+	public function coverage(): array {
+		return $this->coverage;
+	}
+
+	/**
+	 * How much of the whole of it the tests reached.
+	 *
+	 * **Summed from the files rather than recorded as a total**, so that a run
+	 * which re-measured three files of four hundred reports the project's
+	 * coverage and not those three files' — the store's entries for everything
+	 * it did not look at are still the truth about them.
+	 *
+	 * @return Reach
+	 */
+	public function reach(): Reach {
+		$reach = Reach::none();
+
+		foreach($this->coverage as $one) {
+			$reach = $reach->plus($one);
+		}
+
+		return $reach;
 	}
 
 	/**
@@ -293,6 +328,7 @@ final readonly class Snapshot {
 			$unproven,
 			[...$this->watched, ...$other->watched],
 			[...$this->configuration, ...$other->configuration],
+			[...$this->coverage, ...$other->coverage],
 		);
 	}
 
@@ -316,17 +352,26 @@ final readonly class Snapshot {
 		$unproven = $this->unproven;
 		$watched = $this->watched;
 		$configuration = $this->configuration;
+		$coverage = $this->coverage;
 
 		foreach($paths as $path) {
-			unset($verified[$path], $tests[$path], $unproven[$path], $watched[$path], $configuration[$path]);
+			unset(
+				$verified[$path],
+				$tests[$path],
+				$unproven[$path],
+				$watched[$path],
+				$configuration[$path],
+				$coverage[$path],
+			);
 		}
 
-		return self::of($verified, $tests, $unproven, $watched, $configuration);
+		return self::of($verified, $tests, $unproven, $watched, $configuration, $coverage);
 	}
 
 	/**
 	 * Just the named files, plus everything that was observed rather than
-	 * proven: the gaps, what is watched, and every test that runs any of it.
+	 * proven: the gaps, what is watched, how much of each was reached, and every
+	 * test that runs any of it.
 	 *
 	 * **The tests of an unproven file are kept too.** A file nothing could
 	 * prove is still carried forward, and dropping the test that runs it would
@@ -350,12 +395,15 @@ final readonly class Snapshot {
 			$wanted[] = $path;
 		}
 
+		$kept = array_flip($wanted);
+
 		return self::of(
 			$verified,
-			$this->testsRunning(array_flip($wanted)),
+			$this->testsRunning($kept),
 			$this->unproven,
 			$this->watched,
 			$this->configuration,
+			array_intersect_key($this->coverage, $kept),
 		);
 	}
 

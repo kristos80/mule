@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Console;
 
+use Kristos80\Mule\Coverage\Reach;
 use Kristos80\Mule\Coverage\Unreached;
 
 /**
@@ -29,6 +30,45 @@ final readonly class Summary {
 		$uncovered = $unproven === 0 ? "" : ", {$unproven} not covered in full";
 
 		return "mule: {$verified} of {$total} files verified, {$stale} stale{$uncovered}.";
+	}
+
+	/**
+	 * How much of the project the tests reach, in lines.
+	 *
+	 * **The proportion is worked out in whole tenths of a percent**, because
+	 * `0.29 * 1000` is `289.999…` in binary and a project at 29 % should not be
+	 * reported at 28.9 %. Integer division also means the figure is only ever
+	 * rounded down, so nothing one line short of complete can read as 100 %.
+	 *
+	 * **Nothing is said where nothing was measured.** A store written before
+	 * mule recorded this has no lines to report, and the file counts it does
+	 * have are still true.
+	 *
+	 * @param Reach $reach
+	 * @return list<string>
+	 */
+	public static function coverage(Reach $reach): array {
+		if(!$reach->isMeasured()) {
+			return [];
+		}
+
+		$percent = number_format(intdiv($reach->executed * 1000, $reach->executable) / 10, 1);
+
+		return ["mule: {$reach->executed} of {$reach->executable} lines covered ({$percent}%)."];
+	}
+
+	/**
+	 * Said when a project asked for more covered lines than it has.
+	 *
+	 * **Reported after the verdicts are banked, never instead of them.** The
+	 * mutation work was done and proven; discarding it because a separate
+	 * assertion failed would mean paying for it again on the next run.
+	 *
+	 * @param int $minimum
+	 * @return string
+	 */
+	public static function belowMinimumCoverage(int $minimum): string {
+		return "mule: that is below the {$minimum}% this project asks for.";
 	}
 
 	/**

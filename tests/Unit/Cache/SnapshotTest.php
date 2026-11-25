@@ -7,6 +7,7 @@ use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\StoreFormat;
 use Kristos80\Mule\Cache\Touched;
 use Kristos80\Mule\Cache\Unproven;
+use Kristos80\Mule\Coverage\Reach;
 use Kristos80\Mule\Coverage\Unreached;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -215,6 +216,76 @@ final class SnapshotTest extends TestCase {
 		$only = $snapshot->only(["src/A.php"]);
 
 		self::assertSame(["tests/ATest.php", "tests/BTest.php"], array_keys($only->tests()));
+	}
+
+	public function testAddsUpHowMuchOfEveryFileWasReached(): void {
+		$snapshot = Snapshot::of([], [], [], [], [], [
+			"src/A.php" => new Reach(10, 10),
+			"src/B.php" => new Reach(6, 2),
+		]);
+
+		self::assertSame(16, $snapshot->reach()->executable);
+		self::assertSame(12, $snapshot->reach()->executed);
+	}
+
+	public function testReachesNothingWhenNoCoverageWasRecorded(): void {
+		self::assertFalse(self::snapshot(["src/A.php" => "aa"])->reach()->isMeasured());
+	}
+
+	public function testSortsTheCoverageTooWhateverOrderItArrivedIn(): void {
+		$snapshot = Snapshot::of([], [], [], [], [], [
+			"src/Z.php" => new Reach(1, 1),
+			"src/A.php" => new Reach(2, 2),
+		]);
+
+		self::assertSame(["src/A.php", "src/Z.php"], array_keys($snapshot->coverage()));
+	}
+
+	/**
+	 * The whole reason the numbers are per file: a run that re-measured one file
+	 * of two reports the project's coverage, not that file's.
+	 *
+	 * @return void
+	 */
+	public function testTakesTheNewerMeasurementOfAFileAndKeepsTheOlderOfTheRest(): void {
+		$stored = Snapshot::of([], [], [], [], [], [
+			"src/A.php" => new Reach(10, 4),
+			"src/B.php" => new Reach(20, 20),
+		]);
+
+		$merged = $stored->merged(Snapshot::of([], [], [], [], [], ["src/A.php" => new Reach(10, 10)]));
+
+		self::assertSame(30, $merged->reach()->executable);
+		self::assertSame(30, $merged->reach()->executed);
+	}
+
+	public function testForgetsHowMuchOfADeletedFileWasReached(): void {
+		$snapshot = Snapshot::of(["src/A.php" => "aa"], [], [], [], [], [
+			"src/A.php" => new Reach(4, 4),
+			"src/Gone.php" => new Reach(9, 9),
+		]);
+
+		self::assertSame(["src/A.php"], array_keys($snapshot->without(["src/Gone.php"])->coverage()));
+	}
+
+	public function testNarrowingKeepsTheCoverageOfWhatItBanksAndOfTheGaps(): void {
+		$snapshot = Snapshot::of(
+			["src/A.php" => "aa", "src/B.php" => "bb"],
+			[],
+			["src/C.php" => new Unproven("cc", [])],
+			[],
+			[],
+			[
+				"src/A.php" => new Reach(4, 4),
+				"src/B.php" => new Reach(5, 5),
+				"src/C.php" => new Reach(6, 1),
+			],
+		);
+
+		self::assertSame(
+			["src/A.php", "src/C.php"],
+			array_keys($snapshot->only(["src/A.php"])->coverage()),
+		);
 	}
 
 	public function testRejectsNarrowingToAPathItDoesNotHold(): void {

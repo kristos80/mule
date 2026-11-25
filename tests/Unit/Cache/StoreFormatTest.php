@@ -7,6 +7,7 @@ use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\StoreFormat;
 use Kristos80\Mule\Cache\Touched;
 use Kristos80\Mule\Cache\Unproven;
+use Kristos80\Mule\Coverage\Reach;
 use Kristos80\Mule\Coverage\Unreached;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -26,7 +27,7 @@ final class StoreFormatTest extends TestCase {
 			. "\t},\n\t\"unproven\": {},\n\t\"tests\": {\n"
 			. "\t\t\"tests/ATest.php\": {\"source\":\"tt\",\"touches\":[\"src/A.php\"]},\n"
 			. "\t\t\"tests/BTest.php\": {\"source\":\"uu\",\"touches\":[\"src/B.php\"]}\n"
-			. "\t},\n\t\"watched\": {},\n\t\"configuration\": {}\n}\n",
+			. "\t},\n\t\"watched\": {},\n\t\"configuration\": {},\n\t\"coverage\": {}\n}\n",
 			StoreFormat::write($snapshot),
 		);
 	}
@@ -34,7 +35,7 @@ final class StoreFormatTest extends TestCase {
 	public function testWritesAnEmptySnapshotAsEmptySections(): void {
 		self::assertSame(
 			"{\n\t\"verified\": {},\n\t\"unproven\": {},\n\t\"tests\": {},"
-			. "\n\t\"watched\": {},\n\t\"configuration\": {}\n}\n",
+			. "\n\t\"watched\": {},\n\t\"configuration\": {},\n\t\"coverage\": {}\n}\n",
 			StoreFormat::write(Snapshot::of([], [])),
 		);
 	}
@@ -55,7 +56,7 @@ final class StoreFormatTest extends TestCase {
 			. "\t\t\"src/Excluded.php\": {\"digest\":\"ee\"}\n"
 			. "\t},\n\t\"configuration\": {\n"
 			. "\t\t\"composer.json\": {\"digest\":\"cc\"}\n"
-			. "\t}\n}\n",
+			. "\t},\n\t\"coverage\": {}\n}\n",
 			StoreFormat::write($snapshot),
 		);
 	}
@@ -81,7 +82,7 @@ final class StoreFormatTest extends TestCase {
 			. "\t\t\"composer.json\": {\"digest\":\"cc\"},\n"
 			. "\t\t\"infection.json\": {\"digest\":\"jj\"},\n"
 			. "\t\t\"infection.json5\": {\"digest\":\"55\"}\n"
-			. "\t}\n}\n",
+			. "\t},\n\t\"coverage\": {}\n}\n",
 			StoreFormat::write($snapshot),
 		);
 	}
@@ -129,6 +130,51 @@ final class StoreFormatTest extends TestCase {
 			["composer.json" => "cc", "src/A.php" => "aa", "src/B.php" => "bb"],
 			$read->digests(),
 		);
+	}
+
+	public function testWritesHowMuchOfEachFileTheTestsReached(): void {
+		$snapshot = Snapshot::of(["src/A.php" => "aa"], [], [], [], [], [
+			"src/B.php" => new Reach(6, 2),
+			"src/A.php" => new Reach(4, 4),
+		]);
+
+		self::assertStringContainsString(
+			"\"coverage\": {\n"
+			. "\t\t\"src/A.php\": {\"executable\":4,\"executed\":4},\n"
+			. "\t\t\"src/B.php\": {\"executable\":6,\"executed\":2}\n"
+			. "\t}",
+			StoreFormat::write($snapshot),
+		);
+	}
+
+	public function testReadsBackHowMuchOfEachFileTheTestsReached(): void {
+		$snapshot = Snapshot::of([], [], [], [], [], ["src/A.php" => new Reach(9, 5)]);
+
+		$read = StoreFormat::read(StoreFormat::write($snapshot));
+
+		self::assertSame(9, $read->reach()->executable);
+		self::assertSame(5, $read->reach()->executed);
+	}
+
+	/**
+	 * Nothing to report rather than nothing to work from: the file counts in
+	 * such a store are still true, and re-measuring for a number that is only
+	 * ever printed would spend the run this cache exists to skip.
+	 *
+	 * @return void
+	 */
+	public function testReadsAStoreWrittenBeforeCoverageWasRecordedAsHavingNone(): void {
+		$read = StoreFormat::read('{"verified": {"src/A.php": {"digest": "aa"}}}');
+
+		self::assertSame(1, $read->count());
+		self::assertFalse($read->reach()->isMeasured());
+	}
+
+	public function testRejectsACoverageEntryWithoutItsCounts(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("The executable in the mule store coverage entry for src/A.php must be a whole number.");
+
+		StoreFormat::read('{"coverage": {"src/A.php": {"executed": 4}}}');
 	}
 
 	public function testReadsBackWhatItWrote(): void {

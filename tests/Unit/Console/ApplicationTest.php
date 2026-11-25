@@ -28,7 +28,7 @@ final class ApplicationTest extends TestCase {
 	 */
 	protected function setUp(): void {
 		$this->filesystem = (new InMemoryFilesystem())
-			->given("/project/composer.json", "{}")
+			->given("/project/composer.json", '{"autoload": {"psr-4": {"Acme\\\\": "src"}}}')
 			->given("/project/src/Key.php", "<?php class Key {}")
 			->given("/project/tests/KeyTest.php", "<?php class KeyTest {}");
 		$this->processes = new CoveringProcesses($this->filesystem, ["Key.php" => ["Acme\\Tests\\KeyTest::testOne"]]);
@@ -53,7 +53,7 @@ final class ApplicationTest extends TestCase {
 		self::assertSame(0, $this->ran(["status"]));
 
 		self::assertSame(1, $this->processes->count());
-		self::assertSame("mule: 0 of 1 files verified, 1 stale.", $this->output->text());
+		self::assertSame("mule: 0 of 1 files verified, 1 stale.\nmule: 1 of 1 lines covered (100.0%).", $this->output->text());
 	}
 
 	public function testPassesOnTheStatusOfAFailedRun(): void {

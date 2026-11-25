@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Console;
 
 use Kristos80\Mule\Console\Summary;
+use Kristos80\Mule\Coverage\Reach;
 use Kristos80\Mule\Coverage\Unreached;
 use PHPUnit\Framework\TestCase;
 
@@ -21,6 +22,57 @@ final class SummaryTest extends TestCase {
 		self::assertSame(
 			"mule: 16 of 20 files verified, 3 stale, 1 not covered in full.",
 			Summary::verified(20, 3, 1),
+		);
+	}
+
+	public function testSaysHowManyLinesTheTestsReach(): void {
+		self::assertSame(
+			["mule: 1250 of 1266 lines covered (98.7%)."],
+			Summary::coverage(new Reach(1266, 1250)),
+		);
+	}
+
+	public function testSaysSoWhenTheTestsReachEveryLine(): void {
+		self::assertSame(
+			["mule: 1266 of 1266 lines covered (100.0%)."],
+			Summary::coverage(new Reach(1266, 1266)),
+		);
+	}
+
+	/**
+	 * Rounded down, never up: a project one line short of complete is not
+	 * reported at a hundred percent.
+	 *
+	 * @return void
+	 */
+	public function testRoundsTheProportionDown(): void {
+		self::assertSame(
+			["mule: 9999 of 10000 lines covered (99.9%)."],
+			Summary::coverage(new Reach(10000, 9999)),
+		);
+	}
+
+	/**
+	 * `0.29 * 1000` is `289.999…` in binary, so a tenth worked out in floating
+	 * point and floored reports this project at 28.9 %.
+	 *
+	 * @return void
+	 */
+	public function testWorksTheProportionOutWithoutLosingATenthToABinaryFraction(): void {
+		self::assertSame(
+			["mule: 29 of 100 lines covered (29.0%)."],
+			Summary::coverage(new Reach(100, 29)),
+		);
+	}
+
+	public function testSaysNothingAboutCoverageWhenThereIsNoneRecorded(): void {
+		self::assertSame([], Summary::coverage(Reach::none()));
+	}
+
+	public function testSaysWhenCoverageIsBelowWhatTheProjectAsksFor(): void {
+		self::assertSame(
+			"mule: that is below the 80% this project asks for.",
+			Summary::belowMinimumCoverage(80),
 		);
 	}
 

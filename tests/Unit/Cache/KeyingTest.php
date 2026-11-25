@@ -8,14 +8,18 @@ use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Reading;
 use Kristos80\Mule\Cache\StoreFormat;
 use Kristos80\Mule\Cache\Universe;
+use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\CoverageXml;
+use Kristos80\Mule\Tests\Support\CoveringProcesses;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
 use Kristos80\Mule\Tests\Support\MappedClasses;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
 final class KeyingTest extends TestCase {
+
+	private const string COMPOSER = '{"autoload": {"psr-4": {"Acme\\\\": "src"}}}';
 
 	private const string SOURCE = "<?php class Key {}";
 
@@ -30,7 +34,7 @@ final class KeyingTest extends TestCase {
 	 */
 	protected function setUp(): void {
 		$this->filesystem = (new InMemoryFilesystem())
-			->given("/project/composer.json", "{}")
+			->given("/project/composer.json", self::COMPOSER)
 			->given("/project/src/Cache/Key.php", self::SOURCE)
 			->given("/project/tests/KeyTest.php", self::KEY_TEST)
 			->given("/project/tests/GateTest.php", self::GATE_TEST)
@@ -178,36 +182,28 @@ final class KeyingTest extends TestCase {
 	}
 
 	/**
-	 * Adding a mutator profile changes what "every mutant died" asserts, so
-	 * the file saying so is recorded — and recorded apart from what is merely
-	 * watched, because the two mean different things when they move: a watched
-	 * file costs a coverage run, and this unproves every verdict there is.
+	 * The engine's own configuration file is not read by anything any more:
+	 * mule renders what the engine needs per run. Hashing a file that changes
+	 * nothing would unprove verdicts for no reason.
 	 *
 	 * @return void
 	 */
-	public function testRecordsTheEnginesOwnConfigurationApartFromWhatItWatches(): void {
+	public function testIgnoresAnEngineConfigurationTheProjectStillHasLyingAround(): void {
 		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
 
-		self::assertSame(
-			["composer.json", "infection.json5"],
-			array_keys($this->decoded()["configuration"]),
-		);
-		self::assertArrayNotHasKey("infection.json5", $this->decoded()["watched"]);
+		self::assertSame(["composer.json"], array_keys($this->decoded()["configuration"]));
 	}
 
-	/**
-	 * mule.json is the one file meant to differ between machines, so recording
-	 * it would make a committed store unusable wherever it differs.
-	 *
-	 * @return void
-	 */
-	public function testDoesNotRecordItsOwnConfiguration(): void {
-		$this->filesystem->given("/project/mule.json", '{"options": []}');
+	public function testRecordsItsOwnConfigurationBecauseEveryKeyInItDefinesTheGate(): void {
+		$this->filesystem->given("/project/mule.json", '{"mutators": {"default": true}}');
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
 
+		self::assertSame(
+			["composer.json", "mule.json"],
+			array_keys($this->decoded()["configuration"]),
+		);
 		self::assertArrayNotHasKey("mule.json", $this->decoded()["watched"]);
-		self::assertArrayNotHasKey("mule.json", $this->decoded()["configuration"]);
 	}
 
 	public function testRecordsWhereTheTestsStopAgainstTheBytesItMeasured(): void {
@@ -256,11 +252,88 @@ final class KeyingTest extends TestCase {
 		self::assertSame(["tests/KeyTest.php"], array_keys($reading->snapshot->tests()));
 	}
 
+	public function testRecordsHowMuchOfAProvenFileTheTestsReached(): void {
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+
+		self::assertSame(
+			["src/Cache/Key.php" => ["executable" => 1, "executed" => 1]],
+			$this->decoded()["coverage"],
+		);
+	}
+
+	public function testRecordsHowMuchOfAFileItCouldNotProveTheTestsReached(): void {
+		$this->givenPartialReport();
+
+		self::assertSame(
+			["src/Cache/Key.php" => ["executable" => 4, "executed" => 1]],
+			$this->decoded()["coverage"],
+		);
+	}
+
+	/**
+	 * How much of one file ran is a fact about that file, measured from its own
+	 * report — so unlike what is watched, a subset run holds the truth about
+	 * every path it was given.
+	 *
+	 * @return void
+	 */
+	public function testStillRecordsCoverageFromAPartialReport(): void {
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+
+		self::assertSame(
+			["src/Cache/Key.php"],
+			array_keys($this->reading(["src/Cache/Key.php"])->snapshot->coverage()),
+		);
+	}
+
 	public function testWatchesNothingFromAPartialReport(): void {
 		$this->filesystem->given("/project/src/Excluded.php", "<?php class Excluded {}");
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
 
 		self::assertSame([], $this->reading(["src/Cache/Key.php"])->snapshot->watched());
+	}
+
+	/**
+	 * The same list that keeps a file out of the engine keeps it out of here,
+	 * which is the whole reason the two are one declaration. Left in the report
+	 * it would be covered in full and banked — recording that every mutant in
+	 * it died when nothing ever made one.
+	 *
+	 * @return void
+	 */
+	public function testKeysNothingForAFileTheProjectExcluded(): void {
+		$this->filesystem->given("/project/mule.json", '{"exclude": ["src/Cache/Key.php"]}');
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+
+		$reading = $this->reading();
+
+		self::assertSame([], $reading->snapshot->paths());
+		self::assertSame([], $reading->unproven());
+		self::assertSame([], $reading->snapshot->coverage(), "nor does it count towards the lines covered.");
+	}
+
+	public function testExcludesEverythingUnderAnExcludedDirectory(): void {
+		$this->filesystem->given("/project/mule.json", '{"exclude": ["src/Cache"]}');
+		$this->filesystem->given("/project/src/Project.php", "<?php class Project {}");
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+		$this->givenReport("Project.php", "Project.php", "/", ["Acme\\Tests\\GateTest::testOne"]);
+
+		self::assertSame(["src/Project.php"], $this->reading()->snapshot->paths());
+	}
+
+	/**
+	 * A directory's name is a prefix of its neighbour's, so the match has to be
+	 * on a whole path segment: excluding `src/Cache` must not take `src/Caches`
+	 * with it.
+	 *
+	 * @return void
+	 */
+	public function testDoesNotExcludeAFileWhoseNameMerelyStartsTheSameWay(): void {
+		$this->filesystem->given("/project/mule.json", '{"exclude": ["src/Cache"]}');
+		$this->filesystem->given("/project/src/Caches.php", "<?php class Caches {}");
+		$this->givenReport("Caches.php", "Caches.php", "/", ["Acme\\Tests\\GateTest::testOne"]);
+
+		self::assertSame(["src/Caches.php"], $this->reading()->snapshot->paths());
 	}
 
 	public function testRejectsACoveringTestTheAutoloaderCannotPlace(): void {
@@ -311,14 +384,17 @@ final class KeyingTest extends TestCase {
 		], ["/project/src", "/project/tests"]);
 		$universe = new Universe($project, $this->filesystem, $classes);
 
-		return (new Keying($project, $this->filesystem, $classes, $universe, $this->declared()))->of("/run/coverage-xml", $only);
+		$configuration = Configuration::load($project, $this->filesystem, new CoveringProcesses($this->filesystem));
+
+		return (new Keying($project, $this->filesystem, $classes, $universe, $this->declared(), $configuration))
+			->of("/run/coverage-xml", $only);
 	}
 
 	/**
 	 * The snapshot read back out of the JSON it writes, which is the shape the
 	 * store keeps and therefore the one worth asserting.
 	 *
-	 * @return array{verified: array<mixed>, tests: array<mixed>, unproven: array<mixed>, watched: array<mixed>, configuration: array<mixed>}
+	 * @return array{verified: array<mixed>, tests: array<mixed>, unproven: array<mixed>, watched: array<mixed>, configuration: array<mixed>, coverage: array<mixed>}
 	 */
 	private function decoded(): array {
 		$decoded = json_decode(StoreFormat::write($this->reading()->snapshot), TRUE);
@@ -329,6 +405,7 @@ final class KeyingTest extends TestCase {
 		self::assertIsArray($decoded["unproven"]);
 		self::assertIsArray($decoded["watched"]);
 		self::assertIsArray($decoded["configuration"]);
+		self::assertIsArray($decoded["coverage"]);
 
 		return [
 			"verified" => $decoded["verified"],
@@ -336,6 +413,7 @@ final class KeyingTest extends TestCase {
 			"unproven" => $decoded["unproven"],
 			"watched" => $decoded["watched"],
 			"configuration" => $decoded["configuration"],
+			"coverage" => $decoded["coverage"],
 		];
 	}
 

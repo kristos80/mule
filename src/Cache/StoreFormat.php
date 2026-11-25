@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Cache;
 
+use Kristos80\Mule\Coverage\Reach;
 use Kristos80\Mule\Coverage\Unreached;
 use Kristos80\Mule\Json\Decoded;
 
@@ -12,7 +13,7 @@ use Kristos80\Mule\Json\Decoded;
  * **Its own class because the shape of the file is not the shape of the
  * decision.** A snapshot answers what is stale; this answers what a person
  * sees in a diff — sorted, one entry per line, slashes as they were written,
- * five named sections — and the two change for entirely different reasons.
+ * six named sections — and the two change for entirely different reasons.
  */
 final readonly class StoreFormat {
 
@@ -31,6 +32,12 @@ final readonly class StoreFormat {
 	 * that has some — so such a store re-proves itself once and is written back
 	 * in the current shape.
 	 *
+	 * **A store written before `coverage` was a section reads as having none**,
+	 * and mule then reports the file counts it does have and says nothing about
+	 * lines until a run measures some. Treating the absence as a reason to
+	 * re-measure would spend a coverage pass — and, for a settled store, the
+	 * whole engine — on a number that is only ever reported.
+	 *
 	 * @param string $json
 	 * @return Snapshot
 	 */
@@ -40,6 +47,7 @@ final readonly class StoreFormat {
 		$tests = [];
 		$watched = [];
 		$configuration = [];
+		$coverage = [];
 
 		foreach($store->object("verified")->entries() as $path => $entry) {
 			$verified[$path] = $entry->string("digest");
@@ -57,7 +65,11 @@ final readonly class StoreFormat {
 			$configuration[$path] = $entry->string("digest");
 		}
 
-		return Snapshot::of($verified, $tests, self::unprovenIn($store), $watched, $configuration);
+		foreach($store->object("coverage")->entries() as $path => $entry) {
+			$coverage[$path] = new Reach($entry->number("executable"), $entry->number("executed"));
+		}
+
+		return Snapshot::of($verified, $tests, self::unprovenIn($store), $watched, $configuration, $coverage);
 	}
 
 	/**
@@ -73,6 +85,7 @@ final readonly class StoreFormat {
 		$unproven = [];
 		$watched = [];
 		$configuration = [];
+		$coverage = [];
 
 		foreach($snapshot->verified() as $path => $digest) {
 			$verified[] = self::line($path, ["digest" => $digest]);
@@ -94,11 +107,16 @@ final readonly class StoreFormat {
 			$configuration[] = self::line($path, ["digest" => $digest]);
 		}
 
+		foreach($snapshot->coverage() as $path => $reach) {
+			$coverage[] = self::line($path, $reach->toArray());
+		}
+
 		return "{\n\t\"verified\": {" . self::block($verified)
 			. "},\n\t\"unproven\": {" . self::block($unproven)
 			. "},\n\t\"tests\": {" . self::block($tests)
 			. "},\n\t\"watched\": {" . self::block($watched)
-			. "},\n\t\"configuration\": {" . self::block($configuration) . "}\n}\n";
+			. "},\n\t\"configuration\": {" . self::block($configuration)
+			. "},\n\t\"coverage\": {" . self::block($coverage) . "}\n}\n";
 	}
 
 	/**
