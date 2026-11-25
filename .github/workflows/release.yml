@@ -38,17 +38,14 @@ jobs:
       - name: Static analysis
         run: composer analyse
 
-      - name: Unit suite
-        run: composer test
+      # One run, with the driver attached. Running `composer test` and then the
+      # same suite again for coverage measured nothing the first pass had not,
+      # and paid for every test twice on both legs.
+      - name: Unit suite, with coverage
+        run: ./vendor/bin/phpunit --coverage-text
 
       - name: Integration suite
         run: composer test:integration
-
-      # Coverage is no longer a gate of its own: mule asserts min-coverage
-      # itself, from the same report it keys verdicts from, so this step exists
-      # only to fail fast and legibly before the slow one.
-      - name: Coverage
-        run: ./vendor/bin/phpunit --coverage-text
 
       # Nothing is removed first any more: mule.json holds only what defines
       # the gate, and it is byte-identical on every machine. Enabling a
@@ -59,13 +56,27 @@ jobs:
       # not of the runtime, and the committed store is keyed on file digests
       # that no PHP version changes. Running it twice would prove nothing twice
       # and could write two stores.
+      # `new` on a pull request and `full` on master, which is this tool used on
+      # itself rather than around itself.
+      #
+      # **Both are audited by the same diff**, and that is what makes `new`
+      # enough here. The store is committed, so a current one leaves `new` with
+      # nothing to mutate and nothing to write; a stale one is mutated, banked,
+      # and the diff below fails. So a pull request still cannot land a store
+      # that does not describe its own tree, and it pays seconds rather than
+      # every mutant to prove it.
+      #
+      # **`full` stays where it earns its cost.** Only a whole-project run can
+      # catch a store that claims *more* than was proven — `new` trusts what it
+      # is told — and master is where a release is cut from, so that is where
+      # the claim has to be true.
       - name: Mutation gate, gated at MSI 100 %
         if: matrix.php == '8.4'
-        run: |
-          php bin/mule full
+        env:
+          VERB: ${{ github.event_name == 'pull_request' && 'new' || 'full' }}
+        run: php bin/mule "$VERB"
 
-      # The store is committed, so a verdict banked on a laptop is inherited
-      # here. If this run banked something new, the committed store was stale.
+      # If that run banked anything, the committed store did not already say it.
       - name: The committed store was already complete
         if: matrix.php == '8.4'
         run: git diff --exit-code .mule/verified.json
