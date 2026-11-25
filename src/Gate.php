@@ -15,6 +15,7 @@ use Kristos80\Mule\Coverage\Reach;
 use Kristos80\Mule\Coverage\Unreached;
 use Kristos80\Mule\Engine\Declaration;
 use Kristos80\Mule\Engine\Infection;
+use Kristos80\Mule\Engine\Outcome;
 use Kristos80\Mule\External\OutputInterface;
 use Kristos80\Mule\External\ProcessesInterface;
 use Kristos80\Mule\Runner\Run;
@@ -205,15 +206,10 @@ final readonly class Gate {
 				return $this->shortfall($reach);
 			}
 
-			$this->scratch->declare($run, $this->declaration->json());
+			$this->scratch->declare($run, $this->declaration->json($run->mutantsJson()));
 
 			$status = $this->processes->run($this->engine->command($run, $scope), $this->project->root);
-
-			if($status !== 0) {
-				return $status;
-			}
-
-			$proven = $this->bankable($reading, $scope);
+			$proven = $this->provenBy($run, $status, $reading, $scope);
 			$unmoved = $this->freshness->unmoved($reading->snapshot, $proven);
 			$banked = $this->store->bank($reading->snapshot, $unmoved);
 
@@ -223,7 +219,7 @@ final readonly class Gate {
 				$this->output->line($line);
 			}
 
-			return $this->shortfall($reach);
+			return $status === 0 ? $this->shortfall($reach) : $status;
 		} finally {
 			$this->scratch->remove($run);
 		}
@@ -347,6 +343,53 @@ final readonly class Gate {
 		foreach(Summary::attributionBound($snapshot->isAttributionBound()) as $line) {
 			$this->output->line($line);
 		}
+	}
+
+	/**
+	 * Of the files this run mutated, the ones it proved.
+	 *
+	 * **A failing run keeps what it proved.** The engine reports one verdict for
+	 * the whole scope, and mule used to discard the lot on a non-zero exit: one
+	 * surviving mutant in one file and every other file in the scope went
+	 * unrecorded. On a project that is not already at the full score that meant
+	 * nothing could ever be banked, so the cache could only help a project that
+	 * did not need it. The engine's own log says which files were to blame, and
+	 * the rest were proven by the same run that failed.
+	 *
+	 * **A file is proven by evidence rather than by the absence of blame** —
+	 * see {@see Outcome}, where the difference is the engine that died halfway.
+	 *
+	 * **The run still fails.** Nothing here changes the exit status; it changes
+	 * only how much of the work survives it.
+	 *
+	 * @param Run $run
+	 * @param int $status
+	 * @param Reading $reading
+	 * @param list<string>|null $scope
+	 * @return list<string>
+	 */
+	private function provenBy(Run $run, int $status, Reading $reading, ?array $scope): array {
+		$bankable = $this->bankable($reading, $scope);
+
+		if($status === 0) {
+			return $bankable;
+		}
+
+		$proven = [];
+
+		foreach(Outcome::provenIn($this->scratch->mutants($run) ?: "{}") as $path) {
+			$proven[$this->project->relative($path)] = $path;
+		}
+
+		$kept = [];
+
+		foreach($bankable as $path) {
+			if(isset($proven[$path])) {
+				$kept[] = $path;
+			}
+		}
+
+		return $kept;
 	}
 
 	/**

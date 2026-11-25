@@ -26,6 +26,7 @@ final class DeclarationTest extends TestCase {
 		self::assertSame([
 			"source" => ["directories" => ["/project/src", "/project/lib"]],
 			"phpUnit" => ["configDir" => "/project"],
+			"logs" => ["json" => "/tmp/mule.cafe/mutants.json"],
 			"minMsi" => 100,
 			"minCoveredMsi" => 100,
 		], $this->decoded($this->configuration(source: ["src", "lib"])));
@@ -58,6 +59,7 @@ final class DeclarationTest extends TestCase {
 				"excludes" => ["External/Disk.php"],
 			],
 			"phpUnit" => ["configDir" => "/project"],
+			"logs" => ["json" => "/tmp/mule.cafe/mutants.json"],
 			"minMsi" => 100,
 			"minCoveredMsi" => 100,
 		], $this->decoded($this->configuration(exclude: ["src/External/Disk.php"])));
@@ -83,6 +85,7 @@ final class DeclarationTest extends TestCase {
 		self::assertSame([
 			"source" => ["directories" => ["/project/src"]],
 			"phpUnit" => ["configDir" => "/project"],
+			"logs" => ["json" => "/tmp/mule.cafe/mutants.json"],
 			"minMsi" => 100,
 			"minCoveredMsi" => 100,
 			"timeout" => 15,
@@ -90,7 +93,7 @@ final class DeclarationTest extends TestCase {
 	}
 
 	public function testWritesItselfAsBytesEndingInANewline(): void {
-		$json = (new Declaration($this->configuration(), "/project"))->json();
+		$json = (new Declaration($this->configuration(), "/project"))->json("/tmp/mule.cafe/mutants.json");
 
 		self::assertStringEndsWith("}\n", $json);
 		self::assertStringContainsString("/project/src", $json, "slashes are left as they were written.");
@@ -100,7 +103,7 @@ final class DeclarationTest extends TestCase {
 		$this->expectException(RuntimeException::class);
 		$this->expectExceptionMessage("The excluded path docs/One.php in mule.json is not inside any of the source directories");
 
-		(new Declaration($this->configuration(exclude: ["docs/One.php"]), "/project"))->json();
+		(new Declaration($this->configuration(exclude: ["docs/One.php"]), "/project"))->json("/tmp/mule.cafe/mutants.json");
 	}
 
 	/**
@@ -108,7 +111,7 @@ final class DeclarationTest extends TestCase {
 	 * @return array<string, mixed>
 	 */
 	private function decoded(Configuration $configuration): array {
-		$decoded = json_decode((new Declaration($configuration, "/project"))->json(), TRUE);
+		$decoded = json_decode((new Declaration($configuration, "/project"))->json("/tmp/mule.cafe/mutants.json"), TRUE);
 
 		self::assertIsArray($decoded);
 

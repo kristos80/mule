@@ -32,6 +32,7 @@ final class CoveringProcesses implements ProcessesInterface {
 	 * @param array<string, array{executable: int, executed: int, methods: list<array{name: string, start: int, end: int, executable: int, executed: int}>}> $gaps
 	 *        Source paths the tests do not reach all of, keyed as in $covered.
 	 * @param array<string, string> $duringEngine Absolute path to contents, written while the engine runs.
+	 * @param list<string>|null $survivors Source paths the engine's log blames, or NULL for an engine that left no log.
 	 */
 	public function __construct(
 		private InMemoryFilesystem $filesystem,
@@ -40,6 +41,7 @@ final class CoveringProcesses implements ProcessesInterface {
 		private array $statuses = [],
 		private array $gaps = [],
 		private array $duringEngine = [],
+		private ?array $survivors = NULL,
 	) {}
 
 	/**
@@ -58,6 +60,7 @@ final class CoveringProcesses implements ProcessesInterface {
 
 		if(!$covering) {
 			$this->keepTheDeclaration($command);
+			$this->logMutants($command);
 			$this->edit();
 		}
 
@@ -149,6 +152,43 @@ final class CoveringProcesses implements ProcessesInterface {
 			if(str_starts_with($argument, $flag)) {
 				$path = substr($argument, strlen($flag));
 				$this->declaration = $this->filesystem->exists($path) ? $this->filesystem->read($path) : "";
+			}
+		}
+	}
+
+	/**
+	 * The log a real engine leaves behind, with one escaped mutant per file the
+	 * test said should survive.
+	 *
+	 * @param list<string> $command
+	 * @return void
+	 */
+	private function logMutants(array $command): void {
+		if($this->survivors === NULL) {
+			return;
+		}
+
+		$log = ["killed" => [], "escaped" => []];
+
+		foreach(array_keys($this->covered) as $path) {
+			$bucket = in_array($path, $this->survivors, TRUE) ? "escaped" : "killed";
+			$log[$bucket][] = ["mutator" => ["originalFilePath" => "{$this->sourceRoot}/{$path}"]];
+		}
+
+		$this->writeLog($command, json_encode($log, JSON_THROW_ON_ERROR));
+	}
+
+	/**
+	 * @param list<string> $command
+	 * @param string $log
+	 * @return void
+	 */
+	private function writeLog(array $command, string $log): void {
+		$flag = "--configuration=";
+
+		foreach($command as $argument) {
+			if(str_starts_with($argument, $flag)) {
+				$this->filesystem->given(dirname(substr($argument, strlen($flag))) . "/mutants.json", $log);
 			}
 		}
 	}

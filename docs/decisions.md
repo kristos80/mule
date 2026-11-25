@@ -1071,3 +1071,40 @@ Worth keeping in mind as a shape rather than a fact about one preset: **a defaul
 that silently does nothing is indistinguishable from a default that works, for
 exactly as long as something else happens to cover for it.** A literal footer
 covered for this one across a dozen releases.
+
+## A failing run keeps what it proved
+
+For most of this tool's life a non-zero exit from the engine banked nothing. The
+README gave the reason: reading the engine's JSON log would need a path, the log
+can only be configured rather than passed as a flag, and a committed config means
+one shared log file that two concurrent runs would both write — "a cache that
+reads another run's results is worse than one that forgets".
+
+That was true when it was written and stopped being true the day mule started
+generating the engine's configuration itself. The config now lives in the run's
+own scratch directory under a random name, so the log path is unique per run and
+nothing is shared. The objection had expired and nobody noticed, including while
+making the change that expired it.
+
+**What it cost in the meantime, measured on a real project rather than argued.**
+A 610-file application with 6 720 mutants had 173 survive. The gate failed, so
+nothing was banked — not the 437 files that were clean either — and the next run
+started from nothing. The cache could only ever help a project already at the
+full score, which is to say a project that did not need it. Three days of work on
+this tool and that was the first thing anyone asked of it that it could not do.
+
+`Engine\Outcome` reads the log and answers which files the run vouches for
+entirely. **Positive evidence, not absence of blame**: a file must show a mutant
+the engine counted towards the score and none it did not. The difference is the
+engine that dies halfway — its log names neither the files it never reached nor
+any survivor in them, so taking the scope and subtracting the blame would record
+verdicts for files nothing had mutated. A test was written for exactly that case
+before the code was.
+
+Errors, syntax errors and timeouts count as killed, because the engine counts
+them towards the score; refusing them would refuse files the engine was satisfied
+with. `escaped`, `uncovered` and `ignored` disqualify, the last because an ignored
+mutant was never run whatever the reason.
+
+**The run still fails.** Nothing here touches the exit status. A missing log
+vouches for nothing, which is the old behaviour rather than a new failure.

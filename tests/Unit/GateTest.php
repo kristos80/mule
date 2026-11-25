@@ -467,7 +467,8 @@ final class GateTest extends TestCase {
 		$this->gate()->full();
 
 		self::assertSame(
-			'{"source":{"directories":["/project/src"]},"phpUnit":{"configDir":"/project"},"minMsi":100,"minCoveredMsi":100}',
+			'{"source":{"directories":["/project/src"]},"phpUnit":{"configDir":"/project"},"logs":{"json":"'
+			. self::RUN . '/mutants.json"},"minMsi":100,"minCoveredMsi":100}',
 			str_replace(["\n", "\t", " "], "", $this->processes->declaration),
 		);
 	}
@@ -789,14 +790,55 @@ final class GateTest extends TestCase {
 		self::assertSame("", $this->output->text());
 	}
 
-	public function testBanksNothingWhenTheEngineFails(): void {
+	/**
+	 * A failing run keeps what it proved. The engine reports one verdict for the
+	 * whole scope, and discarding the lot meant a project not already at the
+	 * full score could never bank anything — so the cache could only help a
+	 * project that did not need it.
+	 *
+	 * @return void
+	 */
+	public function testBanksWhatAFailingRunProvedAndNotWhatItDidNot(): void {
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		], "/project/src", [0, 1], [], [], ["Key.php"]);
+
+		self::assertSame(1, $this->gate()->full(), "the run still fails.");
+
+		self::assertSame(["src/Gate.php"], $this->stored(), "and keeps the file nothing survived in.");
+	}
+
+	/**
+	 * Every file the run proved, not the first of them: a failing run on a real
+	 * project leaves hundreds proven and a handful blamed, and keeping one of
+	 * the hundreds would be its own kind of starting over.
+	 *
+	 * @return void
+	 */
+	public function testBanksEveryFileAFailingRunProvedRatherThanTheFirst(): void {
+		$this->filesystem
+			->given("/project/src/Extra.php", "<?php class Extra {}")
+			->given("/project/tests/ExtraTest.php", "<?php class ExtraTest {}");
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+			"Extra.php" => ["Acme\\Tests\\ExtraTest::testOne"],
+		], "/project/src", [0, 1], [], [], ["Key.php"]);
+
+		self::assertSame(1, $this->gate()->full());
+
+		self::assertSame(["src/Extra.php", "src/Gate.php"], $this->stored());
+	}
+
+	public function testBanksNothingWhenAFailingEngineLeftNoLog(): void {
 		$this->processes = new CoveringProcesses($this->filesystem, [
 			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
 		], "/project/src", [0, 1]);
 
 		self::assertSame(1, $this->gate()->full());
 
-		self::assertFalse($this->filesystem->exists(self::STORE));
+		self::assertSame([], $this->storedSnapshot()->paths(), "no per-file answer, nothing recorded.");
 	}
 
 	public function testReportsWhatTheStoreClaimsWithoutMutatingAnything(): void {
@@ -939,6 +981,7 @@ final class GateTest extends TestCase {
 		$classes = new MappedClasses([
 			"Acme\\Tests\\KeyTest" => "/project/tests/KeyTest.php",
 			"Acme\\Tests\\GateTest" => "/project/tests/GateTest.php",
+			"Acme\\Tests\\ExtraTest" => "/project/tests/ExtraTest.php",
 		], ["/project/src", "/project/tests"]);
 		$universe = new Universe($project, $this->filesystem, $classes);
 
