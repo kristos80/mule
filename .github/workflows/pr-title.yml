@@ -61,14 +61,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Through the environment rather than an expression in the script: a
-      # description is untrusted input, and interpolating it into a shell would
-      # be a script injection.
+      # The description is fetched rather than interpolated. Passing it through
+      # `env:` would be safe too — that is GitHub's own hardening advice, and
+      # unsafe is only ever `${{ }}` inside a `run:` line — but a workflow
+      # expression carrying untrusted data is a pattern a scanner cannot tell
+      # apart from the unsafe one, and it earned a security finding here. Asking
+      # the API keeps the data out of the template altogether, which costs
+      # nothing and leaves nothing to argue about.
       - name: Check the description
         env:
-          BODY: ${{ github.event.pull_request.body }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
+
+          BODY="$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json body --jq .body)"
 
           # GitHub's five, case-insensitive, with a hyphen tolerated where it
           # takes a space. Matching more than GitHub honours is the safe
