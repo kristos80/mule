@@ -1,3 +1,9 @@
+## [3.1.0](https://github.com/kristos80/mule/compare/v3.0.0...v3.1.0) (2026-11-25)
+
+### Features
+
+* keep what a failing run proved ([#8](https://github.com/kristos80/mule/issues/8)) ([2d45bfe](https://github.com/kristos80/mule/commit/2d45bfea29cd6f833747d761d6df722e80820b9f))
+
 ## [3.0.0](https://github.com/kristos80/mule/compare/v2.0.0...v3.0.0) (2026-11-25)
 
 ### ⚠ BREAKING CHANGES
