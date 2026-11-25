@@ -282,6 +282,11 @@ final readonly class Gate {
 		$reach = $measured->reach();
 
 		$this->announce($total, count($stale), $reading->gaps, $reach);
+
+		foreach(Summary::engineMoved($stored->engine(), $reading->snapshot->engine()) as $line) {
+			$this->output->line($line);
+		}
+
 		$this->caution($reading->snapshot);
 
 		sort($unfinished);

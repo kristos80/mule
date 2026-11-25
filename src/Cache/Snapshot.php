@@ -28,6 +28,7 @@ final readonly class Snapshot {
 	 * @param array<string, string> $watched Everything else the project autoloads, sorted.
 	 * @param array<string, string> $configuration What the verdicts were measured under, sorted.
 	 * @param array<string, Reach> $coverage How much of each source file the tests reached, sorted.
+	 * @param array<string, string> $engine The engine the verdicts were proven under, sorted.
 	 */
 	private function __construct(
 		private array $verified,
@@ -36,6 +37,7 @@ final readonly class Snapshot {
 		private array $watched,
 		private array $configuration,
 		private array $coverage,
+		private array $engine,
 	) {}
 
 	/**
@@ -51,6 +53,7 @@ final readonly class Snapshot {
 	 * @param array<string, string> $watched
 	 * @param array<string, string> $configuration
 	 * @param array<string, Reach> $coverage
+	 * @param array<string, string> $engine
 	 * @return self
 	 */
 	public static function of(
@@ -60,6 +63,7 @@ final readonly class Snapshot {
 		array $watched = [],
 		array $configuration = [],
 		array $coverage = [],
+		array $engine = [],
 	): self {
 		$watched = array_diff_key($watched, $configuration);
 
@@ -69,8 +73,9 @@ final readonly class Snapshot {
 		ksort($watched);
 		ksort($configuration);
 		ksort($coverage);
+		ksort($engine);
 
-		return new self($verified, $tests, $unproven, $watched, $configuration, $coverage);
+		return new self($verified, $tests, $unproven, $watched, $configuration, $coverage, $engine);
 	}
 
 	/**
@@ -174,6 +179,21 @@ final readonly class Snapshot {
 	}
 
 	/**
+	 * The engine the verdicts were proven under.
+	 *
+	 * **Deliberately absent from {@see self::digests()}.** Everything there is
+	 * a file that has to exist: a path missing from the tree makes the store
+	 * unusable, and one that is merely recorded is pruned when it goes. This is
+	 * a fact about an installation rather than a path, so it is kept apart and
+	 * compared on its own.
+	 *
+	 * @return array<string, string>
+	 */
+	public function engine(): array {
+		return $this->engine;
+	}
+
+	/**
 	 * How much of the whole of it the tests reached.
 	 *
 	 * **Summed from the files rather than recorded as a total**, so that a run
@@ -273,8 +293,8 @@ final readonly class Snapshot {
 	 * it. A path the store holds and the report does not is a deleted or newly
 	 * excluded file, and nothing needs mutating on its behalf.
 	 *
-	 * **Measured under a different configuration, every verdict is stale** —
-	 * see {@see self::supersedes()}.
+	 * **Measured under a different configuration, or by a different engine,
+	 * every verdict is stale** — see {@see self::supersedes()}.
 	 *
 	 * @param self $stored
 	 * @return list<string>
@@ -329,6 +349,7 @@ final readonly class Snapshot {
 			[...$this->watched, ...$other->watched],
 			[...$this->configuration, ...$other->configuration],
 			[...$this->coverage, ...$other->coverage],
+			$other->engine + $this->engine,
 		);
 	}
 
@@ -365,7 +386,7 @@ final readonly class Snapshot {
 			);
 		}
 
-		return self::of($verified, $tests, $unproven, $watched, $configuration, $coverage);
+		return self::of($verified, $tests, $unproven, $watched, $configuration, $coverage, $this->engine);
 	}
 
 	/**
@@ -404,6 +425,7 @@ final readonly class Snapshot {
 			$this->watched,
 			$this->configuration,
 			array_intersect_key($this->coverage, $kept),
+			$this->engine,
 		);
 	}
 
@@ -423,15 +445,33 @@ final readonly class Snapshot {
 	 * engine's business, and guessing it wrong is a false verdict; re-proving a
 	 * project after its gate is redefined is a thing somebody did on purpose.
 	 *
-	 * **A snapshot with no configuration recorded supersedes nothing.** That is
-	 * a partial report, which is only ever read on a run whose store was usable
-	 * — and a usable store has already had its configuration compared.
+	 * **The engine counts for the same reason.** Which mutants exist is the
+	 * engine's business, so a verdict proven by one version is not a verdict
+	 * under another. Measured on a real project: a patch-range bump left 610
+	 * recorded verdicts standing and surfaced as a hundred and seventy-three
+	 * survivors, with every byte of source, test and configuration unchanged.
+	 *
+	 * **A snapshot with neither recorded supersedes nothing.** That is a partial
+	 * report, which is only ever read on a run whose store was usable — and a
+	 * usable store has already had both compared.
 	 *
 	 * @param self $stored
 	 * @return bool
 	 */
 	private function supersedes(self $stored): bool {
-		return $this->configuration !== [] && $this->configuration !== $stored->configuration;
+		$definition = $this->definition();
+
+		return $definition !== [] && $definition !== $stored->definition();
+	}
+
+	/**
+	 * Everything that decides what a verdict asserts, as one map: the files
+	 * that declare the gate, and the engine that would enforce it.
+	 *
+	 * @return array<string, string>
+	 */
+	private function definition(): array {
+		return [...$this->configuration, ...$this->engine];
 	}
 
 	/**

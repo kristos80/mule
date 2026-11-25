@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Cache;
 
+use Kristos80\Mule\External\ClassesInterface;
 use Kristos80\Mule\External\FilesystemInterface;
 use Kristos80\Mule\Project;
 
@@ -51,14 +52,46 @@ final readonly class Declared {
 		"composer.json",
 	];
 
+	/** The engine whose version decides what a passing gate asserts. */
+	private const string ENGINE = "infection/infection";
+
 	/**
 	 * @param Project $project
 	 * @param FilesystemInterface $filesystem
+	 * @param ClassesInterface $classes
 	 */
 	public function __construct(
 		private Project $project,
 		private FilesystemInterface $filesystem,
+		private ClassesInterface $classes,
 	) {}
+
+	/**
+	 * The engine that would prove a verdict now, as a package and its version.
+	 *
+	 * **Recorded beside the verdicts because it is part of what they mean.**
+	 * Which mutants exist is the engine's business, so two versions are two
+	 * gates. Measured the hard way: a patch-range bump moved the engine under
+	 * 610 recorded verdicts on a real project and surfaced as a hundred and
+	 * seventy-three unexplained survivors, with every source file, every test
+	 * and every configuration byte identical.
+	 *
+	 * **Not a path, which is why it is not one of the digests.** Everything else
+	 * recorded is a file that has to exist; this is a fact about an installation,
+	 * and a store that kept it among the paths would be pruned of it on every
+	 * write and re-hash it as a missing file on every read.
+	 *
+	 * **An engine with no version recorded answers nothing.** A package
+	 * installed from a branch has no pretty version, and refusing to run would
+	 * be worse than recording that the question could not be answered.
+	 *
+	 * @return array<string, string>
+	 */
+	public function engine(): array {
+		$version = $this->classes->versionOf(self::ENGINE);
+
+		return $version === NULL ? [] : [self::ENGINE => $version];
+	}
 
 	/**
 	 * The digest of every declared file that is there, in path order.

@@ -89,6 +89,7 @@ final readonly class Keying {
 				$whole ? $this->watched($known) : [],
 				$whole ? $this->declared->digests() : [],
 				$coverage,
+				$whole ? $this->declared->engine() : [],
 			),
 			$gaps,
 		);

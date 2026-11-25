@@ -92,7 +92,7 @@ final readonly class Application {
 		$project = Project::containing($directory, $this->filesystem);
 		$configuration = Configuration::load($project, $this->filesystem, $this->processes);
 		$universe = new Universe($project, $this->filesystem, $this->classes);
-		$declared = new Declared($project, $this->filesystem);
+		$declared = new Declared($project, $this->filesystem, $this->classes);
 
 		return new Gate(
 			$project,

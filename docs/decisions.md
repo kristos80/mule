@@ -1108,3 +1108,49 @@ mutant was never run whatever the reason.
 
 **The run still fails.** Nothing here touches the exit status. A missing log
 vouches for nothing, which is the old behaviour rather than a new failure.
+
+## The engine's version is recorded, because two versions are two gates
+
+Found by spending most of a day failing to explain a hundred and seventy-three
+survivors on a project where **every source file, every test file and every
+watched file was byte-identical** to what a store of 610 verdicts had been
+proven against. Nothing had changed, and the gate answered differently.
+
+Eliminated by measurement, in order: the configuration was equivalent (three
+keys, reproduced exactly); `--mutators=` and a config `mutators` map generate
+identical counts; the coverage report credited the same test class and the same
+ten methods on the line that escaped; the engine's `@default` profile was
+unchanged between the two versions, which differ only by two mutators in
+`@nullify` that the project does not enable. Each of those was a hypothesis
+stated as likely and then measured, and three of them were wrong.
+
+The answer was the engine: a `require: ^0.32` in mule had resolved **0.32.7**
+into a project that had deliberately pinned **0.32.0** and enforced the pin with
+a composer script — a script dismissed, in this very session, as "checking
+nothing" because it tested the global binary rather than the vendor one. The
+right fix for that script was to point it at the vendor binary. Deleting it was
+not.
+
+**So the version is recorded beside the verdicts and compared before any of them
+is reused**, exactly as the declaring files are. A move unproves everything, and
+`Summary::engineMoved()` says so in one line naming both versions — because
+without that line this failure mode is indistinguishable from a project that
+suddenly grew survivors, which is precisely how long it took to find.
+
+**It is a seventh store section rather than another configuration entry.** Every
+path in `configuration` is a file that has to exist: `Freshness` re-hashes each
+one and refuses a store naming anything missing, and `Store::pruned()` drops
+entries whose file has gone. A package name among them would be re-hashed as a
+missing file on every read and pruned on every write — the cache would be dead
+on arrival. `Snapshot::definition()` is what keeps the complexity of comparing
+both in one place.
+
+**And the engine is pinned exactly, not by range.** A patch range that can change
+which mutants exist is not a patch range in this context; `composer update` must
+not be able to redefine a gate. Recording the version is what makes a change
+safe; pinning is what makes it deliberate.
+
+The shape worth remembering, since it has now happened twice in this repository:
+**a fact that decides what a verdict means, and that is not a file, is invisible
+to a cache built out of file digests.** The configuration files were the first
+one. This was the second.
