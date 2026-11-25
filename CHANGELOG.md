@@ -1,3 +1,17 @@
+## [3.0.0](https://github.com/kristos80/mule/compare/v2.0.0...v3.0.0) (2026-11-25)
+
+### ⚠ BREAKING CHANGES
+
+* name the mutators as an argument, and require the runner (#4)
+
+### Features
+
+* name the mutators as an argument, and require the runner ([#4](https://github.com/kristos80/mule/issues/4)) ([bc0a20c](https://github.com/kristos80/mule/commit/bc0a20cde68178e8872314ef9605e89861a8cf0f))
+
+### Bug Fixes
+
+* recognise the breaking-change marker in a commit subject ([#5](https://github.com/kristos80/mule/issues/5)) ([885cbe3](https://github.com/kristos80/mule/commit/885cbe3a901d2343ef21c75d9e7ad56130ce940f)), closes [#4](https://github.com/kristos80/mule/issues/4) [#4](https://github.com/kristos80/mule/issues/4) [#4](https://github.com/kristos80/mule/issues/4)
+
 # [2.0.0](https://github.com/kristos80/mule/compare/v1.4.3...v2.0.0) (2026-11-25)
 
 
