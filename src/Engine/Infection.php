@@ -62,6 +62,7 @@ final readonly class Infection {
 			"--coverage={$run->directory}",
 			"--skip-initial-tests",
 			"--no-interaction",
+			"--mutators=" . implode(",", $this->configuration->mutators),
 			...$this->chosen(),
 		];
 

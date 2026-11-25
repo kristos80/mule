@@ -18,6 +18,7 @@ final class InfectionTest extends TestCase {
 			"--coverage=/tmp/mule.cafe",
 			"--skip-initial-tests",
 			"--no-interaction",
+			"--mutators=@default",
 		], $this->command(NULL));
 	}
 
@@ -27,6 +28,19 @@ final class InfectionTest extends TestCase {
 	 *
 	 * @return void
 	 */
+	/**
+	 * Every profile and every single mutator the engine accepts, in the order
+	 * the project asked for them. The engine's own configuration schema would
+	 * refuse half of these, which is why they are an argument.
+	 *
+	 * @return void
+	 */
+	public function testNamesEveryMutatorItWasGiven(): void {
+		$command = $this->command(NULL, mutators: ["@default", "@nullify", "ArrayFind", "ArrayFindKey"]);
+
+		self::assertContains("--mutators=@default,@nullify,ArrayFind,ArrayFindKey", $command);
+	}
+
 	public function testSaysNothingAboutTheScoreOnTheCommandLine(): void {
 		self::assertNotContains("--min-msi=100", $this->command(NULL));
 		self::assertNotContains("--min-covered-msi=100", $this->command(NULL));
@@ -70,16 +84,22 @@ final class InfectionTest extends TestCase {
 	 * @param list<string>|null $files
 	 * @param string|null $threads
 	 * @param bool $uncovered
+	 * @param list<string> $mutators
 	 * @return list<string>
 	 */
-	private function command(?array $files, ?string $threads = NULL, bool $uncovered = FALSE): array {
+	private function command(
+		?array $files,
+		?string $threads = NULL,
+		bool $uncovered = FALSE,
+		array $mutators = ["@default"],
+	): array {
 		$configuration = new Configuration(
 			[PHP_BINARY, "./vendor/bin/phpunit"],
 			["src"],
 			[],
 			NULL,
 			FALSE,
-			["@default"],
+			$mutators,
 			$uncovered,
 			NULL,
 			NULL,

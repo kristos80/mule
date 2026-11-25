@@ -978,3 +978,59 @@ with "mule needs it to be a JSON object" — a message pointing nowhere near the
 syntax. The example is plain JSON with the annotations beside it now, and
 unparseable bytes say so distinctly from valid JSON that is not an object.
 
+
+## The mutators are an argument, because the engine's schema is narrower than the engine
+
+Two defects in the first release of the configuration rework, both found by
+running it against the project mule was written for rather than against itself.
+
+**`mutators` could name a family the engine would refuse.** Mule's list of
+families was written from the engine's `ProfileList::ALL_PROFILES`, which is the
+command line's view. The *configuration schema* is narrower: it sets
+`additionalProperties: false` and defines eighteen profiles where the engine
+honours nineteen. `@nullify` is in the engine and not in the schema, so once the
+configuration was a document mule writes rather than flags mule passes,
+`"mutators": {"nullify": true}` produced a file the engine rejected outright —
+`[mutators] The property @nullify is not defined and the definition does not
+allow additional properties`. Verified by handing the engine exactly the document
+mule would have written.
+
+**And it could not name a single mutator at all.** hermes-2 turns on `ArrayFind`
+and `ArrayFindKey` individually, precisely because the engine ships no profile
+its schema accepts for them. Mule's vocabulary had families and nothing else, so
+that project's `mule.json` — empty, since every key is optional — silently gated
+on less than its `infection.json5` had. A tool that cannot express its own
+flagship consumer's gate is not worth the purity.
+
+Both are the same mistake and have one fix: **name the mutators as an argument**,
+which is validated by the engine rather than by a schema describing it. Verified
+to accept `@default,@identical,@nullify,ArrayFind,ArrayFindKey` in one go.
+`mule.json` now takes either vocabulary in its `mutators` map, told apart by
+case — lower case is one of mule's families and is checked against the list;
+anything else is one of the engine's own mutators, which are PascalCase without
+exception, and is passed through. That is the one place the engine's vocabulary
+shows, and it is admitted rather than worked around because there is no mule word
+for a single mutator and no family that covers one.
+
+It is also the first real cost of having no passthrough, which was the trade
+accepted knowingly when `mule.json` became mule's own vocabulary. The lesson is
+narrower than "add an escape hatch": a list copied from one of a dependency's
+two surfaces will be wrong about the other.
+
+**PHPUnit joined `require` alongside the engine.** A consumer installing mule
+gets both tools it drives, and neither has a key in `mule.json` to point at one.
+The cost is a narrower compatibility surface rather than a conflict: the two
+tools resolve together without trouble — PHPUnit 13.1.14 against Infection
+0.32.7, sharing `sebastian/diff 8.3.0`, with mule's whole suite, coverage and
+mutation gate green on it — but `^12.0 || ^13.0` means a project on PHPUnit 10 or
+11 cannot install mule as a dev dependency and must install it as a tool of its
+own. The store is keyed on file digests and does not care where mule came from,
+so that route costs nothing but the mention.
+
+One consequence of the engine being a dependency rather than a command, found by
+installing mule into a fresh project rather than by reasoning about it: Infection
+ships a Composer plugin, so a consumer must allow
+`infection/extension-installer` or a non-interactive `composer install` stops
+before it writes a vendor directory. Dependency *resolution* is fine — fifty-nine
+packages, no conflict — which is why this does not look like a dependency
+problem and is not one. The README carries the line to add.

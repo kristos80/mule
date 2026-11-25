@@ -84,6 +84,12 @@ in-memory fakes of the five interfaces.
 | `composer test:mutate:new` | the gate over only what the store cannot vouch for |
 | `composer test:mutate:status` | what the store claims, mutating nothing |
 
+**Both tools mule drives are in `require`**, not `require-dev`: a consumer gets
+the engine and the runner by installing mule, and neither has a key in
+`mule.json`. The cost is a narrower compatibility surface —
+`phpunit/phpunit ^12.0 || ^13.0`, so a project on 10 or 11 cannot install mule
+as a dev dependency and has to install it as a tool of its own.
+
 `mule.json` holds what defines the gate, in mule's own vocabulary — no PHPUnit or
 Infection key appears in it, and the engine's configuration is rendered per run
 into the scratch directory. It is committed and byte-identical on every machine,

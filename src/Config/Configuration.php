@@ -295,27 +295,53 @@ final readonly class Configuration {
 	}
 
 	/**
-	 * The mutator families asked for, translated into the engine's spelling.
+	 * The mutators asked for, in the engine's spelling.
+	 *
+	 * **Two vocabularies, told apart by their case.** A lower-case name is one
+	 * of mule's families and is checked against the list above; anything else is
+	 * one of the engine's own mutators — `ArrayFind`, `TrueValue` — and is passed
+	 * through as written. The engine's mutator names are PascalCase without
+	 * exception, so the two cannot be confused.
+	 *
+	 * **Naming a single mutator is the one place the engine's vocabulary
+	 * shows.** It is admitted because there is no mule word for it and no family
+	 * that covers it: measured on the project mule was written for, which turns
+	 * on `ArrayFind` and `ArrayFindKey` individually because the engine ships no
+	 * profile its configuration schema will accept for them. A tool that cannot
+	 * express its own flagship consumer's gate is not worth the purity.
 	 *
 	 * @param Decoded $declared
 	 * @return list<string>
 	 */
 	private static function mutatorsOf(Decoded $declared): array {
-		$families = in_array("mutators", $declared->names(), TRUE)
+		$asked = in_array("mutators", $declared->names(), TRUE)
 			? $declared->enabled("mutators")
 			: self::FAMILIES_BY_DEFAULT;
-		$file = self::FILE;
 		$mutators = [];
 
-		foreach($families as $family) {
-			if(!in_array($family, self::FAMILIES, TRUE)) {
-				throw new Failure("The mutator family {$family} in {$file} is not one mule has: " . implode(", ", self::FAMILIES) . ".");
-			}
-
-			$mutators[] = "@" . str_replace("-", "_", $family);
+		foreach($asked as $name) {
+			$mutators[] = self::mutatorOf($name);
 		}
 
 		return $mutators;
+	}
+
+	/**
+	 * @param string $name
+	 * @return string
+	 */
+	private static function mutatorOf(string $name): string {
+		if($name !== strtolower($name)) {
+			return $name;
+		}
+
+		if(!in_array($name, self::FAMILIES, TRUE)) {
+			$file = self::FILE;
+
+			throw new Failure("The mutator family {$name} in {$file} is not one mule has: " . implode(", ", self::FAMILIES) . ".");
+		}
+
+		return "@" . str_replace("-", "_", $name);
 	}
 
 	/**

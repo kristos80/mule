@@ -116,6 +116,23 @@ final class ConfigurationTest extends TestCase {
 		self::assertSame(["@default"], $this->configuration()->mutators);
 	}
 
+	/**
+	 * The one place the engine's vocabulary shows, and it is admitted because
+	 * there is no mule word for it: the project mule was written for turns on
+	 * `ArrayFind` and `ArrayFindKey` individually, the engine shipping no
+	 * profile its schema accepts for them.
+	 *
+	 * @return void
+	 */
+	public function testPassesASingleMutatorThroughAsTheEngineSpellsIt(): void {
+		$this->givenMuleJson('{"mutators": {"default": true, "ArrayFind": true, "ArrayFindKey": true}}');
+
+		self::assertSame(
+			["@default", "ArrayFind", "ArrayFindKey"],
+			$this->configuration()->mutators,
+		);
+	}
+
 	public function testRejectsAFamilyMuleDoesNotHave(): void {
 		$this->givenMuleJson('{"mutators": {"wishful": true}}');
 
