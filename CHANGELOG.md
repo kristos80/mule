@@ -1,3 +1,13 @@
+## [4.0.0](https://github.com/kristos80/mule/compare/v3.1.0...v4.0.0) (2026-11-25)
+
+### ⚠ BREAKING CHANGES
+
+* record the engine's version, and pin it (#10)
+
+### Features
+
+* record the engine's version, and pin it ([#10](https://github.com/kristos80/mule/issues/10)) ([86a8403](https://github.com/kristos80/mule/commit/86a840380a2c85aecae528bc80acdb4f7fddb29f))
+
 ## [3.1.0](https://github.com/kristos80/mule/compare/v3.0.0...v3.1.0) (2026-11-25)
 
 ### Features
