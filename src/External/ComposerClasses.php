@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\External;
 
 use Composer\Autoload\ClassLoader;
+use Composer\InstalledVersions;
 
 /**
  * The project's own Composer autoloader, asked where a class lives.
@@ -38,5 +39,13 @@ final readonly class ComposerClasses implements ClassesInterface {
 	 */
 	public function directories(): array {
 		return array_merge(...array_values($this->loader->getPrefixesPsr4()));
+	}
+
+	/**
+	 * @param string $package
+	 * @return string|null
+	 */
+	public function versionOf(string $package): ?string {
+		return InstalledVersions::getPrettyVersion($package);
 	}
 }

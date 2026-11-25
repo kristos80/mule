@@ -87,6 +87,7 @@ than leaving you to infer it.
 |---|---|
 | `composer.json` | it is what the autoloader, and therefore the universe of files, comes from |
 | `mule.json` | every key in it defines the gate — what is mutated, what is left out, which mutator families are on |
+| the engine's version | which mutants exist is the engine's business, so two versions are two gates |
 
 Widening the gate is the case that makes this necessary and it was measured, not
 imagined: adding a mutator family left an earlier mule answering "30 of 30
@@ -102,7 +103,7 @@ is how a cache starts lying.
 | | |
 |---|---|
 | `infection.json5` and friends | nothing reads them any more. Mule renders what the engine needs per run, so a file lying around in your project changes nothing and hashing it would unprove verdicts for nothing. |
-| the PHP version, and the versions of PHPUnit, Infection and the coverage driver | fingerprinting them would end the thing this cache is for: a laptop on 8.4 and CI on 8.5, or a `composer update` between runs, would each throw away every verdict. The trade is deliberate and it is the usual one for a content-addressed cache — the inputs that are *committed* are keyed, the installed toolchain is not. If a dependency bump could change your score, run `mule full`; CI running `mule full` on `master` is the cheap way to never think about it. |
+| the PHP version, and the versions of PHPUnit and the coverage driver | fingerprinting them would end the thing this cache is for: a laptop on 8.4 and CI on 8.5, or a `composer update` between runs, would each throw away every verdict. The trade is deliberate and it is the usual one for a content-addressed cache — the inputs that are *committed* are keyed, the installed toolchain is not. If a dependency bump could change your score, run `mule full`; CI running `mule full` on `master` is the cheap way to never think about it. |
 
 **A watched file is a third case**: a file your project autoloads that no test
 reached. Changing one means the store can no longer claim to describe the tree,
@@ -127,12 +128,12 @@ test run used.
 
 ## The store is committed, and that is what engine caches cannot do
 
-`.mule/verified.json` belongs in your repository, and holds six sections: the
+`.mule/verified.json` belongs in your repository, and holds seven sections: the
 files proven, the files the tests do not reach all of, what each test runs, a
 digest for everything else the project autoloads — that one being how a later
 run can be sure nothing has *appeared* as well as that nothing has changed —
-the configuration the verdicts were measured under, and how many lines of each
-file the tests reached. Only what the project owns is recorded: the autoloader
+the configuration the verdicts were measured under, how many lines of each file
+the tests reached, and the engine version that proved them. Only what the project owns is recorded: the autoloader
 knows a prefix per installed dependency, and a store with `vendor/` in it would
 be invalidated by every `composer install` and differ on every machine.
 

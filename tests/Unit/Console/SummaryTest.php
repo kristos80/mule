@@ -76,6 +76,36 @@ final class SummaryTest extends TestCase {
 		);
 	}
 
+	public function testSaysWhenTheEngineMovedUnderTheVerdicts(): void {
+		self::assertSame(
+			["mule: every verdict is stale because the engine moved, from "
+				. "infection/infection 0.32.0 to infection/infection 0.32.7."],
+			Summary::engineMoved(["infection/infection" => "0.32.0"], ["infection/infection" => "0.32.7"]),
+		);
+	}
+
+	public function testSaysNothingWhenTheEngineIsTheOneThatProvedThem(): void {
+		self::assertSame([], Summary::engineMoved(["i" => "1.0"], ["i" => "1.0"]));
+	}
+
+	/**
+	 * A store written before mule recorded this, or a partial report that
+	 * cannot say: neither is an engine that moved.
+	 *
+	 * @return void
+	 */
+	public function testSaysNothingWhereEitherEngineIsUnrecorded(): void {
+		self::assertSame([], Summary::engineMoved([], ["i" => "1.0"]));
+		self::assertSame([], Summary::engineMoved(["i" => "1.0"], []));
+	}
+
+	public function testNamesEveryPackageRatherThanTheFirst(): void {
+		self::assertSame(
+			["mule: every verdict is stale because the engine moved, from a 1.0, b 1.0 to a 2.0, b 2.0."],
+			Summary::engineMoved(["a" => "1.0", "b" => "1.0"], ["a" => "2.0", "b" => "2.0"]),
+		);
+	}
+
 	public function testSaysNothingAboutGapsWhenThereAreNone(): void {
 		self::assertSame([], Summary::unreached([]));
 	}

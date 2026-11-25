@@ -153,13 +153,19 @@ final readonly class Freshness {
 	 * store written before the section existed re-prove itself exactly once —
 	 * it records no configuration, the tree has some, and that is a mismatch.
 	 *
+	 * **The engine is compared the same way and for the same reason.** Which
+	 * mutants exist is the engine's business, so a verdict proven by one version
+	 * is not a verdict under another — and the engine is not a file, so nothing
+	 * else here would have noticed it move.
+	 *
 	 * @param Snapshot $stored
 	 * @param array<string, string> $recorded
 	 * @param array<string, string> $now
 	 * @return bool
 	 */
 	private function describes(Snapshot $stored, array $recorded, array $now): bool {
-		return $stored->configuration() === $this->declared->digests()
+		return $stored->engine() === $this->declared->engine()
+			&& $stored->configuration() === $this->declared->digests()
 			&& $this->same($stored->watched(), $now)
 			&& $this->same($stored->unprovenDigests(), $now)
 			&& $this->nothingNew($recorded);

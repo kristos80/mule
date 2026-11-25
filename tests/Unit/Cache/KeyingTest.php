@@ -188,6 +188,27 @@ final class KeyingTest extends TestCase {
 	 *
 	 * @return void
 	 */
+	/**
+	 * Which mutants exist is the engine's business, so the version that would
+	 * prove a verdict is recorded beside it.
+	 *
+	 * @return void
+	 */
+	public function testRecordsTheEngineThatWouldProveTheVerdicts(): void {
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+
+		self::assertSame(
+			["infection/infection" => ["version" => "0.32.7"]],
+			$this->decoded()["engine"],
+		);
+	}
+
+	public function testRecordsNoEngineFromAPartialReport(): void {
+		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
+
+		self::assertSame([], $this->reading(["src/Cache/Key.php"])->snapshot->engine());
+	}
+
 	public function testIgnoresAnEngineConfigurationTheProjectStillHasLyingAround(): void {
 		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
@@ -381,7 +402,7 @@ final class KeyingTest extends TestCase {
 		$classes = new MappedClasses([
 			"Acme\\Tests\\KeyTest" => "/project/tests/KeyTest.php",
 			"Acme\\Tests\\GateTest" => "/project/tests/GateTest.php",
-		], ["/project/src", "/project/tests"]);
+		], ["/project/src", "/project/tests"], ["infection/infection" => "0.32.7"]);
 		$universe = new Universe($project, $this->filesystem, $classes);
 
 		$configuration = Configuration::load($project, $this->filesystem, new CoveringProcesses($this->filesystem));
@@ -394,7 +415,7 @@ final class KeyingTest extends TestCase {
 	 * The snapshot read back out of the JSON it writes, which is the shape the
 	 * store keeps and therefore the one worth asserting.
 	 *
-	 * @return array{verified: array<mixed>, tests: array<mixed>, unproven: array<mixed>, watched: array<mixed>, configuration: array<mixed>, coverage: array<mixed>}
+	 * @return array{verified: array<mixed>, tests: array<mixed>, unproven: array<mixed>, watched: array<mixed>, configuration: array<mixed>, coverage: array<mixed>, engine: array<mixed>}
 	 */
 	private function decoded(): array {
 		$decoded = json_decode(StoreFormat::write($this->reading()->snapshot), TRUE);
@@ -406,6 +427,7 @@ final class KeyingTest extends TestCase {
 		self::assertIsArray($decoded["watched"]);
 		self::assertIsArray($decoded["configuration"]);
 		self::assertIsArray($decoded["coverage"]);
+		self::assertIsArray($decoded["engine"]);
 
 		return [
 			"verified" => $decoded["verified"],
@@ -414,6 +436,7 @@ final class KeyingTest extends TestCase {
 			"watched" => $decoded["watched"],
 			"configuration" => $decoded["configuration"],
 			"coverage" => $decoded["coverage"],
+			"engine" => $decoded["engine"],
 		];
 	}
 
@@ -458,6 +481,6 @@ final class KeyingTest extends TestCase {
 	 * @return Declared
 	 */
 	private function declared(): Declared {
-		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem);
+		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem, new MappedClasses([], [], ["infection/infection" => "0.32.7"]));
 	}
 }

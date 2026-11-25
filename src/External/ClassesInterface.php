@@ -45,4 +45,23 @@ interface ClassesInterface {
 	 * @return list<string> Absolute paths, in no particular order.
 	 */
 	public function directories(): array;
+
+	/**
+	 * The version of an installed package, or NULL where it has none.
+	 *
+	 * **The engine's version is part of what a verdict means.** Which mutants
+	 * exist is the engine's business, so two engines are two gates — and a
+	 * store that does not record which one proved it cannot notice the swap.
+	 * Measured the hard way on a real project: a patch-range bump moved the
+	 * engine under 610 recorded verdicts and surfaced as a hundred and
+	 * seventy-three unexplained survivors.
+	 *
+	 * **Asked of Composer rather than of the binary.** A version is already
+	 * recorded in the vendor directory the autoloader came from, so reading it
+	 * costs no process and cannot disagree with what is installed.
+	 *
+	 * @param string $package
+	 * @return string|null
+	 */
+	public function versionOf(string $package): ?string;
 }

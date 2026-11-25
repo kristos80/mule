@@ -286,6 +286,38 @@ final class FreshnessTest extends TestCase {
 
 
 	/**
+	 * The case this exists for. Every byte of source, test and configuration
+	 * identical, and the engine underneath replaced — which no digest can see,
+	 * because the engine is not a file.
+	 *
+	 * @return void
+	 */
+	public function testRefusesWhenTheEngineMovedUnderTheVerdicts(): void {
+		$stored = Snapshot::of(
+			["src/A.php" => hash("sha256", self::SOURCE)],
+			[],
+			[],
+			[],
+			[],
+			[],
+			["infection/infection" => "0.32.0"],
+		);
+
+		$freshness = new Freshness(
+			Project::containing("/project", $this->filesystem),
+			$this->filesystem,
+			$this->universe(["/project/src"]),
+			new Declared(
+				Project::containing("/project", $this->filesystem),
+				$this->filesystem,
+				new MappedClasses([], [], ["infection/infection" => "0.32.7"]),
+			),
+		);
+
+		self::assertFalse($freshness->of($stored)->usable);
+	}
+
+	/**
 	 * @return Freshness
 	 */
 	private function freshness(): Freshness {
@@ -350,6 +382,6 @@ final class FreshnessTest extends TestCase {
 	 * @return Declared
 	 */
 	private function declared(): Declared {
-		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem);
+		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem, new MappedClasses());
 	}
 }

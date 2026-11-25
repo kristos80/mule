@@ -45,6 +45,9 @@ final class GateTest extends TestCase {
 
 	private RecordingOutput $output;
 
+	/** @var array<string, string> What the project has installed, as a test states it. */
+	private array $versions = [];
+
 	/**
 	 * @return void
 	 */
@@ -489,6 +492,35 @@ final class GateTest extends TestCase {
 		$this->gate()->full();
 
 		self::assertSame(["src/Gate.php"], $this->stored());
+	}
+
+	/**
+	 * The case that cost a day. Every source file, every test and every
+	 * configuration byte identical, the engine underneath replaced, and nothing
+	 * else in the store able to notice — so without this line it reads as a
+	 * project that suddenly grew survivors.
+	 *
+	 * @return void
+	 */
+	public function testSaysSoWhenTheEngineMovedUnderTheVerdicts(): void {
+		$this->versions = ["infection/infection" => "0.32.0"];
+		$this->gate()->full();
+
+		$this->versions = ["infection/infection" => "0.32.7"];
+		$this->output = new RecordingOutput();
+		$this->processes = new CoveringProcesses($this->filesystem, [
+			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
+			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
+		]);
+
+		self::assertSame(0, $this->gate()->full());
+
+		self::assertStringContainsString("mule: 0 of 2 files verified, 2 stale.", $this->output->text());
+		self::assertStringContainsString(
+			"mule: every verdict is stale because the engine moved, "
+			. "from infection/infection 0.32.0 to infection/infection 0.32.7.",
+			$this->output->text(),
+		);
 	}
 
 	public function testHasSomethingToMutateWhileAnythingIsNotCoveredInFull(): void {
@@ -982,7 +1014,7 @@ final class GateTest extends TestCase {
 			"Acme\\Tests\\KeyTest" => "/project/tests/KeyTest.php",
 			"Acme\\Tests\\GateTest" => "/project/tests/GateTest.php",
 			"Acme\\Tests\\ExtraTest" => "/project/tests/ExtraTest.php",
-		], ["/project/src", "/project/tests"]);
+		], ["/project/src", "/project/tests"], $this->versions);
 		$universe = new Universe($project, $this->filesystem, $classes);
 
 		$configuration = Configuration::load($project, $this->filesystem, $this->processes);
@@ -1030,6 +1062,6 @@ final class GateTest extends TestCase {
 	 * @return Declared
 	 */
 	private function declared(): Declared {
-		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem);
+		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem, new MappedClasses([], [], $this->versions));
 	}
 }

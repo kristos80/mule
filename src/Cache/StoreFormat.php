@@ -13,7 +13,7 @@ use Kristos80\Mule\Json\Decoded;
  * **Its own class because the shape of the file is not the shape of the
  * decision.** A snapshot answers what is stale; this answers what a person
  * sees in a diff — sorted, one entry per line, slashes as they were written,
- * six named sections — and the two change for entirely different reasons.
+ * seven named sections — and the two change for entirely different reasons.
  */
 final readonly class StoreFormat {
 
@@ -48,6 +48,7 @@ final readonly class StoreFormat {
 		$watched = [];
 		$configuration = [];
 		$coverage = [];
+		$engine = [];
 
 		foreach($store->object("verified")->entries() as $path => $entry) {
 			$verified[$path] = $entry->string("digest");
@@ -69,7 +70,11 @@ final readonly class StoreFormat {
 			$coverage[$path] = new Reach($entry->number("executable"), $entry->number("executed"));
 		}
 
-		return Snapshot::of($verified, $tests, self::unprovenIn($store), $watched, $configuration, $coverage);
+		foreach($store->object("engine")->entries() as $package => $entry) {
+			$engine[$package] = $entry->string("version");
+		}
+
+		return Snapshot::of($verified, $tests, self::unprovenIn($store), $watched, $configuration, $coverage, $engine);
 	}
 
 	/**
@@ -86,6 +91,7 @@ final readonly class StoreFormat {
 		$watched = [];
 		$configuration = [];
 		$coverage = [];
+		$engine = [];
 
 		foreach($snapshot->verified() as $path => $digest) {
 			$verified[] = self::line($path, ["digest" => $digest]);
@@ -111,12 +117,17 @@ final readonly class StoreFormat {
 			$coverage[] = self::line($path, $reach->toArray());
 		}
 
+		foreach($snapshot->engine() as $package => $version) {
+			$engine[] = self::line($package, ["version" => $version]);
+		}
+
 		return "{\n\t\"verified\": {" . self::block($verified)
 			. "},\n\t\"unproven\": {" . self::block($unproven)
 			. "},\n\t\"tests\": {" . self::block($tests)
 			. "},\n\t\"watched\": {" . self::block($watched)
 			. "},\n\t\"configuration\": {" . self::block($configuration)
-			. "},\n\t\"coverage\": {" . self::block($coverage) . "}\n}\n";
+			. "},\n\t\"coverage\": {" . self::block($coverage)
+			. "},\n\t\"engine\": {" . self::block($engine) . "}\n}\n";
 	}
 
 	/**

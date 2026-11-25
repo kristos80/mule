@@ -6,6 +6,7 @@ namespace Kristos80\Mule\Tests\Unit\Cache;
 use Kristos80\Mule\Cache\Declared;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
+use Kristos80\Mule\Tests\Support\MappedClasses;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -72,9 +73,54 @@ public function testIncludesTheConfigurationMuleIsGiven(): void {
 	}
 
 		/**
+	 * Which mutants exist is the engine's business, so two versions are two
+	 * gates. Measured the hard way on a real project: a patch-range bump moved
+	 * the engine under 610 recorded verdicts and surfaced as survivors, with
+	 * every source file, test and configuration byte unchanged.
+	 *
+	 * @return void
+	 */
+	public function testDeclaresTheEngineThatWouldProveAVerdict(): void {
+		$declared = new Declared(
+			Project::containing("/project", $this->filesystem),
+			$this->filesystem,
+			new MappedClasses([], [], ["infection/infection" => "0.32.7"]),
+		);
+
+		self::assertSame(["infection/infection" => "0.32.7"], $declared->engine());
+	}
+
+	/**
+	 * A package installed from a branch has no pretty version, and refusing to
+	 * run would be worse than recording that the question had no answer.
+	 *
+	 * @return void
+	 */
+	public function testDeclaresNoEngineWhereThereIsNoVersionToRead(): void {
+		self::assertSame([], $this->declared()->engine());
+	}
+
+	/**
+	 * The engine is not a file, so it is kept out of the digests: everything
+	 * there has to exist on disk, and a store holding a package name among the
+	 * paths would be pruned of it on every write.
+	 *
+	 * @return void
+	 */
+	public function testKeepsTheEngineOutOfTheDigests(): void {
+		$declared = new Declared(
+			Project::containing("/project", $this->filesystem),
+			$this->filesystem,
+			new MappedClasses([], [], ["infection/infection" => "0.32.7"]),
+		);
+
+		self::assertArrayNotHasKey("infection/infection", $declared->digests());
+	}
+
+	/**
 	 * @return Declared
 	 */
 	private function declared(): Declared {
-		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem);
+		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem, new MappedClasses());
 	}
 }

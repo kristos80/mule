@@ -27,7 +27,7 @@ final class StoreFormatTest extends TestCase {
 			. "\t},\n\t\"unproven\": {},\n\t\"tests\": {\n"
 			. "\t\t\"tests/ATest.php\": {\"source\":\"tt\",\"touches\":[\"src/A.php\"]},\n"
 			. "\t\t\"tests/BTest.php\": {\"source\":\"uu\",\"touches\":[\"src/B.php\"]}\n"
-			. "\t},\n\t\"watched\": {},\n\t\"configuration\": {},\n\t\"coverage\": {}\n}\n",
+			. "\t},\n\t\"watched\": {},\n\t\"configuration\": {},\n\t\"coverage\": {},\n\t\"engine\": {}\n}\n",
 			StoreFormat::write($snapshot),
 		);
 	}
@@ -35,7 +35,7 @@ final class StoreFormatTest extends TestCase {
 	public function testWritesAnEmptySnapshotAsEmptySections(): void {
 		self::assertSame(
 			"{\n\t\"verified\": {},\n\t\"unproven\": {},\n\t\"tests\": {},"
-			. "\n\t\"watched\": {},\n\t\"configuration\": {},\n\t\"coverage\": {}\n}\n",
+			. "\n\t\"watched\": {},\n\t\"configuration\": {},\n\t\"coverage\": {},\n\t\"engine\": {}\n}\n",
 			StoreFormat::write(Snapshot::of([], [])),
 		);
 	}
@@ -56,7 +56,7 @@ final class StoreFormatTest extends TestCase {
 			. "\t\t\"src/Excluded.php\": {\"digest\":\"ee\"}\n"
 			. "\t},\n\t\"configuration\": {\n"
 			. "\t\t\"composer.json\": {\"digest\":\"cc\"}\n"
-			. "\t},\n\t\"coverage\": {}\n}\n",
+			. "\t},\n\t\"coverage\": {},\n\t\"engine\": {}\n}\n",
 			StoreFormat::write($snapshot),
 		);
 	}
@@ -82,7 +82,7 @@ final class StoreFormatTest extends TestCase {
 			. "\t\t\"composer.json\": {\"digest\":\"cc\"},\n"
 			. "\t\t\"infection.json\": {\"digest\":\"jj\"},\n"
 			. "\t\t\"infection.json5\": {\"digest\":\"55\"}\n"
-			. "\t},\n\t\"coverage\": {}\n}\n",
+			. "\t},\n\t\"coverage\": {},\n\t\"engine\": {}\n}\n",
 			StoreFormat::write($snapshot),
 		);
 	}
@@ -175,6 +175,29 @@ final class StoreFormatTest extends TestCase {
 		$this->expectExceptionMessage("The executable in the mule store coverage entry for src/A.php must be a whole number.");
 
 		StoreFormat::read('{"coverage": {"src/A.php": {"executed": 4}}}');
+	}
+
+	public function testWritesAndReadsBackTheEngineTheVerdictsWereProvenUnder(): void {
+		$snapshot = Snapshot::of([], [], [], [], [], [], ["infection/infection" => "0.32.7"]);
+
+		self::assertStringContainsString(
+			"\"engine\": {\n\t\t\"infection/infection\": {\"version\":\"0.32.7\"}\n\t}",
+			StoreFormat::write($snapshot),
+		);
+		self::assertSame(
+			["infection/infection" => "0.32.7"],
+			StoreFormat::read(StoreFormat::write($snapshot))->engine(),
+		);
+	}
+
+	/**
+	 * A store written before mule recorded the engine reads as having none,
+	 * and re-proves itself once rather than being refused.
+	 *
+	 * @return void
+	 */
+	public function testReadsAStoreWrittenBeforeTheEngineWasRecordedAsHavingNone(): void {
+		self::assertSame([], StoreFormat::read('{"verified": {"src/A.php": {"digest": "aa"}}}')->engine());
 	}
 
 	public function testReadsBackWhatItWrote(): void {

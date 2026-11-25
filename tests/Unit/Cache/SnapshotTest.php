@@ -288,6 +288,66 @@ final class SnapshotTest extends TestCase {
 		);
 	}
 
+	/**
+	 * Which mutants exist is the engine's business, so a verdict proven by one
+	 * version is not a verdict under another — and the engine is not a file, so
+	 * no digest would have noticed it move.
+	 *
+	 * @return void
+	 */
+	public function testEverythingIsStaleWhenTheEngineMoved(): void {
+		$current = Snapshot::of(["src/A.php" => "aa"], [], [], [], [], [], ["i" => "2.0"]);
+		$stored = Snapshot::of(["src/A.php" => "aa"], [], [], [], [], [], ["i" => "1.0"]);
+
+		self::assertSame(["src/A.php"], $current->staleAgainst($stored));
+	}
+
+	public function testNothingIsStaleWhenTheEngineIsTheOneThatProvedIt(): void {
+		$current = Snapshot::of(["src/A.php" => "aa"], [], [], [], [], [], ["i" => "1.0"]);
+		$stored = Snapshot::of(["src/A.php" => "aa"], [], [], [], [], [], ["i" => "1.0"]);
+
+		self::assertSame([], $current->staleAgainst($stored));
+	}
+
+	/**
+	 * A partial report cannot say which engine is installed, so banking one
+	 * must carry forward what the store already recorded rather than erasing
+	 * it — exactly as the configuration is carried.
+	 *
+	 * @return void
+	 */
+	public function testKeepsTheRecordedEngineWhenTheNewerSnapshotHasNone(): void {
+		$stored = Snapshot::of([], [], [], [], [], [], ["i" => "1.0"]);
+
+		self::assertSame(["i" => "1.0"], $stored->merged(Snapshot::of([], []))->engine());
+	}
+
+	public function testTakesTheNewerEngineWhereThereIsOne(): void {
+		$stored = Snapshot::of([], [], [], [], [], [], ["i" => "1.0"]);
+		$newer = Snapshot::of([], [], [], [], [], [], ["i" => "2.0"]);
+
+		self::assertSame(["i" => "2.0"], $stored->merged($newer)->engine());
+	}
+
+	public function testKeepsTheEngineOutOfTheDigests(): void {
+		$snapshot = Snapshot::of(["src/A.php" => "aa"], [], [], [], [], [], ["i" => "1.0"]);
+
+		self::assertSame(["src/A.php" => "aa"], $snapshot->digests());
+	}
+
+	public function testKeepsTheEngineThroughNarrowingAndPruning(): void {
+		$snapshot = Snapshot::of(["src/A.php" => "aa"], [], [], [], [], [], ["i" => "1.0"]);
+
+		self::assertSame(["i" => "1.0"], $snapshot->only(["src/A.php"])->engine());
+		self::assertSame(["i" => "1.0"], $snapshot->without(["src/Gone.php"])->engine());
+	}
+
+	public function testSortsTheEngineTooWhateverOrderItArrivedIn(): void {
+		$snapshot = Snapshot::of([], [], [], [], [], [], ["z/engine" => "1.0", "a/engine" => "2.0"]);
+
+		self::assertSame(["a/engine", "z/engine"], array_keys($snapshot->engine()));
+	}
+
 	public function testRejectsNarrowingToAPathItDoesNotHold(): void {
 		$this->expectException(RuntimeException::class);
 		$this->expectExceptionMessage("src/Gone.php is not in this run's verdicts, so mule cannot bank it.");

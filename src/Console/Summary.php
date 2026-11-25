@@ -72,6 +72,43 @@ final readonly class Summary {
 	}
 
 	/**
+	 * Said when the engine that would prove a verdict is not the one that did.
+	 *
+	 * **Worth a line of its own because nothing else can explain it.** Every
+	 * source file, every test and every configuration byte can be identical and
+	 * the gate still answer differently, because which mutants exist is the
+	 * engine's business. Without this, a version moving underneath a store
+	 * reads as a project that suddenly grew survivors — which is exactly how it
+	 * was found, after hours of looking at everything else.
+	 *
+	 * @param array<string, string> $proven The engine the store recorded.
+	 * @param array<string, string> $now The engine this run would use.
+	 * @return list<string> Empty where both agree, or where either is unrecorded.
+	 */
+	public static function engineMoved(array $proven, array $now): array {
+		if($proven === [] || $now === [] || $proven === $now) {
+			return [];
+		}
+
+		return ["mule: every verdict is stale because the engine moved, from "
+			. self::named($proven) . " to " . self::named($now) . "."];
+	}
+
+	/**
+	 * @param array<string, string> $engine
+	 * @return string
+	 */
+	private static function named(array $engine): string {
+		$named = [];
+
+		foreach($engine as $package => $version) {
+			$named[] = "{$package} {$version}";
+		}
+
+		return implode(", ", $named);
+	}
+
+	/**
 	 * Where the tests stop, for the files that cannot be banked because of it.
 	 *
 	 * **Said out loud rather than left to be inferred.** A file that is not
