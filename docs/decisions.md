@@ -1034,3 +1034,40 @@ ships a Composer plugin, so a consumer must allow
 before it writes a vendor directory. Dependency *resolution* is fine — fifty-nine
 packages, no conflict — which is why this does not look like a dependency
 problem and is not one. The README carries the line to add.
+
+## The breaking-change marker in a subject never worked, and nothing noticed
+
+v3.0.0 was due from a merged `feat!:` and no version was cut at all. The log did
+not say "no breaking change"; it said **"The commit should not trigger a
+release"** — the analyser had not seen a `feat` either.
+
+`@semantic-release/commit-analyzer` defaults to the
+`conventional-changelog-angular` preset, whose `headerPattern` is
+`/^(\w*)(?:\((.*)\))?: (.*)$/`: no `!` between the type and the colon, and no
+`breakingHeaderPattern` anywhere in the package. So `feat!: …` does not parse.
+The type comes out null and the commit triggers nothing — not a major, not a
+minor, nothing.
+
+**It had never worked.** v2.0.0 looked like proof that it did, but that release
+came from a merge commit whose branch commit carried a literal `BREAKING CHANGE`
+footer in its body, which the analyser matches independently of the header. The
+`!` was along for the ride. `CLAUDE.md` promised the marker worked on the
+strength of a release that had happened for the other reason.
+
+**Squash merges made it dangerous rather than merely wrong.** The pull request
+title is now the only subject semantic-release reads, so a title of `feat!:`
+silently releases nothing — and `pr-title.yml` cannot catch it, because the title
+is perfectly well formed. The one guard that exists for "a title that releases
+nothing" is blind to the one title that looks most like it should release
+something.
+
+The fix is the `conventionalcommits` preset, which implements the specification
+with `breakingHeaderPattern: /^(\w*)(?:\((.*)\))?!: (.*)$/`. Verified rather than
+assumed, on the commit that failed: the same `feat!:` subject that produced "The
+commit should not trigger a release" now produces "The release type for the
+commit is major", and the next version computes as 3.0.0.
+
+Worth keeping in mind as a shape rather than a fact about one preset: **a default
+that silently does nothing is indistinguishable from a default that works, for
+exactly as long as something else happens to cover for it.** A literal footer
+covered for this one across a dozen releases.
