@@ -134,6 +134,15 @@ the gates to pass, requires every commit to be verified, and blocks force pushes
 and deletion. Local commits need no signing key: what lands on master is
 GitHub's own squash commit, signed with the web-flow key.
 
+**A pull request description must not carry a CI skip directive.** The squash
+commit takes its body from the description, and GitHub honours a skip directive
+anywhere in a commit message — so a description that merely *mentions* one skips
+the whole post-merge run: no gates on the merge commit, and no release.
+`pr-title.yml` refuses the five GitHub honours for that reason. Found the hard
+way on the pull request that moved the release off a direct push, whose
+description explained the directive it was removing and whose merge recorded
+zero checks.
+
 ## Layout
 
 ```
