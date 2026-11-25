@@ -356,11 +356,27 @@ nothing machine-local lives here any more.
 
 ## What it will not do for you
 
-**A failing run banks nothing**, even the files that were clean, and the next run
-re-mutates them. The alternative — reading the engine's JSON log to bank partial
-progress — can only be pointed at a path by committed config, so two concurrent
-runs would write one log file, and a cache that reads another run's results is
-worse than one that forgets.
+**A failing run keeps what it proved.** The engine reports one verdict for a
+whole scope, and mule used to discard the lot on a non-zero exit: one surviving
+mutant in one file and six hundred proven files went unrecorded. On a project
+that is not already at the full score that meant nothing could ever be banked —
+the cache could only help a project that did not need it.
+
+Mule now reads the engine's own log and records the files whose every mutant
+died. **The run still fails**, and the files something survived in are still not
+recorded; what changes is that you converge instead of starting over.
+
+A file is proven by *evidence* rather than by the absence of blame: it has to
+show a mutant the engine counted towards the score and none it did not. That
+matters exactly when it is most dangerous — an engine that died halfway names
+neither the files it never reached nor any survivor in them, so subtracting
+blame from the scope would record verdicts for files nothing had mutated.
+
+This was impossible until mule began writing the engine's configuration itself.
+The log can only be asked for in a configuration file, never on a command line,
+and a *committed* config would have meant one shared log path for every
+concurrent run. Mule writes a config per run into that run's own scratch
+directory, so the path is unique and the objection is gone.
 
 **Timeouts count as kills.** A mutant the clock killed is banked exactly like one
 an assertion killed, and the record freezes whichever answer the clock happened

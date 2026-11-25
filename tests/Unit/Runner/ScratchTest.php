@@ -86,4 +86,27 @@ final class ScratchTest extends TestCase {
 
 		self::assertFalse($filesystem->exists($run->engineJson()));
 	}
+
+	public function testHandsBackTheLogTheEngineLeft(): void {
+		$filesystem = (new InMemoryFilesystem())
+			->givenDirectory("/tmp/mule.cafe1234")
+			->given("/tmp/mule.cafe1234/mutants.json", '{"killed": []}');
+
+		$mutants = (new Scratch($filesystem, new FixedRandom()))->mutants(new Run("/tmp/mule.cafe1234"));
+
+		self::assertSame('{"killed": []}', $mutants);
+	}
+
+	/**
+	 * An engine that died before writing one, or that was never asked, leaves
+	 * mule with no per-file answer — and no answer means nothing is banked,
+	 * which is the behaviour being replaced rather than a new failure.
+	 *
+	 * @return void
+	 */
+	public function testHandsBackNothingWhereTheEngineLeftNoLog(): void {
+		$filesystem = (new InMemoryFilesystem())->givenDirectory("/tmp/mule.cafe1234");
+
+		self::assertSame("", (new Scratch($filesystem, new FixedRandom()))->mutants(new Run("/tmp/mule.cafe1234")));
+	}
 }

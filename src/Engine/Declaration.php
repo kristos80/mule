@@ -54,10 +54,11 @@ final readonly class Declaration {
 	/**
 	 * The engine's configuration for this run, as the bytes to write.
 	 *
+	 * @param string $log Where the engine should write its log of every mutant.
 	 * @return string
 	 */
-	public function json(): string {
-		return json_encode($this->document(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
+	public function json(string $log): string {
+		return json_encode($this->document($log), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
 	}
 
 	/**
@@ -69,12 +70,20 @@ final readonly class Declaration {
 	 * **`timeout` likewise.** Absent means the engine's own default, which is
 	 * not a number mule should have an opinion about.
 	 *
+	 * **The log is asked for here rather than as an argument**, because a
+	 * configuration file is the only place the engine takes one: its command
+	 * line offers text, html and two CI formats and no JSON. That was the
+	 * standing reason a failing run banked nothing, and it stopped being true
+	 * the moment mule began writing this document.
+	 *
+	 * @param string $log
 	 * @return array<string, mixed>
 	 */
-	private function document(): array {
+	private function document(string $log): array {
 		$document = [
 			"source" => ["directories" => $this->directories()],
 			"phpUnit" => ["configDir" => $this->root],
+			"logs" => ["json" => $log],
 			"minMsi" => self::FULL_SCORE,
 			"minCoveredMsi" => self::FULL_SCORE,
 		];

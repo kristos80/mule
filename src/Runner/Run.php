@@ -36,6 +36,20 @@ final readonly class Run {
 	}
 
 	/**
+	 * Where the engine writes its log of every mutant.
+	 *
+	 * **Read only when the engine failed.** A clean exit proves every mutant in
+	 * the scope died, so there is nothing to look up; a failure is the only time
+	 * mule needs to know *which* files were to blame, and by then the run has
+	 * already spent minutes.
+	 *
+	 * @return string
+	 */
+	public function mutantsJson(): string {
+		return "{$this->directory}/mutants.json";
+	}
+
+	/**
 	 * Where mule writes the configuration it hands the engine.
 	 *
 	 * **Here rather than in the project**, so a crash leaves nothing behind in

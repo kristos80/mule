@@ -59,6 +59,23 @@ final readonly class Scratch {
 	}
 
 	/**
+	 * The log the engine left, or nothing where it left none.
+	 *
+	 * **Absent is not an error.** An engine that died before writing one, or
+	 * that was never asked, leaves mule with no per-file answer — and no
+	 * per-file answer means nothing is banked, which is exactly the behaviour
+	 * being replaced rather than a new failure.
+	 *
+	 * @param Run $run
+	 * @return string
+	 */
+	public function mutants(Run $run): string {
+		return $this->filesystem->exists($run->mutantsJson())
+			? $this->filesystem->read($run->mutantsJson())
+			: "";
+	}
+
+	/**
 	 * Removes the run's directory and everything a coverage run left in it.
 	 *
 	 * **Longest path first is deepest first**, because a directory's path is a
