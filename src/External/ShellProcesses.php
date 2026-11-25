@@ -33,4 +33,11 @@ final readonly class ShellProcesses implements ProcessesInterface {
 
 		return proc_close($process);
 	}
+
+	/**
+	 * @return string|false
+	 */
+	public function iniFile(): string|false {
+		return php_ini_loaded_file();
+	}
 }

@@ -26,58 +26,52 @@ final class DeclaredTest extends TestCase {
 		self::assertSame(["composer.json" => hash("sha256", "{}")], $this->declared()->digests());
 	}
 
-	public function testIncludesTheEnginesConfiguration(): void {
-		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
+public function testIncludesTheConfigurationMuleIsGiven(): void {
+		$this->filesystem->given("/project/mule.json", '{"mutators": {"default": true}}');
 
 		self::assertSame([
 			"composer.json" => hash("sha256", "{}"),
-			"infection.json5" => hash("sha256", '{"mutators": {"@default": true}}'),
+			"mule.json" => hash("sha256", '{"mutators": {"default": true}}'),
 		], $this->declared()->digests());
 	}
 
 	/**
 	 * Sorted, because the answer is compared with `===` against a snapshot
-	 * section that is sorted — and the declared order is not sorted order:
-	 * `infection.json5` is looked for before `infection.json`.
+	 * section that is sorted.
 	 *
 	 * @return void
 	 */
-	public function testAnswersInPathOrderRatherThanTheOrderItLooks(): void {
-		$this->filesystem->given("/project/infection.json5", "five");
-		$this->filesystem->given("/project/infection.json", "plain");
+	public function testAnswersInPathOrder(): void {
+		$this->filesystem->given("/project/mule.json", "declared");
 
-		self::assertSame(
-			["composer.json", "infection.json", "infection.json5"],
-			array_keys($this->declared()->digests()),
-		);
+		self::assertSame(["composer.json", "mule.json"], array_keys($this->declared()->digests()));
 	}
 
 	/**
-	 * A project has one engine configuration or another and not all of them, so
-	 * an absent file is absent rather than a digest of nothing — which is what
-	 * makes one appearing a change {@see \Kristos80\Mule\Cache\Freshness} can
-	 * see.
+	 * A project need not have a mule.json at all, so an absent file is absent
+	 * rather than a digest of nothing — which is what makes one appearing a
+	 * change {@see \Kristos80\Mule\Cache\Freshness} can see.
 	 *
 	 * @return void
 	 */
 	public function testLeavesOutWhatIsNotThere(): void {
-		self::assertArrayNotHasKey("infection.json", $this->declared()->digests());
-	}
-
-	/**
-	 * mule.json is the one file meant to differ between machines — CI deletes
-	 * it — so recording it would make a committed store unusable wherever it
-	 * differs.
-	 *
-	 * @return void
-	 */
-	public function testNeverDeclaresMulesOwnConfiguration(): void {
-		$this->filesystem->given("/project/mule.json", '{"options": []}');
-
 		self::assertArrayNotHasKey("mule.json", $this->declared()->digests());
 	}
 
 	/**
+	 * The engine's own configuration file is not read by anything any more:
+	 * mule renders what the engine needs per run from mule.json. Hashing a
+	 * file that changes nothing would unprove verdicts for no reason.
+	 *
+	 * @return void
+	 */
+	public function testNeverDeclaresAnEngineConfigurationTheProjectStillHas(): void {
+		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
+
+		self::assertArrayNotHasKey("infection.json5", $this->declared()->digests());
+	}
+
+		/**
 	 * @return Declared
 	 */
 	private function declared(): Declared {

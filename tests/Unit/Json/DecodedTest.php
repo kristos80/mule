@@ -114,7 +114,7 @@ final class DecodedTest extends TestCase {
 
 	public function testRejectsBytesThatAreNotJson(): void {
 		$this->expectException(RuntimeException::class);
-		$this->expectExceptionMessage("Cannot read mule.json: mule needs it to be a JSON object.");
+		$this->expectExceptionMessage("Cannot read mule.json: syntax error. It must be plain JSON — comments and trailing commas are not.");
 
 		Decoded::of("{not json", "mule.json");
 	}
@@ -166,5 +166,73 @@ final class DecodedTest extends TestCase {
 		$this->expectExceptionMessage("The entry for src/A.php in the mule store is malformed.");
 
 		Decoded::of('{"src/A.php": "aa"}', "the mule store")->entries();
+	}
+
+	public function testReadsAWholeNumberThatNeedNotBeThere(): void {
+		self::assertSame(15, Decoded::of('{"timeout": 15}', "mule.json")->numberOr("timeout", NULL));
+		self::assertNull(Decoded::of("{}", "mule.json")->numberOr("timeout", NULL));
+	}
+
+	public function testReadsAFlagThatNeedNotBeThere(): void {
+		self::assertTrue(Decoded::of('{"narrow": true}', "mule.json")->flag("narrow", FALSE));
+		self::assertFalse(Decoded::of("{}", "mule.json")->flag("narrow", FALSE));
+	}
+
+	public function testRejectsAFlagThatIsNeitherTrueNorFalse(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("The narrow in mule.json must be true or false.");
+
+		Decoded::of('{"narrow": "yes"}', "mule.json")->flag("narrow", FALSE);
+	}
+
+	public function testReadsOnlyTheNamesTurnedOn(): void {
+		$decoded = Decoded::of('{"mutators": {"one": true, "two": false, "three": true}}', "mule.json");
+
+		self::assertSame(["one", "three"], $decoded->enabled("mutators"));
+	}
+
+	public function testRejectsAnEnabledNameThatIsNotAFlag(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("The one in mule.json mutators must be true or false.");
+
+		Decoded::of('{"mutators": {"one": 1}}', "mule.json")->enabled("mutators");
+	}
+
+	public function testNamesEveryKeyItCarries(): void {
+		self::assertSame(["one", "two"], Decoded::of('{"one": 1, "two": 2}', "mule.json")->names());
+	}
+
+	public function testReadsPathsWrittenSinglyOrAsAList(): void {
+		$decoded = Decoded::of('{"psr-4": {"One": "src/", "Two": ["lib", "extra/"]}}', "composer.json");
+
+		self::assertSame(["src", "lib", "extra"], $decoded->paths("psr-4"));
+	}
+
+	public function testRejectsAPathThatIsNotOne(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("The One in composer.json psr-4 must be a path or a list of them.");
+
+		Decoded::of('{"psr-4": {"One": ""}}', "composer.json")->paths("psr-4");
+	}
+
+	/**
+	 * `mule.json` is the only file a project writes, so a comment or a trailing
+	 * comma in it is an easy thing to reach for — and "mule needs it to be a
+	 * JSON object" points nowhere near the syntax.
+	 *
+	 * @return void
+	 */
+	public function testSaysWhatIsWrongWithBytesThatWillNotParse(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("Cannot read mule.json: syntax error. It must be plain JSON — comments and trailing commas are not.");
+
+		Decoded::of("{\n\t// a comment\n\t\"threads\": \"max\"\n}", "mule.json");
+	}
+
+	public function testStillComplainsSeparatelyAboutValidJsonThatIsNotAnObject(): void {
+		$this->expectException(RuntimeException::class);
+		$this->expectExceptionMessage("Cannot read mule.json: mule needs it to be a JSON object.");
+
+		Decoded::of('["source"]', "mule.json");
 	}
 }

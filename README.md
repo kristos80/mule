@@ -86,12 +86,12 @@ than leaving you to infer it.
 | | |
 |---|---|
 | `composer.json` | it is what the autoloader, and therefore the universe of files, comes from |
-| `infection.json5`, `infection.json`, and their `.dist` forms | the mutator profiles are *what a passing gate asserts* |
+| `mule.json` | every key in it defines the gate — what is mutated, what is left out, which mutator families are on |
 
-Widening the engine's configuration is the case that makes this necessary and
-it was measured, not imagined: adding `@equal` to `infection.json5` left an
-earlier mule answering "30 of 30 verified, nothing to mutate" about a gate that
-had just been given a new class of mutant to kill. A verdict proven under the
+Widening the gate is the case that makes this necessary and it was measured, not
+imagined: adding a mutator family left an earlier mule answering "30 of 30
+verified, nothing to mutate" about a gate that had just been given a new class
+of mutant to kill. A verdict proven under the
 narrower configuration is not merely old, it answers a different question —
 so all of them go, and the next run proves the project again. Which files a
 newly enabled profile would reach is the engine's business, and guessing it
@@ -101,7 +101,7 @@ is how a cache starts lying.
 
 | | |
 |---|---|
-| `mule.json` | the one file meant to differ per machine — a coverage-driver wrapper on a laptop, deleted entirely on CI. Watching it would make a committed store unusable on the machine it exists to help. Run `mule full` after changing the coverage command or the engine's options. |
+| `infection.json5` and friends | nothing reads them any more. Mule renders what the engine needs per run, so a file lying around in your project changes nothing and hashing it would unprove verdicts for nothing. |
 | the PHP version, and the versions of PHPUnit, Infection and the coverage driver | fingerprinting them would end the thing this cache is for: a laptop on 8.4 and CI on 8.5, or a `composer update` between runs, would each throw away every verdict. The trade is deliberate and it is the usual one for a content-addressed cache — the inputs that are *committed* are keyed, the installed toolchain is not. If a dependency bump could change your score, run `mule full`; CI running `mule full` on `master` is the cheap way to never think about it. |
 
 **A watched file is a third case**: a file your project autoloads that no test
@@ -127,14 +127,14 @@ test run used.
 
 ## The store is committed, and that is what engine caches cannot do
 
-`.mule/verified.json` belongs in your repository, and holds five sections: the
+`.mule/verified.json` belongs in your repository, and holds six sections: the
 files proven, the files the tests do not reach all of, what each test runs, a
 digest for everything else the project autoloads — that one being how a later
 run can be sure nothing has *appeared* as well as that nothing has changed —
-and the configuration the verdicts were measured under. Only what the project
-owns is recorded: the autoloader knows a prefix per installed dependency, and a
-store with `vendor/` in it would be invalidated by every `composer install` and
-differ on every machine.
+the configuration the verdicts were measured under, and how many lines of each
+file the tests reached. Only what the project owns is recorded: the autoloader
+knows a prefix per installed dependency, and a store with `vendor/` in it would
+be invalidated by every `composer install` and differ on every machine.
 
 It belongs in your repository. A content-hash verdict is not
 machine-local state: the same bytes give the same answer on the next machine, so
@@ -229,7 +229,7 @@ mule: every test here covers exactly one file, so no change can mark another
 |---|---|
 | `mule new` | The gate over only the files the store cannot vouch for. Banks what it proves. Usually what you want in the loop. |
 | `mule full` | The gate over the whole project. Banks every file. |
-| `mule status` | What the store claims, mutating nothing. |
+| `mule status` | What the store claims — files verified, lines covered, where the tests stop — mutating nothing. |
 
 **A run that has nothing to do generates no coverage at all.** The store
 records a digest for every file the project autoloads, so "has anything moved"
@@ -244,17 +244,16 @@ where they go:**
 
 ```json
 {
-	"coverage": ["./vendor/bin/phpunit", "--coverage-xml={coverage-xml}", "--log-junit={junit}", "{tests}"]
+	"narrow": true
 }
 ```
 
-`{tests}` is its own argument and expands in place to every test that runs
-something still outstanding — every one of them, because a file is only as
-covered as the report says, and a run that executed some of its tests would
-report the rest of it as unreached. Leave the placeholder out and the suite
-runs whole, which is what every project gets until it opts in: narrowing a test
-run is sound only where tests do not depend on each other having run, and that
-is not something mule may assume on your behalf.
+Mule then runs every test that covers something still outstanding — every one of
+them, because a file is only as covered as the report says, and a run that
+executed some of its tests would report the rest of it as unreached. Off by
+default, which is what every project gets until it opts in: narrowing a test run
+is sound only where tests do not depend on each other having run, and that is not
+something mule may assume on your behalf.
 
 **How much it buys depends entirely on how broad your tests are**, and this
 package is the wrong advertisement for it: editing one file here leaves 23 of
@@ -286,23 +285,74 @@ your path otherwise.
 
 ## Configuration
 
-Mule infers what it can. The source universe comes from the coverage report, the
-covering tests from your autoloader, the test runner from whichever binary you
-installed, and the store lives at `.mule/verified.json` because it is committed
-and there is one of it. `mule.json` is for the rest, and every key is optional:
+**You configure mule, and mule configures everything else.** Neither PHPUnit nor
+Infection appears in `mule.json`, and neither has to be installed, pointed at or
+reasoned about: the engine ships with mule as a dependency, the test runner is
+whichever one your project installed, and what the engine needs is rendered per
+run into the run's own scratch directory. There is no `infection.json5` to
+write — and if you have one, mule neither reads it nor hashes it.
+
+**The one thing mule cannot do for you is turn on a coverage driver.** That is
+done to the environment mule runs in, exactly as you would for PHPUnit:
 
 ```json
 {
-	"coverage": ["herd", "coverage", "./vendor/bin/phpunit", "--coverage-xml={coverage-xml}", "--log-junit={junit}"],
-	"binary": "./vendor/bin/infection",
-	"options": ["--threads=max", "--no-progress"]
+	"scripts": {
+		"mutate": "herd coverage bin/mule new"
+	}
 }
 ```
 
-`coverage` must pass both placeholders; mule substitutes a scratch directory
-that is unique per run and removed afterwards, so two sessions can run the gate
-at once without treading on each other. The common reason to set it is a
-coverage-driver wrapper such as Herd's.
+Wrapping *mule* is enough — mule hands its own interpreter and its own `php.ini`
+to the coverage run it starts, so whatever enabled the driver for mule is in
+force for the runner too. (That detail is load-bearing: a wrapper that enables
+Xdebug through an ini leaves a child started as plain `PHP_BINARY` with no ini
+and no driver. Measured, then fixed.)
+
+Every key is optional, and a project with full coverage and no exclusions needs
+no `mule.json` at all. **It is plain JSON** — comments and trailing commas are
+not, and mule says so rather than reading past them:
+
+```json
+{
+	"source": ["src"],
+	"exclude": ["src/External/PhpFilesystem.php"],
+	"tests": "unit",
+	"narrow": false,
+	"mutators": { "default": true, "identical": true },
+	"mutate-uncovered": false,
+	"min-coverage": 100,
+	"timeout": 10,
+	"threads": "max"
+}
+```
+
+| key | |
+|---|---|
+| `source` | The directories to mutate. Inferred from `composer.json`'s non-dev `psr-4` roots, so most projects never set it. |
+| `exclude` | Project-relative paths left out of mutation **and** out mule's reading of the coverage report, so the two cannot drift apart. The engine applies its exclude list to every source directory at once, and mule asks a file the same question the engine will — so with several source roots, excluding `lib/Generated` excludes `src/Generated` too. Name them differently if you want one and not the other. |
+| `tests` | Which suite coverage is worked out from. Omit for all of them. |
+| `narrow` | May a coverage run execute only the tests of what is outstanding? Off by default: narrowing a test run is sound only where tests do not depend on each other having run, and mule will not assume that for you. |
+| `mutators` | Mule's own names — no `@`, no underscores. Defaults to `default` and `identical`. An unknown family is refused rather than forwarded. |
+| `mutate-uncovered` | Mutate code no test reaches. Below full coverage this makes the gate fail rather than report, which is a choice you are entitled to make. |
+| `min-coverage` | Fail the run below this percentage of covered lines. Omit and mule reports coverage without asserting anything about it. |
+| `timeout` | Seconds a single mutant may run for. |
+| `threads` | How many mutants to run at once. |
+
+**An unknown key is refused, not ignored.** Mule owns this vocabulary, so
+`mutatros` is a mistake every time rather than a setting that silently does
+nothing — and there is no passthrough, so no engine flag of mule's own can be
+contradicted by something written here.
+
+**`exclude` is the key worth understanding.** It drives both halves on purpose.
+Excluded from mutation alone, a file would still arrive in the coverage report,
+still be covered in full, and still be banked — recording that every mutant in it
+died when nothing ever made one. One list, both ends, and the trap is gone.
+
+**Every key defines the gate, so the whole file is digested into the store.**
+Change a mutator family and every verdict is unproven at once, which is correct:
+a verdict is only ever a verdict under some configuration. That is also why
+nothing machine-local lives here any more.
 
 ## What it will not do for you
 
@@ -325,6 +375,7 @@ are re-mutated on every run and reported instead, with the methods named:
 
 ```
 mule: 24 of 25 files verified, 0 stale, 1 not covered in full.
+mule: 1240 of 1266 lines covered (97.9%).
 mule: not banked until the tests reach them:
   src/Cache/Keying.php — testFileOf() lines 94-104, 3 unreached
 ```
@@ -332,10 +383,39 @@ mule: not banked until the tests reach them:
 Mule does not *gate* on coverage — that is your coverage gate's job. It reports
 what the report it is already holding happens to say.
 
-**It trusts your gate, not your intent.** Mule banks a file when the engine exits
-clean under `--min-msi=100 --min-covered-msi=100`. Gate below 100 and a banked
-verdict means "scored at least what you asked for", which is a weaker claim than
-this cache's design assumes.
+**Which includes the number itself, from the cache.** The line counts are
+recorded per file alongside the verdicts, so `mule status` answers how much of
+the project your tests reach without starting a process — and a narrowed run
+reports the whole project's figure rather than that of the handful of files it
+re-measured, because the rest of the store is still the truth about the rest of
+the tree. Two consequences worth knowing: the proportion is rounded **down**, so
+nothing one line short of complete reads as 100 %; and a store written by a mule
+older than this says nothing about lines until the next run that measures some,
+which is one run of `mule new`, not a re-proof of anything.
+
+**The mutation threshold is not yours to lower, and there is nowhere to try.**
+Mule gates at the full score, and `mule.json` has no key for it — nor any
+passthrough to reach the engine with one. That is the one opinion the cache cannot do without, and the reason is
+arithmetic rather than taste: a score is an *aggregate over the run's scope*,
+and skipping a file needs a fact about that file. At 100 %, exit 0 means every
+mutant in every file died, so a per-file record is justified and the narrowed
+run asks the same question as the full one. At 90 %, exit 0 is equally
+compatible with one file at 100 % and another at 60 % — and `mule new` over one
+changed file would demand 90 % *of that file* while `mule full` demands 90 % *of
+everything*, so **the two verbs disagree in both directions**. Supporting it
+would mean recording each file's killed-and-total and recomputing the project
+figure, which is a measurement cache rather than a proof cache, and it needs
+per-file numbers out of an engine whose CLI does not expose them.
+
+So mule cannot gate a project that will not reach 100 % MSI on its covered
+code. That is a real limit, not a soft preference.
+
+**Everything else about the gate is yours.** Any coverage threshold at all works
+untouched, because mule reports coverage and never gates on it — the only rule
+the cache needs is per-file and different from yours: a file is bankable when
+the engine saw *all* of it. And `--with-uncovered` is accepted: at full coverage
+it does nothing, and below it the engine simply fails rather than recording
+anything false, which is a choice you are entitled to make.
 
 ### The key is only as complete as your coverage attribution
 
@@ -393,6 +473,23 @@ See `CLAUDE.md` for the rules and `docs/decisions.md` for why each of them.
 ## Requirements
 
 PHP 8.4+, a coverage driver, and PHPUnit or Pest to run your tests.
+
+**The engine is a dependency, so its constraints become yours.** Mule requires
+`infection/infection ^0.32`, which Composer resolves alongside the rest of your
+project. That is deliberate — it is what removes the `binary` key, makes the
+engine's version pinnable by your lock file, and lets mule promise the engine is
+there at all. Infection and a current PHPUnit share a `composer.json` without
+trouble (its `sebastian/diff ^4.0 || … || ^8.0` spans PHPUnit 9 through 12), but
+it does bring:
+
+- `symfony/console`, `symfony/filesystem`, `symfony/finder` at `^6.4 || ^7.0 || ^8.0`
+- `nikic/php-parser ^5.6.2`
+- `justinrainbow/json-schema ^6.0`
+
+A project pinned below any of those — Symfony 5.4, say — will not resolve. If
+that is you, install mule as a tool of its own rather than as a dev dependency
+of the project it gates; the store it writes is keyed on file digests and does
+not care where mule came from.
 
 ## Licence
 

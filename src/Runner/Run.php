@@ -4,8 +4,8 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Runner;
 
 /**
- * One invocation's scratch space, and the two paths inside it that a coverage
- * run writes and the engine reads.
+ * One invocation's scratch space, and the paths inside it: the two a coverage
+ * run writes and the engine reads, and the one mule writes for the engine.
  */
 final readonly class Run {
 
@@ -33,5 +33,19 @@ final readonly class Run {
 	 */
 	public function junit(): string {
 		return "{$this->directory}/junit.xml";
+	}
+
+	/**
+	 * Where mule writes the configuration it hands the engine.
+	 *
+	 * **Here rather than in the project**, so a crash leaves nothing behind in
+	 * a repository and two runs at once cannot read each other's. The engine
+	 * resolves a configuration's relative paths against its directory, which is
+	 * this one — so everything written into it is absolute.
+	 *
+	 * @return string
+	 */
+	public function engineJson(): string {
+		return "{$this->directory}/infection.json";
 	}
 }

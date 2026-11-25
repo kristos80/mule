@@ -117,13 +117,13 @@ final class FreshnessTest extends TestCase {
 	 * The one change no section of the store can notice by itself: a file that
 	 * declares the gate appearing where there was none. Every other digest is
 	 * only interesting because the store says so, but the declared set is known
-	 * independently of it — so an `infection.json5` that was not there when the
+	 * independently of it — so a `mule.json` that was not there when the
 	 * verdicts were proven is a mismatch rather than a blind spot.
 	 *
 	 * @return void
 	 */
 	public function testRefusesWhenADeclaredFileAppearsThatWasNeverThere(): void {
-		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
+		$this->filesystem->given("/project/mule.json", '{"mutators": {"default": true}}');
 
 		self::assertFalse($this->freshness()->of($this->stored())->usable);
 	}

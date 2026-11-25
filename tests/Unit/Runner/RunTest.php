@@ -15,4 +15,8 @@ final class RunTest extends TestCase {
 	public function testNamesWhereTheJunitLogIsWritten(): void {
 		self::assertSame("/tmp/mule.cafe/junit.xml", (new Run("/tmp/mule.cafe"))->junit());
 	}
+
+	public function testNamesWhereTheEnginesConfigurationIsWritten(): void {
+		self::assertSame("/tmp/mule.cafe/infection.json", (new Run("/tmp/mule.cafe"))->engineJson());
+	}
 }

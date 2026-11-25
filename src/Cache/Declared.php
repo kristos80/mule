@@ -22,12 +22,20 @@ use Kristos80\Mule\Project;
  * proven without one. Hashing the declared set from the tree makes a file
  * appearing, changing and vanishing the same kind of event.
  *
- * **`mule.json` is deliberately absent.** It is the one file whose purpose is
- * to differ between machines — a coverage driver wrapper on a laptop, nothing
- * on CI, which is why CI deletes it — so recording it would make a committed
- * store unusable on the very machine it exists to help. The cost, which is the
- * right way round: changing the coverage command or the engine's options
- * invalidates nothing, so run `mule full` after changing one.
+ * **`mule.json` is recorded, and it used to be the one file that was not.** It
+ * held a coverage command, which differed between machines — a driver wrapper
+ * on a laptop and nothing on CI — so hashing it would have made a committed
+ * store unusable on the very machine it existed to help. Every key it has now
+ * changes what a verdict asserts: what to mutate, what to leave out, which
+ * mutator families are on. Nothing machine-local is left in it, because
+ * enabling a coverage driver is done to the environment mule is run in rather
+ * than written down.
+ *
+ * **The engine's own configuration file is deliberately absent**, and no longer
+ * read by anything: mule renders what the engine needs per run from
+ * `mule.json`. A project that still has an `infection.json5` lying around is
+ * not consulted, so hashing it would unprove verdicts over a file that changes
+ * nothing.
  */
 final readonly class Declared {
 
@@ -39,11 +47,8 @@ final readonly class Declared {
 	 * @var list<string>
 	 */
 	public const array PATHS = [
+		"mule.json",
 		"composer.json",
-		"infection.json5",
-		"infection.json",
-		"infection.json5.dist",
-		"infection.json.dist",
 	];
 
 	/**
@@ -61,8 +66,7 @@ final readonly class Declared {
 	 * **Sorted, because the answer is compared with `===`.** A snapshot holds
 	 * its sections sorted, so an unsorted answer here would differ from an
 	 * identical one read back out of the store. The declared order is not
-	 * sorted order either — `infection.json5` is looked for before
-	 * `infection.json`.
+	 * sorted order either — mule's own configuration is looked for first.
 	 *
 	 * **An absent file is absent rather than empty.** A project has
 	 * `infection.json5` or `infection.json` and not both, and a missing entry

@@ -23,15 +23,13 @@ final readonly class CoveredFile {
 	/**
 	 * @param string $path The absolute path of the source file.
 	 * @param list<string> $coveringTests Every covering test, as `Class::method`.
-	 * @param int $executable How many of its lines can be executed at all.
-	 * @param int $executed How many of those the tests reached.
+	 * @param Reach $reach How much of it the tests reached.
 	 * @param list<Unreached> $unreached Where the gap is, when there is one.
 	 */
 	private function __construct(
 		public string $path,
 		public array $coveringTests,
-		public int $executable,
-		public int $executed,
+		public Reach $reach,
 		public array $unreached,
 	) {}
 
@@ -63,19 +61,12 @@ final readonly class CoveredFile {
 		return new self(
 			"{$sourceRoot}{$path}/" . self::attribute($file, "name", $subject),
 			array_values(array_unique($tests)),
-			self::number($lines, "executable", $subject),
-			self::number($lines, "executed", $subject),
+			new Reach(
+				self::number($lines, "executable", $subject),
+				self::number($lines, "executed", $subject),
+			),
 			self::unreachedIn($document, $subject),
 		);
-	}
-
-	/**
-	 * Whether every line of it ran.
-	 *
-	 * @return bool
-	 */
-	public function isFullyCovered(): bool {
-		return $this->executed === $this->executable;
 	}
 
 	/**

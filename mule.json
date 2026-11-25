@@ -1,4 +1,11 @@
 {
-	"coverage": ["herd", "coverage", "./vendor/bin/phpunit", "--coverage-xml={coverage-xml}", "--log-junit={junit}", "{tests}"],
-	"options": ["--threads=max", "--no-progress"]
+	"exclude": [
+		"src/External/ComposerClasses.php",
+		"src/External/PhpFilesystem.php",
+		"src/External/PhpRandom.php",
+		"src/External/ShellProcesses.php",
+		"src/External/StreamOutput.php"
+	],
+	"min-coverage": 100,
+	"threads": "max"
 }

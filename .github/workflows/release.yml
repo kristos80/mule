@@ -44,18 +44,16 @@ jobs:
       - name: Integration suite
         run: composer test:integration
 
-      # Not composer test:coverage: that one wraps phpunit in `herd coverage`,
-      # which is the local coverage driver. pcov is already enabled here, so the
-      # runner is called directly and the same gate applied.
-      - name: Coverage, gated at 100 %
-        run: |
-          ./vendor/bin/phpunit --coverage-clover=.phpunit.cache/clover.xml --coverage-text
-          composer test:coverage:gate
+      # Coverage is no longer a gate of its own: mule asserts min-coverage
+      # itself, from the same report it keys verdicts from, so this step exists
+      # only to fail fast and legibly before the slow one.
+      - name: Coverage
+        run: ./vendor/bin/phpunit --coverage-text
 
-      # mule.json exists for the `herd coverage` wrapper and Infection's
-      # options, neither of which applies here. Removing it runs the gate on
-      # mule's own inference — ./vendor/bin/phpunit for coverage,
-      # ./vendor/bin/infection for the engine — which is one more thing proved.
+      # Nothing is removed first any more: mule.json holds only what defines
+      # the gate, and it is byte-identical on every machine. Enabling a
+      # coverage driver is done to the environment rather than written down,
+      # which here is the pcov the setup step turned on.
       #
       # One leg only: a mutation score is a property of the code and its tests,
       # not of the runtime, and the committed store is keyed on file digests
@@ -64,7 +62,6 @@ jobs:
       - name: Mutation gate, gated at MSI 100 %
         if: matrix.php == '8.4'
         run: |
-          rm mule.json
           php bin/mule full
 
       # The store is committed, so a verdict banked on a laptop is inherited

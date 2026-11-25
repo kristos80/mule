@@ -42,6 +42,23 @@ final readonly class Scratch {
 	}
 
 	/**
+	 * Writes the configuration mule hands the engine into the run's own
+	 * directory.
+	 *
+	 * **Here rather than in the gate**, because the gate holds no filesystem:
+	 * what it does is decide, and the scratch directory's contents belong to
+	 * whatever owns the scratch directory. It is removed with everything else
+	 * the run leaves behind.
+	 *
+	 * @param Run $run
+	 * @param string $declaration
+	 * @return void
+	 */
+	public function declare(Run $run, string $declaration): void {
+		$this->filesystem->write($run->engineJson(), $declaration);
+	}
+
+	/**
 	 * Removes the run's directory and everything a coverage run left in it.
 	 *
 	 * **Longest path first is deepest first**, because a directory's path is a

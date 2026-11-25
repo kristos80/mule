@@ -9,6 +9,7 @@ use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Cache\Universe;
 use Kristos80\Mule\Config\Configuration;
+use Kristos80\Mule\Engine\Declaration;
 use Kristos80\Mule\Engine\Infection;
 use Kristos80\Mule\External\ClassesInterface;
 use Kristos80\Mule\External\FilesystemInterface;
@@ -18,6 +19,7 @@ use Kristos80\Mule\External\RandomInterface;
 use Kristos80\Mule\Failure;
 use Kristos80\Mule\Gate;
 use Kristos80\Mule\Project;
+use Kristos80\Mule\Runner\Measurement;
 use Kristos80\Mule\Runner\Scratch;
 use Throwable;
 
@@ -88,17 +90,19 @@ final readonly class Application {
 	 */
 	private function gateFor(string $directory): Gate {
 		$project = Project::containing($directory, $this->filesystem);
-		$configuration = Configuration::load($project, $this->filesystem);
+		$configuration = Configuration::load($project, $this->filesystem, $this->processes);
 		$universe = new Universe($project, $this->filesystem, $this->classes);
 		$declared = new Declared($project, $this->filesystem);
 
 		return new Gate(
 			$project,
 			$configuration,
-			new Keying($project, $this->filesystem, $this->classes, $universe, $declared),
+			new Keying($project, $this->filesystem, $this->classes, $universe, $declared, $configuration),
 			new Freshness($project, $this->filesystem, $universe, $declared),
 			new Store($project, $this->filesystem, $this->random),
-			new Infection($configuration->binary, $configuration->options),
+			new Measurement($configuration),
+			new Infection($configuration),
+			new Declaration($configuration, $project->root),
 			new Scratch($this->filesystem, $this->random),
 			$this->processes,
 			$this->output,

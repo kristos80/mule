@@ -11,11 +11,14 @@ use Kristos80\Mule\Cache\Standing;
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Console\Summary;
+use Kristos80\Mule\Coverage\Reach;
 use Kristos80\Mule\Coverage\Unreached;
+use Kristos80\Mule\Engine\Declaration;
 use Kristos80\Mule\Engine\Infection;
 use Kristos80\Mule\External\OutputInterface;
 use Kristos80\Mule\External\ProcessesInterface;
 use Kristos80\Mule\Runner\Run;
+use Kristos80\Mule\Runner\Measurement;
 use Kristos80\Mule\Runner\Scratch;
 
 /**
@@ -53,7 +56,9 @@ final readonly class Gate {
 	 * @param Keying $keying
 	 * @param Freshness $freshness
 	 * @param Store $store
+	 * @param Measurement $measurement
 	 * @param Infection $engine
+	 * @param Declaration $declaration
 	 * @param Scratch $scratch
 	 * @param ProcessesInterface $processes
 	 * @param OutputInterface $output
@@ -64,7 +69,9 @@ final readonly class Gate {
 		private Keying $keying,
 		private Freshness $freshness,
 		private Store $store,
+		private Measurement $measurement,
 		private Infection $engine,
+		private Declaration $declaration,
 		private Scratch $scratch,
 		private ProcessesInterface $processes,
 		private OutputInterface $output,
@@ -120,11 +127,11 @@ final readonly class Gate {
 			return NULL;
 		}
 
-		$this->announce($standing->total, 0, []);
+		$this->announce($standing->total, 0, [], $stored->reach());
 		$this->caution($stored);
 		$this->output->line(Summary::nothingToMutate());
 
-		return 0;
+		return $this->shortfall($stored->reach());
 	}
 
 	/**
@@ -143,10 +150,10 @@ final readonly class Gate {
 			return NULL;
 		}
 
-		$this->announce($standing->total, 0, $standing->gaps);
+		$this->announce($standing->total, 0, $standing->gaps, $stored->reach());
 		$this->caution($stored);
 
-		return 0;
+		return $this->shortfall($stored->reach());
 	}
 
 	/**
@@ -162,9 +169,9 @@ final readonly class Gate {
 				return $coverage;
 			}
 
-			$this->report($this->keying->of($run->coverageXml()), Standing::unusable());
+			[, $reach] = $this->report($this->keying->of($run->coverageXml()), Standing::unusable());
 
-			return 0;
+			return $this->shortfall($reach);
 		} finally {
 			$this->scratch->remove($run);
 		}
@@ -189,14 +196,16 @@ final readonly class Gate {
 			}
 
 			$reading = $this->keying->of($run->coverageXml(), $subset);
-			$unfinished = $this->report($reading, $standing);
+			[$unfinished, $reach] = $this->report($reading, $standing);
 			$scope = $narrowed ? $unfinished : NULL;
 
 			if($scope === []) {
 				$this->output->line(Summary::nothingToMutate());
 
-				return 0;
+				return $this->shortfall($reach);
 			}
+
+			$this->scratch->declare($run, $this->declaration->json());
 
 			$status = $this->processes->run($this->engine->command($run, $scope), $this->project->root);
 
@@ -214,7 +223,7 @@ final readonly class Gate {
 				$this->output->line($line);
 			}
 
-			return 0;
+			return $this->shortfall($reach);
 		} finally {
 			$this->scratch->remove($run);
 		}
@@ -228,41 +237,7 @@ final readonly class Gate {
 	 * @return int
 	 */
 	private function cover(Run $run, ?array $tests): int {
-		return $this->processes->run($this->coverageCommand($run, $tests), $this->project->root);
-	}
-
-	/**
-	 * The coverage command with its placeholders filled in.
-	 *
-	 * **`{tests}` is an argument, and it expands in place** — to the test
-	 * files a narrowed run needs, or to nothing at all on a run that wants the
-	 * whole suite. Expanding to nothing rather than to an empty string matters:
-	 * a runner handed `""` as an argument looks for a test file called nothing.
-	 *
-	 * @param Run $run
-	 * @param list<string>|null $tests
-	 * @return list<string>
-	 */
-	private function coverageCommand(Run $run, ?array $tests): array {
-		$command = [];
-
-		foreach($this->configuration->coverage as $argument) {
-			if($argument !== Configuration::TESTS_PLACEHOLDER) {
-				$command[] = str_replace(
-					[Configuration::COVERAGE_PLACEHOLDER, Configuration::JUNIT_PLACEHOLDER],
-					[$run->coverageXml(), $run->junit()],
-					$argument,
-				);
-
-				continue;
-			}
-
-			foreach($tests ?? [] as $test) {
-				$command[] = $test;
-			}
-		}
-
-		return $command;
+		return $this->processes->run($this->measurement->command($run, $tests), $this->project->root);
 	}
 
 	/**
@@ -280,7 +255,7 @@ final readonly class Gate {
 	 * @return list<string>|null
 	 */
 	private function subsetFor(bool $narrowed, Standing $standing): ?array {
-		if(!$narrowed || !$standing->usable || !$this->configuration->narrowable()) {
+		if(!$narrowed || !$standing->usable || !$this->configuration->narrow) {
 			return NULL;
 		}
 
@@ -290,37 +265,76 @@ final readonly class Gate {
 	/**
 	 * Says how much of the project the store vouches for, and answers the rest.
 	 *
+	 * **Coverage is the store's picture with this run's written over it**, for
+	 * the same reason the file count is the store's: a narrowed run measured a
+	 * handful of files, and the lines in the rest of the project did not stop
+	 * existing while it did. Where the store cannot be used at all, the whole
+	 * suite has just run, and the reading is the whole answer.
+	 *
 	 * @param Reading $reading
 	 * @param Standing $standing
-	 * @return list<string> Everything that still needs the engine: stale, plus never bankable.
+	 * @return array{list<string>, Reach} Everything that still needs the engine — stale, plus
+	 *         never bankable — and how much of the project the tests reach.
 	 */
 	private function report(Reading $reading, Standing $standing): array {
-		$stale = $reading->snapshot->staleAgainst($this->store->read());
+		$stored = $this->store->read();
+		$stale = $reading->snapshot->staleAgainst($stored);
 		$unproven = $reading->unproven();
 		$unfinished = [...$stale, ...$unproven];
 		$total = $standing->usable ? $standing->total : $reading->count();
+		$measured = $standing->usable ? $stored->merged($reading->snapshot) : $reading->snapshot;
+		$reach = $measured->reach();
 
-		$this->announce($total, count($stale), $reading->gaps);
+		$this->announce($total, count($stale), $reading->gaps, $reach);
 		$this->caution($reading->snapshot);
 
 		sort($unfinished);
 
-		return $unfinished;
+		return [$unfinished, $reach];
 	}
 
 	/**
-	 * The two things every verb says: how much is vouched for, and where the
-	 * tests stop in whatever is not.
+	 * Nothing, or the one line and the failing status a project that asked for
+	 * more covered lines than it has should get.
+	 *
+	 * **Asked of every verb**, including the ones that start no process: the
+	 * store records how much of each file was reached, so `mule status` can
+	 * hold a project to its own minimum without measuring anything.
+	 *
+	 * **Nothing is asserted where nothing was measured.** A store written
+	 * before mule recorded coverage has no lines to fall short of, and failing
+	 * on that would be failing on mule's own upgrade.
+	 *
+	 * @param Reach $reach
+	 * @return int
+	 */
+	private function shortfall(Reach $reach): int {
+		$minimum = $this->configuration->minCoverage;
+
+		if($minimum === NULL || !$reach->isMeasured() || $reach->reaches($minimum)) {
+			return 0;
+		}
+
+		$this->output->line(Summary::belowMinimumCoverage($minimum));
+
+		return 1;
+	}
+
+	/**
+	 * The three things every verb says: how much is vouched for, how much of
+	 * the project the tests reach, and where they stop in whatever is not
+	 * vouched for.
 	 *
 	 * @param int $total
 	 * @param int $stale
 	 * @param array<string, list<Unreached>> $gaps
+	 * @param Reach $reach
 	 * @return void
 	 */
-	private function announce(int $total, int $stale, array $gaps): void {
+	private function announce(int $total, int $stale, array $gaps, Reach $reach): void {
 		$this->output->line(Summary::verified($total, $stale, count($gaps)));
 
-		foreach(Summary::unreached($gaps) as $line) {
+		foreach([...Summary::coverage($reach), ...Summary::unreached($gaps)] as $line) {
 			$this->output->line($line);
 		}
 	}

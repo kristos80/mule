@@ -21,6 +21,9 @@ final class CoveringProcesses implements ProcessesInterface {
 	/** @var list<array{command: list<string>, directory: string}> */
 	public array $runs = [];
 
+	/** What the engine was handed as its configuration, on its last run. */
+	public string $declaration = "";
+
 	/**
 	 * @param InMemoryFilesystem $filesystem Where the report is written.
 	 * @param array<string, list<string>> $covered Source path, relative to the source root, to its covering tests.
@@ -54,6 +57,7 @@ final class CoveringProcesses implements ProcessesInterface {
 		}
 
 		if(!$covering) {
+			$this->keepTheDeclaration($command);
 			$this->edit();
 		}
 
@@ -132,6 +136,24 @@ final class CoveringProcesses implements ProcessesInterface {
 	}
 
 	/**
+	 * The configuration mule wrote for the engine, read before the run's
+	 * scratch directory is swept up.
+	 *
+	 * @param list<string> $command
+	 * @return void
+	 */
+	private function keepTheDeclaration(array $command): void {
+		$flag = "--configuration=";
+
+		foreach($command as $argument) {
+			if(str_starts_with($argument, $flag)) {
+				$path = substr($argument, strlen($flag));
+				$this->declaration = $this->filesystem->exists($path) ? $this->filesystem->read($path) : "";
+			}
+		}
+	}
+
+	/**
 	 * Somebody saving a file while the gate is mid-run.
 	 *
 	 * @return void
@@ -140,5 +162,15 @@ final class CoveringProcesses implements ProcessesInterface {
 		foreach($this->duringEngine as $path => $contents) {
 			$this->filesystem->given($path, $contents);
 		}
+	}
+
+	/**
+	 * No ini, which is a machine with its coverage driver already loaded — and
+	 * the one answer a test can state without naming a path off this machine.
+	 *
+	 * @return string|false
+	 */
+	public function iniFile(): string|false {
+		return FALSE;
 	}
 }
