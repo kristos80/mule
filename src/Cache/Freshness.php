@@ -143,15 +143,15 @@ final readonly class Freshness {
 	/**
 	 * Whether the store is about this tree at all.
 	 *
-	 * **The declared configuration is compared against the tree, not against
-	 * the store's own entries.** Every other section can only be checked for
-	 * having moved, because the store is the only record that those paths were
-	 * ever interesting. The declared set is known independently, so it is the
-	 * one place an *appearance* can be noticed without a coverage run: a
-	 * project that gains an `infection.json5` it never had does not get to go
-	 * on answering from verdicts proven without one. It is also what makes a
-	 * store written before the section existed re-prove itself exactly once —
-	 * it records no configuration, the tree has some, and that is a mismatch.
+	 * **The declared gate is compared against what this run declares, not
+	 * against the store's own entries.** Every other section can only be checked
+	 * for having moved, because the store is the only record that those paths
+	 * were ever interesting. The gate is known independently of the store, so a
+	 * project that widens it — a mutator family added to `mule.json`, uncovered
+	 * code brought in — stops answering from verdicts proven without it, and no
+	 * coverage run is needed to notice. It is also what makes a store written
+	 * before the section existed re-prove itself exactly once: it records no
+	 * gate, this run declares one, and that is a mismatch.
 	 *
 	 * **The engine is compared the same way and for the same reason.** Which
 	 * mutants exist is the engine's business, so a verdict proven by one version

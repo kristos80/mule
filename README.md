@@ -85,8 +85,10 @@ than leaving you to infer it.
 
 | | |
 |---|---|
-| `composer.json` | it is what the autoloader, and therefore the universe of files, comes from |
-| `mule.json` | every key in it defines the gate — what is mutated, what is left out, which mutator families are on |
+| `source`, `exclude`, `tests` | what gets mutated at all, and what ran to kill it |
+| `mutators` | which mutator families are on, and therefore which mutants exist to be killed |
+| `mutate-uncovered` | whether code no test reaches is mutated |
+| `timeout` | how long a mutant gets before it counts as killed |
 | the engine's version | which mutants exist is the engine's business, so two versions are two gates |
 
 Widening the gate is the case that makes this necessary and it was measured, not
@@ -102,6 +104,9 @@ is how a cache starts lying.
 
 | | |
 |---|---|
+| `threads`, `min-coverage`, `narrow` | one is how fast the engine goes, one is an assertion about lines rather than about mutants, and one is how coverage is measured rather than what was proven. None can change a verdict, so none unproves one — tuning a run's speed is free. |
+| `composer.json` | not read for this at all. The only thing in it that changes a verdict is where your code lives, and that arrives as `source` already. A dependency added or removed leaves every verdict standing; a test root appearing is caught as a file appearing instead. |
+| `mule.json` as a file | it is the six settings above that are recorded, not the bytes. Reformat it, reorder its keys, or write a default out explicitly and nothing is unproven. |
 | `infection.json5` and friends | nothing reads them any more. Mule renders what the engine needs per run, so a file lying around in your project changes nothing and hashing it would unprove verdicts for nothing. |
 | the PHP version, and the versions of PHPUnit and the coverage driver | fingerprinting them would end the thing this cache is for: a laptop on 8.4 and CI on 8.5, or a `composer update` between runs, would each throw away every verdict. The trade is deliberate and it is the usual one for a content-addressed cache — the inputs that are *committed* are keyed, the installed toolchain is not. If a dependency bump could change your score, run `mule full`; CI running `mule full` on `master` is the cheap way to never think about it. |
 

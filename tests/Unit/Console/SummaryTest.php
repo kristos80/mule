@@ -106,6 +106,17 @@ final class SummaryTest extends TestCase {
 		);
 	}
 
+	public function testSaysSoBeforeMutatingOneProcessAtATime(): void {
+		self::assertSame(
+			["mule: mutating one process at a time; set threads in mule.json to use more."],
+			Summary::singleThreaded(NULL),
+		);
+	}
+
+	public function testSaysNothingWhenTheProjectAskedForMore(): void {
+		self::assertSame([], Summary::singleThreaded("max"));
+	}
+
 	public function testSaysNothingAboutGapsWhenThereAreNone(): void {
 		self::assertSame([], Summary::unreached([]));
 	}

@@ -11,7 +11,9 @@ use Kristos80\Mule\Cache\Universe;
 use Kristos80\Mule\Cache\Unproven;
 use Kristos80\Mule\Coverage\Unreached;
 use Kristos80\Mule\Failure;
+use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Project;
+use Kristos80\Mule\Tests\Support\CoveringProcesses;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
 use Kristos80\Mule\Tests\Support\MappedClasses;
 use PHPUnit\Framework\TestCase;
@@ -35,7 +37,7 @@ final class FreshnessTest extends TestCase {
 	 */
 	protected function setUp(): void {
 		$this->filesystem = (new InMemoryFilesystem())
-			->given("/project/composer.json", "{}")
+			->given("/project/composer.json", '{"autoload": {"psr-4": {"Acme\\\\": "src"}}}')
 			->given("/project/src/A.php", self::SOURCE)
 			->given("/project/tests/ATest.php", self::TEST);
 	}
@@ -92,10 +94,43 @@ final class FreshnessTest extends TestCase {
 		self::assertSame(["src/A.php"], $this->freshness()->of($this->stored())->stale);
 	}
 
-	public function testRefusesWhenADeclaredFileMoved(): void {
-		$this->filesystem->given("/project/composer.json", '{"name": "acme/thing"}');
+	public function testRefusesWhenTheSourceMoved(): void {
+		$stored = $this->stored();
 
-		self::assertFalse($this->freshness()->of($this->stored())->usable);
+		$this->filesystem->given("/project/composer.json", '{"autoload": {"psr-4": {"Acme\\\\": "app"}}}');
+
+		self::assertFalse($this->freshness()->of($stored)->usable);
+	}
+
+	/**
+	 * **The reason the gate is digested rather than the files it is read from.**
+	 * A dependency is not a gate: measured on a real project, where removing
+	 * two unused dev dependencies threw away 610 verdicts.
+	 *
+	 * @return void
+	 */
+	public function testSpeaksForATreeWhereOnlyADependencyChanged(): void {
+		$stored = $this->stored();
+
+		$this->filesystem->given(
+			"/project/composer.json",
+			'{"autoload": {"psr-4": {"Acme\\\\": "src"}}, "require-dev": {"acme/thing": "^1.0"}}',
+		);
+
+		self::assertTrue($this->freshness()->of($stored)->usable);
+	}
+
+	/**
+	 * Neither is how fast the engine runs, nor a threshold about lines.
+	 *
+	 * @return void
+	 */
+	public function testSpeaksForATreeWhereOnlyTheSpeedChanged(): void {
+		$stored = $this->stored();
+
+		$this->filesystem->given("/project/mule.json", '{"threads": "max", "min-coverage": 80}');
+
+		self::assertTrue($this->freshness()->of($stored)->usable);
 	}
 
 	public function testRefusesWhenAFileItWatchesMoved(): void {
@@ -105,7 +140,7 @@ final class FreshnessTest extends TestCase {
 			["tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"])],
 			[],
 			["src/Excluded.php" => hash("sha256", "<?php interface Excluded {}")],
-			["composer.json" => hash("sha256", "{}")],
+			$this->gate(),
 		);
 
 		$this->filesystem->given("/project/src/Excluded.php", "<?php interface Excluded { public function one(); }");
@@ -122,10 +157,12 @@ final class FreshnessTest extends TestCase {
 	 *
 	 * @return void
 	 */
-	public function testRefusesWhenADeclaredFileAppearsThatWasNeverThere(): void {
+	public function testRefusesWhenTheGateItselfChanged(): void {
+		$stored = $this->stored();
+
 		$this->filesystem->given("/project/mule.json", '{"mutators": {"default": true}}');
 
-		self::assertFalse($this->freshness()->of($this->stored())->usable);
+		self::assertFalse($this->freshness()->of($stored)->usable);
 	}
 
 	/**
@@ -217,7 +254,7 @@ final class FreshnessTest extends TestCase {
 			["tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php", "src/B.php"])],
 			["src/B.php" => new Unproven(hash("sha256", "<?php class B {}"), [])],
 			[],
-			["composer.json" => hash("sha256", "{}")],
+			$this->gate(),
 		);
 
 		$this->filesystem->given("/project/src/B.php", "<?php class B {}");
@@ -234,7 +271,7 @@ final class FreshnessTest extends TestCase {
 			],
 			[],
 			[],
-			["composer.json" => hash("sha256", "{}")],
+			$this->gate(),
 		);
 
 		$this->filesystem->given("/project/tests/BTest.php", "<?php class BTest {}");
@@ -252,7 +289,7 @@ final class FreshnessTest extends TestCase {
 			],
 			[],
 			[],
-			["composer.json" => hash("sha256", "{}")],
+			$this->gate(),
 		);
 
 		$this->filesystem->given("/project/tests/Other.php", "<?php class Other {}");
@@ -307,11 +344,7 @@ final class FreshnessTest extends TestCase {
 			Project::containing("/project", $this->filesystem),
 			$this->filesystem,
 			$this->universe(["/project/src"]),
-			new Declared(
-				Project::containing("/project", $this->filesystem),
-				$this->filesystem,
-				new MappedClasses([], [], ["infection/infection" => "0.32.7"]),
-			),
+			new Declared($this->configuration(), new MappedClasses([], [], ["infection/infection" => "0.32.7"])),
 		);
 
 		self::assertFalse($freshness->of($stored)->usable);
@@ -349,13 +382,23 @@ final class FreshnessTest extends TestCase {
 	 *
 	 * @return Snapshot
 	 */
+	/**
+	 * The gate as the declared side would record it, which is what a usable
+	 * store has to agree with.
+	 *
+	 * @return array<string, string>
+	 */
+	private function gate(): array {
+		return $this->declared()->digests();
+	}
+
 	private function stored(): Snapshot {
 		return Snapshot::of(
 			["src/A.php" => hash("sha256", self::SOURCE)],
 			["tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"])],
 			[],
 			[],
-			["composer.json" => hash("sha256", "{}")],
+			$this->gate(),
 		);
 	}
 
@@ -374,7 +417,7 @@ final class FreshnessTest extends TestCase {
 			["tests/ATest.php" => new Touched(hash("sha256", self::TEST), ["src/A.php"])],
 			["src/B.php" => new Unproven(hash("sha256", $source), [new Unreached("two", 3, 8, 2)])],
 			[],
-			["composer.json" => hash("sha256", "{}")],
+			$this->gate(),
 		);
 	}
 
@@ -382,6 +425,17 @@ final class FreshnessTest extends TestCase {
 	 * @return Declared
 	 */
 	private function declared(): Declared {
-		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem, new MappedClasses());
+		return new Declared($this->configuration(), new MappedClasses());
+	}
+
+	/**
+	 * @return Configuration
+	 */
+	private function configuration(): Configuration {
+		return Configuration::load(
+			Project::containing("/project", $this->filesystem),
+			$this->filesystem,
+			new CoveringProcesses($this->filesystem),
+		);
 	}
 }

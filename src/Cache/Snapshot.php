@@ -79,13 +79,18 @@ final readonly class Snapshot {
 	}
 
 	/**
-	 * Everything this snapshot has a digest for, whatever section it sits in:
-	 * what a later run has to re-hash to know that nothing has moved.
+	 * Every *file* this snapshot has a digest for: what a later run has to
+	 * re-hash to know that nothing has moved.
+	 *
+	 * **The configuration and the engine are deliberately absent.** Everything
+	 * here is a path that has to exist — it is re-hashed on every read and
+	 * pruned when it goes — and neither of those two is a path. They are
+	 * compared on their own, together, by {@see self::definition()}.
 	 *
 	 * @return array<string, string>
 	 */
 	public function digests(): array {
-		$digests = [...$this->watched, ...$this->configuration];
+		$digests = $this->watched;
 
 		foreach($this->verified as $path => $digest) {
 			$digests[$path] = $digest;
@@ -237,34 +242,6 @@ final readonly class Snapshot {
 	}
 
 	/**
-	 * Whether every test in it was credited with exactly one file.
-	 *
-	 * **A report like this cannot describe a dependency.** Changing one file
-	 * can never mark another stale, because nothing in the data says any two
-	 * are connected — which is what `#[CoversClass]` does to a coverage
-	 * report. It is worth saying out loud, because the narrowing then looks
-	 * exactly as trustworthy as it would on a report that had measured
-	 * everything.
-	 *
-	 * Fewer than two tests is not evidence of anything, so it is not reported.
-	 *
-	 * @return bool
-	 */
-	public function isAttributionBound(): bool {
-		if(count($this->tests) < 2) {
-			return FALSE;
-		}
-
-		foreach($this->tests as $test) {
-			if(count($test->touches) !== 1) {
-				return FALSE;
-			}
-		}
-
-		return TRUE;
-	}
-
-	/**
 	 * Of the paths given, the ones this snapshot holds a verdict for, in the
 	 * order they were given.
 	 *
@@ -320,17 +297,37 @@ final readonly class Snapshot {
 	 * This snapshot with another's entries written over it, section by
 	 * section.
 	 *
-	 * **Written over, never replaced.** A run that re-measured only part of
-	 * the project knows nothing about the rest, so its empty sections must not
-	 * erase what an earlier run recorded. What it does know wins: a file it
-	 * proved stops being unproven, and a file it could not prove stops being
-	 * verified, because a path belongs to exactly one of the two and the
-	 * newer answer is the true one.
+	 * **Written over, never replaced — except where the newer snapshot speaks
+	 * for the whole project.** A run that re-measured only part of it knows
+	 * nothing about the rest, so its empty sections must not erase what an
+	 * earlier run recorded. What it does know wins: a file it proved stops
+	 * being unproven, and a file it could not prove stops being verified,
+	 * because a path belongs to exactly one of the two and the newer answer is
+	 * the true one.
+	 *
+	 * **A snapshot that redefines the gate replaces it outright**, because the
+	 * verdicts under it are not old, they are answers to a different question.
+	 * Merging them forward is how a store comes to claim more than anything
+	 * ever proved: measured on a real project, where a gate change left 610
+	 * verdicts standing of which one run had earned 221.
+	 *
+	 * **And what declares the gate is replaced rather than merged** whenever
+	 * the newer snapshot declares anything at all. Merging it is how a record
+	 * of something mule has stopped declaring survives forever — there is
+	 * nothing to delete it, the comparison is for equality, and the store is
+	 * unusable from then on with no way back. Measured the hard way: an
+	 * `infection.json5` digest written by a version that read the file
+	 * outlived the version that stopped, and bricked the cache of the project
+	 * this tool was written for.
 	 *
 	 * @param self $other
 	 * @return self
 	 */
 	public function merged(self $other): self {
+		if($other->supersedes($this)) {
+			return $other;
+		}
+
 		$verified = [...$this->verified, ...$other->verified];
 		$unproven = [...$this->unproven, ...$other->unproven];
 
@@ -347,9 +344,9 @@ final readonly class Snapshot {
 			[...$this->tests, ...$other->tests],
 			$unproven,
 			[...$this->watched, ...$other->watched],
-			[...$this->configuration, ...$other->configuration],
+			self::later($this->configuration, $other->configuration),
 			[...$this->coverage, ...$other->coverage],
-			$other->engine + $this->engine,
+			self::later($this->engine, $other->engine),
 		);
 	}
 
@@ -462,6 +459,22 @@ final readonly class Snapshot {
 		$definition = $this->definition();
 
 		return $definition !== [] && $definition !== $stored->definition();
+	}
+
+	/**
+	 * Whichever of the two was recorded by a run that could say, newer first.
+	 *
+	 * **Replaced rather than merged.** Merging is how a record of something
+	 * mule has stopped declaring survives forever: nothing deletes it, the
+	 * comparison is for equality, and the store is unusable from then on with
+	 * no way back.
+	 *
+	 * @param array<string, string> $stored
+	 * @param array<string, string> $measured
+	 * @return array<string, string>
+	 */
+	private static function later(array $stored, array $measured): array {
+		return $measured === [] ? $stored : $measured;
 	}
 
 	/**

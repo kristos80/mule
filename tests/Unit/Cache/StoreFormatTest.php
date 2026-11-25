@@ -62,10 +62,13 @@ final class StoreFormatTest extends TestCase {
 	}
 
 	/**
-	 * Sorted like every other section, and it is the one section whose source
-	 * is not already in path order: the configuration files are recorded in the
-	 * order mule looks for them, which puts `infection.json5` before
-	 * `infection.json`.
+	 * Sorted like every other section, and the one section whose entries do not
+	 * arrive in path order. Mule writes a single `gate` digest here now, but a
+	 * store written by a version that hashed configuration *files* holds one
+	 * entry per file in the order that version looked for them — which put
+	 * `infection.json5` before `infection.json`. Reading such a store and
+	 * writing it back out has to produce a sorted file like any other, because
+	 * that is the write a project sees in a diff.
 	 *
 	 * @return void
 	 */

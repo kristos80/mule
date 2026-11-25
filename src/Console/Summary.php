@@ -109,6 +109,29 @@ final readonly class Summary {
 	}
 
 	/**
+	 * Said before a run that will mutate one process at a time.
+	 *
+	 * **Mule will not choose concurrency on a project's behalf.** Running
+	 * mutants in parallel can turn a test that shares state into one that fails
+	 * for the wrong reason — and a mutant killed by a flaky test is a mutant
+	 * recorded as dead when nothing proved it, which is the one kind of wrong
+	 * answer this tool exists to avoid. So the engine's own default stands, as
+	 * `narrow` does, and the project decides.
+	 *
+	 * **But it should not be a surprise.** Silence here is how a six-thousand
+	 * mutant run went single-threaded on a project whose own tooling had always
+	 * asked for every core.
+	 *
+	 * @param string|null $threads
+	 * @return list<string>
+	 */
+	public static function singleThreaded(?string $threads): array {
+		return $threads === NULL
+			? ["mule: mutating one process at a time; set threads in mule.json to use more."]
+			: [];
+	}
+
+	/**
 	 * Where the tests stop, for the files that cannot be banked because of it.
 	 *
 	 * **Said out loud rather than left to be inferred.** A file that is not
