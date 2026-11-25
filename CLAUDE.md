@@ -97,13 +97,27 @@ mule hands its own interpreter and ini to the coverage run it starts.
 pull requests and on pushes to `master`; the `release` job runs only on a push
 to `master` and only after the gates pass.
 
-**The commit message is what cuts a version.** semantic-release reads the
-conventional commits since the last tag: `fix:` is a patch, `feat:` a minor, a
-`BREAKING CHANGE:` footer or `feat!:` a major. Anything else — `ci:`, `chore:`,
-`docs:`, `refactor:`, `test:`, `perf:` — releases nothing, which is the right
-answer for a change consumers cannot see. A release writes `CHANGELOG.md`, tags
-`vX.Y.Z`, publishes the GitHub release, and commits the changelog back with
-`[skip ci]` so it does not retrigger the workflow.
+**The pull request's title is what cuts a version.** Master takes only squash
+merges and takes the commit subject from the PR title, so the title lands on
+master verbatim and is the only thing semantic-release reads. `pr-title.yml`
+validates it for that reason: a title that is not conventional fails nothing, it
+silently releases nothing.
+
+`fix:` is a patch, `feat:` a minor, a `BREAKING CHANGE:` footer or `feat!:` a
+major. `ci:`, `chore:`, `docs:`, `refactor:` and `test:` release nothing, which
+is the right answer for a change consumers cannot see. **`perf:` and `revert:`
+are not in the allowed list**, and that is deliberate rather than an omission:
+both would cut a patch under semantic-release's defaults, so admitting either is
+a decision about what this repository releases.
+
+**A release tags, publishes, and then opens a pull request.** The tag and the
+GitHub release go out from the workflow — a tag is not a branch, so no ruleset
+stands in the way. The changelog does not: `@semantic-release/git` would have
+pushed it straight to master, which the ruleset rejects twice over, so it
+arrives through `peter-evans/create-pull-request` like any other change. The
+consequence, accepted: a tag's tree does not contain its own changelog entry.
+The `release` job skips a head commit whose subject starts with
+`chore(release):`, which is what keeps merging that PR from releasing again.
 
 **Packagist takes the version from the tag**, through its GitHub integration.
 Nothing in the workflow talks to Packagist, and `composer.json` carries no
@@ -114,6 +128,11 @@ release has to rewrite is a second copy of something the tag already says.
 run `php bin/mule full` and then `git diff --exit-code .mule/verified.json`, so
 run `composer test:mutate:new` and commit `.mule/verified.json` in the same
 commit. A stale store fails the gate, and a failed gate cuts no release.
+
+**Master takes no direct pushes.** A ruleset requires a pull request, requires
+the gates to pass, requires every commit to be verified, and blocks force pushes
+and deletion. Local commits need no signing key: what lands on master is
+GitHub's own squash commit, signed with the web-flow key.
 
 ## Layout
 
