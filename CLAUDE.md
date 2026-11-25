@@ -138,10 +138,17 @@ Nothing in the workflow talks to Packagist, and `composer.json` carries no
 `version` field — `composer validate --strict` warns against one, and a field a
 release has to rewrite is a second copy of something the tag already says.
 
-**A change under `src/` or `tests/` has to carry the store with it.** The gates
-run `php bin/mule full` and then `git diff --exit-code .mule/verified.json`, so
-run `composer test:mutate:new` and commit `.mule/verified.json` in the same
-commit. A stale store fails the gate, and a failed gate cuts no release.
+**A change under `src/` or `tests/` has to carry the store with it.** Run
+`composer test:mutate:new` and commit `.mule/verified.json` in the same commit.
+
+The gates then check it twice, differently. On a pull request they run
+`php bin/mule new`, which with a current store mutates nothing and writes
+nothing — and with a stale one mutates, banks, and fails the
+`git diff --exit-code .mule/verified.json` that follows. So a stale store is
+caught in seconds rather than by re-proving the project. On a push to master
+they run `php bin/mule full`, because only a whole-project run can catch a store
+claiming *more* than was proven, and master is where a release is cut from. That
+is this tool used on itself rather than around itself.
 
 **Master takes no direct pushes.** A ruleset requires a pull request, requires
 the gates to pass, requires every commit to be verified, and blocks force pushes
