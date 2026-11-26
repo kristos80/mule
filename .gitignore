@@ -2,16 +2,17 @@
 /composer.lock
 /node_modules/
 /.phpunit.cache/
-/.infection/
-/.cov/
 /.idea/
-/infection.log
 .DS_Store
 
-# The engine's own log, written per run and keyed to nothing.
-/.mule/infection.json
+# Everything machine-local lives under .mule/cache/, which ignores itself: mule
+# writes a "*" in there on first run. The store beside it is committed on
+# purpose — a content-hashed verdict is not machine-local state. Keeping the two
+# in separate directories is what stops `git add .mule` committing a 61 MB shard
+# cache. See docs/keying.md §4.
+/.mule/cache/
 
-# The store itself is committed on purpose: a content-hash verdict is not
-# machine-local state, so the next machine inherits the work instead of
-# re-proving it. That is the whole point of .mule/verified.json — see
-# docs/keying.md §4. It returns when there is a store to write.
+# Until the pipeline writes into .mule/cache/ itself, the gate's own scratch:
+/.cov/
+/.infection/
+/.mule/infection.json

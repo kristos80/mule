@@ -104,25 +104,6 @@ This is what makes the cold path cheap — see §5.
 **M5 — `--filter=a.php,b.php` restricts mutation to those files**, and files
 outside the filter need no fresh coverage.
 
-**M16 — A test class that executes no instrumented source is absent from
-`testIds()`, so splitting produces no shard for it.** This is the 33-test gap in
-the counts table above, materialising: on the application, splitting 4,393 test
-ids yielded 328 shards while 331+ test classes exist. The missing ones are **pure
-enum tests** — `enum Locale`, `enum ResyncLineVerdict`, `enum ResyncRefusalReason`
-— whose cases generate no executable lines. Captured in isolation each one reports
-`testIds=1, coveredLines=0`; captured with the suite, it is not in `testIds` at
-all.
-
-Harmless for attribution, since a test attributing nothing has nothing to merge.
-**Dangerous if inferred rather than recorded**, because "this test covers nothing"
-and "this test's shard went missing" are then the same observation. So the shard
-set is enumerated from the **test files on disk** (G9) and a test file with no
-shard is stored in an explicit *covers-nothing* state, exactly as source files
-carry one of four states (§4).
-
-It is also why `doctor` cannot measure footprints from coverage alone: a test that
-executes no source is invisible in every coverage artifact mule reads.
-
 **M6 — The JSON log is the verdict record.** Top-level keys: `stats`, `escaped`,
 `timeouted`, `killed`, `killedByStaticAnalysis`, `errored`, `syntaxErrors`,
 `uncovered`, `ignored`. Note `uncovered`, **not** `notCovered`. Each entry carries
@@ -243,6 +224,25 @@ unpinned, it is the single most misleading status Infection reports, and it is
 It is zero on both measured projects because neither configures a static analysis
 tool, so accepting it would have been a latent hole rather than a present bug —
 which is exactly the kind that ships.
+
+**M16 — A test class that executes no instrumented source is absent from
+`testIds()`, so splitting produces no shard for it.** This is the 33-test gap in
+the counts table above, materialising: on the application, splitting 4,393 test
+ids yielded 328 shards while 331+ test classes exist. The missing ones are **pure
+enum tests** — `enum Locale`, `enum ResyncLineVerdict`, `enum ResyncRefusalReason`
+— whose cases generate no executable lines. Captured in isolation each one reports
+`testIds=1, coveredLines=0`; captured with the suite, it is not in `testIds` at
+all.
+
+Harmless for attribution, since a test attributing nothing has nothing to merge.
+**Dangerous if inferred rather than recorded**, because "this test covers nothing"
+and "this test's shard went missing" are then the same observation. So the shard
+set is enumerated from the **test files on disk** (G9) and a test file with no
+shard is stored in an explicit *covers-nothing* state, exactly as source files
+carry one of four states (§4).
+
+It is also why `doctor` cannot measure footprints from coverage alone: a test that
+executes no source is invisible in every coverage artifact mule reads.
 
 ---
 
@@ -423,6 +423,36 @@ them in the key. A consumer's `mule.json` names no PHPUnit or Infection key. A
 toolchain change invalidates the whole store at once; that is correct, not an
 error.
 
+### Where things live, and who ignores them
+
+**mule writes the `.gitignore` for its own machine-local artifacts rather than
+asking a consumer to.** Measured reason: the shard cache for the application is
+**61 MB** across 334 shards (§5), and the store beside it is committed on
+purpose. A committed store and 61 MB of scratch cannot share a directory — one
+careless `git add .mule` and the repository is 61 MB heavier.
+
+```
+.mule/verified.json     committed: the store, below
+.mule/cache/            machine-local: shards, merged reports, timings, and
+.mule/cache/.gitignore  the engine's tmpDir — plus a "*" that ignores all of
+                        it, written by mule on first run
+```
+
+Verified: with that one-line file in place, `git add .mule` stages the store and
+nothing else, and the cache needs no entry in the consumer's own `.gitignore`.
+
+**Two of the three scratch directories are mule's to place, and both belong
+inside the cache.** mule renders the Infection configuration itself (§4, M11) so
+it chooses `tmpDir`, and it generates the coverage reports so it chooses their
+path. Neither belongs at the project root, where a consumer has to know about it
+to ignore it.
+
+**The third is not mule's.** `cacheDirectory` in the consumer's `phpunit.xml` is
+theirs, and wants ignoring for hygiene rather than for correctness:
+php-code-coverage's own cache is content-keyed, and PHPUnit's result cache only
+affects ordering, which M10 showed does not move attribution. `doctor` may report
+that it is tracked; mule must not move it.
+
 ### Store
 
 ```
@@ -488,6 +518,19 @@ capture costs 61 s against 34 s for capture-plus-split — twice the price for t
 same shards. Never shard the cold path directly.
 
 **Warm path: re-capture only the dirty test files, then merge.**
+
+**A shard is 99 % skeleton, and storing it that way is a mistake worth not
+making.** Measured on one application shard: 610 files and 8,629 line entries, of
+which **88 — 1.02 % — actually carry a test**, for 178 KB on disk and 61 MB across
+all 334. The bulk is the executable-line skeleton (M4), which is *identical in
+every shard* because it describes the project rather than the test.
+
+So persist the skeleton **once**, keyed with the digests of the files it
+describes, and persist per shard only the entries that name a test. Merging
+reassembles the two. That is the difference between a ~61 MB cache and a ~1.5 MB
+one, and it matters because the cache is read and rewritten on every warm run.
+Gzip is the lazier answer and buys 7× where this buys ~40×; it is also the wrong
+axis, since the redundancy is structural rather than textual.
 
 **Each shard records** its test file's digest *and the digest of every source file
 it recorded non-null line data for, at capture time.*

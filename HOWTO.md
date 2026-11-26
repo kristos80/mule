@@ -283,7 +283,35 @@ Builds the picture from one coverage capture. Writes no store, mutates nothing.
 
 ---
 
-## 7. Minimum config
+## 7. What to put in .gitignore
+
+**Nothing, for mule's own files.** It writes `.mule/cache/.gitignore` containing
+`*` on first run, so everything machine-local ignores itself. That is not
+tidiness: the shard cache for a 613-file project measures **61 MB**, and the
+store sitting beside it at `.mule/verified.json` is committed on purpose. One
+`git add .mule` without that file and the repository is 61 MB heavier.
+
+```
+.mule/verified.json   commit this — a content-hashed verdict is not
+                      machine-local state, so the next machine and CI
+                      inherit the work instead of re-proving it
+.mule/cache/          ignored by mule, automatically. Shards, merged
+                      reports, timings, and the engine's own tmpDir
+```
+
+mule places Infection's `tmpDir` and its coverage output inside that cache
+rather than at your project root, because it renders the engine's configuration
+itself and so gets to choose.
+
+**One thing is yours:** `cacheDirectory` in your `phpunit.xml` — commonly
+`.phpunit.cache`. Ignore it, but for hygiene rather than for correctness:
+php-code-coverage's cache is content-keyed and PHPUnit's result cache only
+affects ordering, which does not move coverage attribution. `doctor` will mention
+it if it is tracked. mule will not move it for you.
+
+---
+
+## 8. Minimum config
 
 ```json
 {
