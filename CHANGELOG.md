@@ -1,3 +1,9 @@
+## [4.0.1](https://github.com/kristos80/mule/compare/v4.0.0...v4.0.1) (2026-11-26)
+
+### Bug Fixes
+
+* hash the gate as a decision, and replace it rather than merge it ([#14](https://github.com/kristos80/mule/issues/14)) ([e33998e](https://github.com/kristos80/mule/commit/e33998edc2498baa147ffca69c6916320c78a68c))
+
 ## [4.0.0](https://github.com/kristos80/mule/compare/v3.1.0...v4.0.0) (2026-11-25)
 
 ### ⚠ BREAKING CHANGES
