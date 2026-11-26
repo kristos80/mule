@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - master
+      # The rewrite's prerelease channel. semantic-release publishes
+      # 5.0.0-next.N from here (see .releaserc.json), so the new pipeline is
+      # exercised by a real consumer while master stays on v4 — rather than
+      # landing as one unvalidated merge. Remove this branch, and its entry in
+      # .releaserc.json, once v5 is on master.
+      - v5
   pull_request:
 
 jobs:
@@ -38,48 +44,57 @@ jobs:
       - name: Static analysis
         run: composer analyse
 
-      # One run, with the driver attached. Running `composer test` and then the
-      # same suite again for coverage measured nothing the first pass had not,
-      # and paid for every test twice on both legs.
+      # One run, with the driver attached, producing every artifact anything
+      # downstream needs. Running `composer test` and then the same suite again
+      # for coverage measured nothing the first pass had not, and paid for every
+      # test twice on both legs.
+      #
+      # The XML coverage and the JUnit log are for the mutation gate below, which
+      # is handed this report rather than generating its own — see M1 in
+      # docs/keying.md. That is also the shape mule itself drives Infection in,
+      # so the gate exercises the mechanic the tool depends on.
       - name: Unit suite, with coverage
-        run: ./vendor/bin/phpunit --coverage-text
+        run: >
+          ./vendor/bin/phpunit
+          --coverage-text
+          --coverage-xml=.cov/coverage-xml
+          --log-junit=.cov/junit.xml
+          --exclude-source-from-xml-coverage
 
-      - name: Integration suite
-        run: composer test:integration
+      # The integration suite is gone with the implementation it exercised.
+      # It returns when there is an external layer again to point it at.
 
-      # Nothing is removed first any more: mule.json holds only what defines
-      # the gate, and it is byte-identical on every machine. Enabling a
-      # coverage driver is done to the environment rather than written down,
-      # which here is the pcov the setup step turned on.
+      # **Plain Infection, not mule on itself.** mule used to gate itself —
+      # `new` on a pull request, `full` on master — and that is deliberately
+      # not what happens here any more.
       #
-      # One leg only: a mutation score is a property of the code and its tests,
-      # not of the runtime, and the committed store is keyed on file digests
-      # that no PHP version changes. Running it twice would prove nothing twice
-      # and could write two stores.
-      # `new` on a pull request and `full` on master, which is this tool used on
-      # itself rather than around itself.
+      # Measured, on this repository: ~29 source files, each test executing
+      # about five of them, which is 17 % of the project per test. A file's
+      # closure is therefore the whole project, and a comment-only edit marks
+      # 29 of 36 files stale. The cache is sound and saves nothing.
       #
-      # **Both are audited by the same diff**, and that is what makes `new`
-      # enough here. The store is committed, so a current one leaves `new` with
-      # nothing to mutate and nothing to write; a stale one is mutated, banked,
-      # and the diff below fails. So a pull request still cannot land a store
-      # that does not describe its own tree, and it pays seconds rather than
-      # every mutant to prove it.
+      # That is a property of the project's size, not of its tests — the
+      # application mule was written for has the same per-test footprint and
+      # invalidates 2.7 % per edit. See docs/keying.md §2 and §8. A 3-second
+      # gate has nothing to gain from a cache, so self-hosting here would add a
+      # failure mode and buy no time.
       #
-      # **`full` stays where it earns its cost.** Only a whole-project run can
-      # catch a store that claims *more* than was proven — `new` trusts what it
-      # is told — and master is where a release is cut from, so that is where
-      # the claim has to be true.
+      # **The flags are not optional**, and docs/keying.md records why for each:
+      # `--with-timeouts` because a timed-out mutant otherwise scores as a kill
+      # (M14), and both MSI floors because a zero-mutant run exits 0 without
+      # them. `--ignore-msi-with-no-mutations` must never appear here (G5).
       - name: Mutation gate, gated at MSI 100 %
         if: matrix.php == '8.4'
-        env:
-          VERB: ${{ github.event_name == 'pull_request' && 'new' || 'full' }}
-        run: php bin/mule "$VERB"
-
-      # If that run banked anything, the committed store did not already say it.
-      - name: The committed store was already complete
-        if: matrix.php == '8.4'
-        run: git diff --exit-code .mule/verified.json
+        run: >
+          ./vendor/bin/infection
+          --coverage=.cov
+          --skip-initial-tests
+          --threads=max
+          --with-timeouts
+          --min-msi=100
+          --min-covered-msi=100
+          --no-progress
+          -n
 
   sonar:
     runs-on: ubuntu-latest
@@ -126,8 +141,13 @@ jobs:
     # guard the run would start again on its own output. `[skip ci]` used to do
     # this when the bump was pushed straight here; a PR's squash commit carries
     # the title verbatim instead, which is what this switches on.
+    # master cuts releases; v5 cuts prereleases (5.0.0-next.N). The branch
+    # list here and the one in .releaserc.json have to agree — semantic-release
+    # refuses to publish from a branch it does not know, and a branch this job
+    # runs on but semantic-release does not is a silent no-op.
     if: >-
-      github.event_name == 'push' && github.ref == 'refs/heads/master'
+      github.event_name == 'push'
+      && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/v5')
       && !startsWith(github.event.head_commit.message, 'chore(release):')
 
     permissions:
@@ -196,9 +216,13 @@ jobs:
       # makes the PR mergeable: what lands on master is GitHub's own squash
       # commit, signed with the web-flow key, which is why `required_signatures`
       # is satisfied without anybody configuring a key locally.
+      # **master only.** This opens a PR into master, so running it from v5
+      # would aim a prerelease's changelog at the released branch. Prereleases
+      # get their notes from the GitHub release and nothing else; CHANGELOG.md
+      # is written once, when v5 lands on master and cuts the real 5.0.0.
       - name: Open the release pull request
         id: opened
-        if: steps.prepared.outputs.changed == 'true'
+        if: steps.prepared.outputs.changed == 'true' && github.ref == 'refs/heads/master'
         uses: peter-evans/create-pull-request@3ffccacd46053766916f087ce41d627c0b8cf2d1 # v8.1.3
         with:
           sign-commits: true

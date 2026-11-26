@@ -1,32 +1,18 @@
-# The static analysis gate: level max, no baseline, no suppressions. An error is
-# fixed at its cause — by a real type, a real check, or a different design — and
-# there is no `@phpstan-ignore` anywhere in this repository. There are also no
-# custom rules, so there is nothing of mine for a test to prove.
-#
-# Unlike phpunit.xml and infection.json5, nothing is excluded here: the external
-# layer needs a real filesystem to *run*, not to be type-checked.
 includes:
 	- vendor/tomasvotruba/cognitive-complexity/config/extension.neon
 
 parameters:
 	level: max
+
 	paths:
 		- src
 		- tests
-		- bin/mule
-	# The whole range composer.json declares, analysed for every version in it,
-	# rather than for whichever runtime the analyser happens to be running on.
-	# Composer's floor is the only thing that should decide what this gate
-	# checks, and the answer should not change between matrix legs.
-	phpVersion:
-		min: 80400
-		max: 80500
 
-	treatPhpDocTypesAsCertain: false
-
-	# The blueprint's numbers, written out so the gate is visible. A method
-	# scores a point per break in straight-line flow plus one per level of
-	# nesting it sits in; a class scores the sum of its methods.
+	# The blueprint's limits. A method that needs more than this is a method
+	# that is making more than one decision.
 	cognitive_complexity:
-		function: 9
 		class: 40
+		function: 9
+
+	# No baseline, and no ignoreErrors. An analyser's complaint is fixed at its
+	# cause — see docs/keying.md and the conventions in CLAUDE.md.

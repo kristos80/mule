@@ -1,3 +1,17 @@
+> [!WARNING]
+> **This branch is the v5 rewrite, and everything below describes v4.**
+>
+> `src/` has been replaced wholesale. The cache design documented here — the
+> store format, the `new`/`full`/`status` verbs, `mule.json`'s vocabulary — is
+> superseded. The v4 documentation stays until v5's own is written, because it
+> is still accurate about the released version consumers are installing.
+>
+> For v5, read **[`HOWTO.md`](HOWTO.md)** (the consumer's contract) and
+> **[`docs/keying.md`](docs/keying.md)** (the specification). The build order is
+> `docs/keying.md` §11.
+
+---
+
 # mule
 
 ![status: work in progress](https://img.shields.io/badge/status-work%20in%20progress-orange)

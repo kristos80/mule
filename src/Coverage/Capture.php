@@ -1,0 +1,169 @@
+<?php
+declare(strict_types=1);
+
+namespace Kristos80\Mule\Coverage;
+
+use Kristos80\Mule\Failure;
+use SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData;
+
+/**
+ * One `--coverage-php` payload, validated.
+ *
+ * **This is the only place a coverage payload stops being `mixed`.** mule reads
+ * and writes `php-code-coverage`'s own serialized shape rather than a public
+ * API, so the one thing standing between a pinned dependency and silently wrong
+ * shards is what this class refuses — see `docs/keying.md` M2. Nothing
+ * downstream re-checks.
+ *
+ * **Every refusal carries its own message.** Not for the reader's benefit: a
+ * guard that falls through to a neighbour's message is a guard no test can tell
+ * apart from its neighbour, and therefore a mutant that survives for ever.
+ */
+final readonly class Capture {
+
+	/**
+	 * The only serialization format mule knows how to split and merge.
+	 */
+	public const int FORMAT = 4;
+
+	/**
+	 * @param ProcessedCodeCoverageData $coverage Line data, keyed by test index.
+	 * @param array<string, mixed> $testResults Keyed by test id; the shape inside belongs to php-code-coverage.
+	 * @param string $basePath The common root the report's paths are relative to.
+	 * @param array<string, mixed> $buildInformation Carried through untouched.
+	 */
+	private function __construct(
+		public ProcessedCodeCoverageData $coverage,
+		public array $testResults,
+		public string $basePath,
+		public array $buildInformation,
+	) {}
+
+	/**
+	 * Reads a payload as it comes off disk, or out of another Capture.
+	 *
+	 * @param mixed $payload Whatever `require`ing a `.cov` file returned.
+	 * @return self
+	 */
+	public static function of(mixed $payload): self {
+		$payload = self::array($payload, "A coverage payload");
+		$coverage = self::at($payload, "codeCoverage");
+
+		if(!$coverage instanceof ProcessedCodeCoverageData) {
+			throw new Failure("A coverage payload's \"codeCoverage\" is not a ProcessedCodeCoverageData.");
+		}
+
+		$buildInformation = self::array(self::at($payload, "buildInformation"), "A coverage payload's build information");
+		$basePath = self::at($payload, "basePath");
+
+		if(!is_string($basePath)) {
+			throw new Failure("A coverage payload's \"basePath\" is not a string.");
+		}
+
+		self::assertFormat($buildInformation);
+
+		return new self(
+			$coverage,
+			self::array(self::at($payload, "testResults"), "A coverage payload's test results"),
+			$basePath,
+			$buildInformation,
+		);
+	}
+
+	/**
+	 * This capture with different coverage, keeping the build information so a
+	 * shard still declares the format it was cut from.
+	 *
+	 * @param ProcessedCodeCoverageData $coverage
+	 * @param array<string, mixed> $testResults
+	 * @param string $basePath
+	 * @return self
+	 */
+	public function with(ProcessedCodeCoverageData $coverage, array $testResults, string $basePath): self {
+		return new self($coverage, $testResults, $basePath, $this->buildInformation);
+	}
+
+	/**
+	 * The payload shape `php-code-coverage` reads back.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function payload(): array {
+		return [
+			"buildInformation" => $this->buildInformation,
+			"basePath" => $this->basePath,
+			"codeCoverage" => $this->coverage,
+			"testResults" => $this->testResults,
+		];
+	}
+
+	/**
+	 * Every test id this capture carries, in the index order the line data
+	 * refers to them by.
+	 *
+	 * **The line data holds indices into this list, not test names.** Reading
+	 * the values of a line's array instead of its keys yields a list of `1`s
+	 * that looks like data and silently produces empty shards — see M3.
+	 *
+	 * @return array<int<0, max>, non-empty-string>
+	 */
+	public function testIds(): array {
+		return $this->coverage->testIds();
+	}
+
+	/**
+	 * One required key's value.
+	 *
+	 * @param array<array-key, mixed> $payload
+	 * @param string $key
+	 * @return mixed
+	 */
+	private static function at(array $payload, string $key): mixed {
+		if(!array_key_exists($key, $payload)) {
+			throw new Failure("A coverage payload is missing its \"{$key}\" key.");
+		}
+
+		return $payload[$key];
+	}
+
+	/**
+	 * @param mixed $value
+	 * @param string $what Named in the refusal, so each caller's message differs.
+	 * @return array<string, mixed>
+	 */
+	private static function array(mixed $value, string $what): array {
+		if(!is_array($value)) {
+			throw new Failure("{$what} must be an array, " . get_debug_type($value) . " given.");
+		}
+
+		/** @var array<string, mixed> $value */
+		return $value;
+	}
+
+	/**
+	 * **Two refusals, because there are two things that can be wrong.** A
+	 * payload that declares no format at all is a different fault from one
+	 * declaring a format mule cannot read, and giving them one message between
+	 * them is how the guard between them becomes unkillable.
+	 *
+	 * @param array<string, mixed> $buildInformation
+	 * @return void
+	 */
+	private static function assertFormat(array $buildInformation): void {
+		$declared = $buildInformation["phpCodeCoverage"] ?? NULL;
+
+		if(!is_array($declared)) {
+			throw new Failure("A coverage payload's build information does not declare a serialization format.");
+		}
+
+		$format = $declared["serializationFormat"] ?? NULL;
+
+		if($format !== self::FORMAT) {
+			throw new Failure(
+				"mule reads php-code-coverage serialization format " . self::FORMAT
+				. ", this payload declares " . var_export($format, TRUE)
+				. ". Pinning phpunit/php-code-coverage is what keeps these in step.",
+			);
+		}
+	}
+}

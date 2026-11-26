@@ -4,71 +4,81 @@ A committed, content-hashed verdict cache for PHP mutation testing: mutate only
 the files whose score can no longer be trusted. A wrapper around Infection with
 caching, and nothing else.
 
+**This branch is the v5 rewrite.** `src/` was replaced wholesale. Read
+`docs/keying.md` before changing anything in `src/` — it is not background, it
+is the specification, and every mechanic in it was established by running the
+pinned tools rather than by reading their documentation.
+
+## Read these first, in this order
+
+| | |
+|---|---|
+| `docs/keying.md` | **the specification.** M1–M16 verified mechanics, G1–G9 guards, GN1–GN3 narrowing-only, §11 the v1 scope and build order |
+| `HOWTO.md` | the contract a consumer accepts: preconditions, and what happens when each is broken |
+| `docs/decisions.md` | why the repository is shaped the way it is. Written for v4; the release machinery, the conventions and the external-layer reasoning still hold. Its cache design is superseded by `docs/keying.md` |
+
+## The one thing that matters most
+
+**A cache must never turn uncertainty into a verified verdict.**
+
+Every guard in `docs/keying.md` §7 exists because some indicator that reads as
+success turned out to represent less verification:
+
+- a coverage report's `hash` is recomputed at render time, so a report built
+  from stale data looks internally consistent (M8)
+- merging shard JUnit files inflates test times, and Infection then *silently
+  skips* mutants that look slow — absent from every detail array in the JSON
+  log, and not counted against MSI (M12, M13)
+- MSI counts timed-out, errored and syntax-error mutants as kills, and drops
+  skipped and ignored ones out of its denominator (M14)
+- `killedByStaticAnalysis` means the tests **failed** to detect the mutant and a
+  type checker caught it afterwards — a test gap that raises the score (M15)
+
+So **"detected by Infection" and "proven to mule" are different predicates.**
+mule banks only `killed`. Never widen that without a measurement.
+
 ## Engineering standards
 
 Follow the engineering blueprint at
 `/Users/chrisathanasiadis/Documents/www/herd/hermes-2/blueprint/README.md`
 (https://github.com/kristos80/engineering-blueprint). Where this file is
-narrower than the blueprint, this file wins — it is the blueprint applied to a
-single-purpose CLI library rather than to an application.
-
-## The one architectural rule
+narrower, this file wins — it is the blueprint applied to a single-purpose CLI
+library rather than to an application.
 
 **Determinism is the aim.** Given the same arguments, the same bytes on disk and
 the same exit codes from the processes it starts, mule makes the same decisions,
 builds the same command line and writes the same store bytes.
 
-That is possible because **every I/O call in the repository lives in
-`src/External/`**, behind an interface, as a wrapper that does one thing:
-
-- An external method is straight-line. Every statement is a call, an assignment
-  or a return. It may also throw: a failure guard, `if(…) { throw …; }` with no
-  else, for a primitive that returns `FALSE` instead of throwing.
-- Anything that decides — a condition that is not a failure guard, a default, a
-  loop, a ternary, `??`, `?->`, recovery — belongs in a tested class on the
-  other side of the interface.
-- **The external layer is the only code that is not unit tested.** Its five
-  concrete classes are excluded from coverage in `phpunit.xml` and from the gate
-  by `exclude` in `mule.json` — one list drives mutation and mule's reading of
-  the coverage report, so those two cannot drift.
-  They are exercised by `tests/Integration` against a real temporary directory
-  and real child processes.
-
-**Everything else is gated at 100 % line coverage and 100 % MSI**, and is
-testable without a disk: the unit suite drives the whole program through
-in-memory fakes of the five interfaces.
-
-## Conventions
-
+- **Every I/O call lives behind an interface in `src/External/`**, as a wrapper
+  whose every statement is a call, an assignment, a return or a throw. Anything
+  that decides — a condition that is not a failure guard, a default, a loop, a
+  ternary, `??`, `?->` — belongs in a tested class on the other side. That layer
+  is the only code not unit tested; it is exercised by an integration suite
+  against a real temporary directory and real child processes.
+  *(The v4 external layer went with the rest of `src/`. It returns as the
+  pipeline needs it; `docs/decisions.md` records what shape it had and why.)*
+- **Everything else is gated at 100 % line coverage and 100 % MSI.**
+- **`mixed` is narrowed once, where it enters.** `Coverage\Capture` is the only
+  place a coverage payload stops being `mixed`; nothing downstream re-checks.
 - **No suppressions, anywhere.** No `@phpstan-ignore`, no `@infection-ignore-all`,
-  no `@codeCoverageIgnore`, no `@psalm-suppress`, no PHPStan baseline, no
-  `assert()` standing in for a type. An analyser's complaint is fixed at its
-  cause. Where the fix would be a runtime narrowing that mutation testing cannot
-  kill, prefer a real type: `get_object_vars()` over a `(string)` cast on a
-  decoded JSON key, a `Dom\XMLDocument` that throws over a `FALSE` to guard.
-- **No custom static-analysis rules**, and therefore no tests for any.
+  no `@codeCoverageIgnore`, no baseline, no `assert()` standing in for a type.
+  An analyser's complaint is fixed at its cause.
+- **Every refusal carries its own message.** Not for the reader's benefit: a
+  guard that falls through to a neighbour's message is a guard no test can tell
+  from its neighbour, and therefore a mutant that survives for ever. Measured —
+  splitting one message into three turned one unkillable mutant into three dead
+  ones.
+- **Prefer deleting an over-defensive guard to testing it.** `?? NULL` already
+  answers for every input shape, so `is_array($x) && is_array($x["k"] ?? NULL)`
+  decided nothing and its `&&` mutant was unkillable. Removing the guard removed
+  five mutants. An equivalent mutant is usually the gate telling you the code is
+  too defensive.
 - **Full PHPDoc.** A `@param` for every parameter and, except on constructors, a
-  `@return`.
-- **`mixed` is narrowed once, where it enters.** `Config\Decoded` is the only
-  place that turns decoded JSON into typed values; nothing downstream re-checks.
-- **No test exists for a guard an analyser asked for.** A test proves a
-  behaviour somebody can ask for.
+  `@return`. Types match the dependency's own contracts: `php-code-coverage`
+  declares `array<int<0, max>, non-empty-string>`, so mule does too rather than
+  widening to `list<string>`.
 - **Everything mule throws on purpose is a `Failure`.** Anything else reaching
-  the top of `Application` is reported as a fault in mule rather than a mistake
-  in the project being gated, so never throw a bare `RuntimeException` from
-  `src/`.
-- **No covers metadata.** No `#[CoversClass]`, no `#[CoversNothing]`. The
-  coverage report is what mule keys itself from, and declaring attribution tells
-  PHPUnit to credit a test with one class while hiding everything else it ran
-  through — which is precisely the connection the cache needs to see. The cost,
-  accepted knowingly: a method exercised only from another class's test now
-  counts as covered, so the gates no longer catch a method with no test of its
-  own. That became a review matter the day the attributes went, and it is worth
-  remembering that it was the gates that caught `Summary::crashed()` the last
-  time. Give a new method a case in its own class's test anyway.
-- **Unit tests never touch the disk, never `chmod`, never skip.** A test that
-  skips when the suite runs as root (as CI does) silently measures a different
-  line set than the same gate on this machine.
+  the top is a fault in mule rather than a mistake in the project being gated.
 - Tabs, double-quoted strings, interpolation over concatenation, uppercase
   `TRUE` / `FALSE` / `NULL`, `final readonly` by default.
 
@@ -77,114 +87,60 @@ in-memory fakes of the five interfaces.
 | | |
 |---|---|
 | `composer test` | the unit suite |
-| `composer test:integration` | the external layer against the real thing |
-| `composer test:coverage` | the coverage report through Herd's driver; the gate itself is mule's `min-coverage` |
+| `composer test:coverage` | the suite through Herd's coverage driver |
 | `composer analyse` | PHPStan at max plus cognitive complexity (9 per method, 40 per class) |
-| `composer test:mutate` | the whole-repository mutation gate; banks every file it proves |
-| `composer test:mutate:new` | the gate over only what the store cannot vouch for |
-| `composer test:mutate:status` | what the store claims, mutating nothing |
+| `composer test:mutate` | the mutation gate: Infection at MSI 100 %, `--with-timeouts` |
 
-**Both tools mule drives are in `require`**, not `require-dev`: a consumer gets
-the engine and the runner by installing mule, and neither has a key in
-`mule.json`. The cost is a narrower compatibility surface —
-`phpunit/phpunit ^12.0 || ^13.0`, so a project on 10 or 11 cannot install mule
-as a dev dependency and has to install it as a tool of its own.
+**mule does not gate itself any more, and that is deliberate.** Measured here:
+~29 source files, each test executing about five of them — 17 % of the project
+per test — so a file's closure is the whole project and a comment-only edit marks
+29 of 36 files stale. The cache is sound and saves nothing.
 
-`mule.json` holds what defines the gate, in mule's own vocabulary — no PHPUnit or
-Infection key appears in it, and the engine's configuration is rendered per run
-into the scratch directory. It is committed and byte-identical on every machine,
-so it is digested into the store. **Nothing machine-local lives in it**: enabling
-a coverage driver is done by wrapping mule (`herd coverage bin/mule full`), and
-mule hands its own interpreter and ini to the coverage run it starts.
+That is a property of **size**, not of the tests. The application mule was
+written for has the same per-test footprint and invalidates 2.7 % per edit. See
+`docs/keying.md` §2 and §8. A three-second gate has nothing to gain from a cache,
+so self-hosting would add a failure mode and buy no time.
+
+**Never pass `--ignore-msi-with-no-mutations`.** A zero-mutant run exits 1 under
+`--min-msi=100` and exits 0 once that flag is added (G5).
 
 ## Releases
 
-`.github/workflows/release.yml` is the whole pipeline. The `gates` job runs on
-pull requests and on pushes to `master`; the `release` job runs only on a push
-to `master` and only after the gates pass.
+`.github/workflows/release.yml` is the whole pipeline, and `docs/decisions.md`
+records what each part of it cost to get right. In short: the pull request's
+title is what cuts a version, master takes only squash merges, a release tags and
+publishes and then opens a changelog pull request that merges itself, and
+Packagist reads the version from the tag.
 
-**The pull request's title is what cuts a version.** Master takes only squash
-merges and takes the commit subject from the PR title, so the title lands on
-master verbatim and is the only thing semantic-release reads. `pr-title.yml`
-validates it for that reason: a title that is not conventional fails nothing, it
-silently releases nothing.
+**`v5` is a prerelease channel.** `.releaserc.json` lists it with
+`prerelease: "next"`, so pushes here publish `5.0.0-next.N` while master stays on
+v4 — which lets the rewrite be exercised by a real consumer instead of landing as
+one unvalidated merge. The `release` job runs on both branches; the changelog
+pull request is master-only, because it targets master and a prerelease's
+changelog has no business there.
 
-`fix:` is a patch, `feat:` a minor, a `BREAKING CHANGE:` footer or `feat!:` a
-major. `ci:`, `chore:`, `docs:`, `refactor:` and `test:` release nothing, which
-is the right answer for a change consumers cannot see. **`perf:` and `revert:`
-are not in the allowed list**, and that is deliberate rather than an omission:
-both would cut a patch under semantic-release's defaults, so admitting either is
-a decision about what this repository releases.
-
-**A release tags, publishes, and then opens a pull request.** The tag and the
-GitHub release go out from the workflow — a tag is not a branch, so no ruleset
-stands in the way. The changelog does not: `@semantic-release/git` would have
-pushed it straight to master, which the ruleset rejects twice over, so it
-arrives through `peter-evans/create-pull-request` like any other change. The
-consequence, accepted: a tag's tree does not contain its own changelog entry.
-The `release` job skips a head commit whose subject starts with
-`chore(release):`, which is what keeps merging that PR from releasing again —
-verified on v3.0.0's own release merge, where that job reported `skipped`.
-
-**That pull request merges itself** once the gates go green, through
-`gh pr merge --auto`. It is the one thing that reaches master without a human
-reading it, and it is a changelog the release has already published. Nothing is
-bypassed: GitHub still waits for the ruleset, the waiting is simply nobody's job.
-Left unmerged it would be harmless, since the tag and the GitHub release are out
-and Packagist reads the tag.
-
-**Packagist takes the version from the tag**, through its GitHub integration.
-Nothing in the workflow talks to Packagist, and `composer.json` carries no
-`version` field — `composer validate --strict` warns against one, and a field a
-release has to rewrite is a second copy of something the tag already says.
-
-**A change under `src/` or `tests/` has to carry the store with it.** Run
-`composer test:mutate:new` and commit `.mule/verified.json` in the same commit.
-
-The gates then check it twice, differently. On a pull request they run
-`php bin/mule new`, which with a current store mutates nothing and writes
-nothing — and with a stale one mutates, banks, and fails the
-`git diff --exit-code .mule/verified.json` that follows. So a stale store is
-caught in seconds rather than by re-proving the project. On a push to master
-they run `php bin/mule full`, because only a whole-project run can catch a store
-claiming *more* than was proven, and master is where a release is cut from. That
-is this tool used on itself rather than around itself.
-
-**Master takes no direct pushes.** A ruleset requires a pull request, requires
-the gates to pass, requires every commit to be verified, and blocks force pushes
-and deletion. Local commits need no signing key: what lands on master is
-GitHub's own squash commit, signed with the web-flow key.
+Remove the `v5` entries from `.releaserc.json` and the workflow's trigger list
+when v5 lands on master.
 
 **A pull request description must not carry a CI skip directive.** The squash
-commit takes its body from the description, and GitHub honours a skip directive
-anywhere in a commit message — so a description that merely *mentions* one skips
-the whole post-merge run: no gates on the merge commit, and no release.
-`pr-title.yml` refuses the five GitHub honours for that reason. Found the hard
-way on the pull request that moved the release off a direct push, whose
-description explained the directive it was removing and whose merge recorded
-zero checks.
+commit takes its body from the description and GitHub honours a skip directive
+anywhere in a commit message, so a description that merely *mentions* one skips
+the whole post-merge run: no gates, no release. `pr-title.yml` refuses the five
+GitHub honours for that reason.
 
 ## Layout
 
 ```
-bin/mule                  composition root: autoload, the five wrappers, exit
 src/
-  Cache/                  Snapshot, Touched, Unproven, Reading, Keying, Declared,
-                          Freshness, Standing, Universe, Store, StoreFormat
-  Config/                 Configuration — mule's whole vocabulary, naming no other tool
-  Console/                Application, Cli, Verb, Summary
-  Coverage/               Report, CoveredFile, Reach, Unreached — parsers over bytes, never paths
-  Engine/                 Infection, Declaration — the engine's command line and the config it points at
-  External/               the five interfaces and their five wrappers
-  Json/                   Decoded — the only place mixed is narrowed
-  Runner/                 Run, Scratch, Measurement — the test runner's command line
-  Gate.php, Project.php
-tests/
-  Unit/                   mirrors src/; no disk, no chmod, no skips
-  Support/                in-memory fakes of the five interfaces
-  Integration/            the wrappers, and one end-to-end run of bin/mule
+  Coverage/   Capture, Split — the shard pipeline (M2, M3, M4)
+  Failure.php
+tests/Unit/   mirrors src/; no disk, no chmod, no skips
+docs/
+  keying.md     the specification
+  decisions.md  why the repository is shaped this way
+HOWTO.md        the consumer's contract
 ```
 
-Documentation: `README.md` is what the tool is; `docs/decisions.md` is why it is
-built this way, including what the rewrite replaced and what each removed
-suppression turned into.
+`src/` is deliberately small right now. `docs/keying.md` §11 is the build order,
+and the differential fixture at step 3 comes before anything is allowed to skip
+work on the strength of the pipeline.

@@ -1,22 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-	The unit suite, and the only suite that produces coverage. It is also the
-	report mule keys itself from, which is why the integration suite lives in
-	its own configuration: the coverage command mule infers for a project with
-	no `mule.json` is this file's default run, so the report CI generates and
-	the report this machine generates name the same covering tests. A testsuite
-	flag in one of them and the committed store would miss on the other.
--->
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
-         bootstrap="vendor/autoload.php"
-         cacheDirectory=".phpunit.cache"
-         colors="true"
-         executionOrder="random"
-         failOnRisky="true"
-         failOnWarning="true"
-         failOnNotice="true"
-         failOnDeprecation="true">
+		 xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+		 bootstrap="vendor/autoload.php"
+		 cacheDirectory=".phpunit.cache"
+		 colors="true"
+		 executionOrder="random"
+		 failOnRisky="true"
+		 failOnWarning="true"
+		 failOnNotice="true"
+		 failOnDeprecation="true"
+		 beStrictAboutOutputDuringTests="true">
 	<testsuites>
 		<testsuite name="unit">
 			<directory>tests/Unit</directory>
@@ -26,17 +19,5 @@
 		<include>
 			<directory>src</directory>
 		</include>
-		<!--
-			The external layer: one statement per method, no decision to assert.
-			infection.json5 excludes the same five files, so the two lists are
-			visibly in step.
-		-->
-		<exclude>
-			<file>src/External/ComposerClasses.php</file>
-			<file>src/External/PhpFilesystem.php</file>
-			<file>src/External/PhpRandom.php</file>
-			<file>src/External/ShellProcesses.php</file>
-			<file>src/External/StreamOutput.php</file>
-		</exclude>
 	</source>
 </phpunit>

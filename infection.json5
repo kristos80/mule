@@ -1,0 +1,8 @@
+{
+	"$schema": "vendor/infection/infection/resources/schema.json",
+	"source": { "directories": ["src"] },
+	"mutators": { "@default": true, "@identical": true },
+	"logs": { "json": ".mule/infection.json" },
+	"testFramework": "phpunit",
+	"tmpDir": ".infection"
+}

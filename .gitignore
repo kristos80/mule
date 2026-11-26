@@ -2,10 +2,16 @@
 /composer.lock
 /node_modules/
 /.phpunit.cache/
+/.infection/
+/.cov/
 /.idea/
 /infection.log
 .DS_Store
 
-# The store is committed on purpose: a content-hash verdict is not
+# The engine's own log, written per run and keyed to nothing.
+/.mule/infection.json
+
+# The store itself is committed on purpose: a content-hash verdict is not
 # machine-local state, so the next machine inherits the work instead of
-# re-proving it. That is the whole point of .mule/verified.json.
+# re-proving it. That is the whole point of .mule/verified.json — see
+# docs/keying.md §4. It returns when there is a store to write.
