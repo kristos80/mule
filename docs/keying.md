@@ -322,6 +322,16 @@ and the project's last, so the loader that answers about the project's tests is
 the project's. And `doctor` should say so when it finds mule among the project's
 own dependencies while running from outside it.
 
+**M19 — `setLineCoverage()` sorts its own keys**, so `lineCoverage()` always
+arrives in canonical file order. Measured: handing it `Zzz, Aaa, Mmm` reads back
+`Aaa, Mmm, Zzz`.
+
+Convenient, and a dependency rather than a guarantee. It is why a merged report's
+file order is deterministic without mule sorting it, and why `Attribution` does
+not sort its file-keyed map — the mutation gate pointed that sort out as having no
+observable effect, which is how the behaviour was noticed at all. The test that
+feeds unsorted input is the tripwire if php-code-coverage ever stops doing it.
+
 ---
 
 ## 2. Where dependency edges come from

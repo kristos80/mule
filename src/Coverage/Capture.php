@@ -141,6 +141,9 @@ final readonly class Capture {
 	/**
 	 * The class part of a test id.
 	 *
+	 * Public because `Attribution` needs the same rule: the timings are keyed by
+	 * whatever this produces, so two spellings of it would be two answers.
+	 *
 	 * **A guard rather than an assumption**: `explode(":", ":x")[0]` is `""`, so
 	 * an id beginning with a colon would yield a class name no JUnit lookup can
 	 * match — and G4 would pass while Infection went on to throw `TestNotFound`.
@@ -148,7 +151,7 @@ final readonly class Capture {
 	 * @param non-empty-string $id
 	 * @return non-empty-string
 	 */
-	private static function classOf(string $id): string {
+	public static function classOf(string $id): string {
 		$class = explode(":", $id)[0];
 
 		if($class === "") {
