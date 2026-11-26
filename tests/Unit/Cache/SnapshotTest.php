@@ -1,0 +1,151 @@
+<?php
+declare(strict_types=1);
+
+namespace Kristos80\Mule\Tests\Unit\Cache;
+
+use Kristos80\Mule\Cache\Snapshot;
+use Kristos80\Mule\Cache\Verdict;
+use PHPUnit\Framework\TestCase;
+
+final class SnapshotTest extends TestCase {
+
+	/**
+	 * @param array<string, int<0, max>> $proven Path to mutant count; the key is derived from the path.
+	 * @param list<string> $unproven
+	 * @return Snapshot
+	 */
+	private function snapshot(array $proven = [], array $unproven = [], string $toolchain = "chain"): Snapshot {
+		/** @var non-empty-string $toolchain */
+		$verdicts = [];
+
+		foreach($proven as $path => $mutants) {
+			$verdicts[$path] = new Verdict("key-of-{$path}", $mutants);
+		}
+
+		return new Snapshot($verdicts, $unproven, $toolchain);
+	}
+
+	public function testVouchesForAFileThatStillKeysTheSame(): void {
+		self::assertTrue($this->snapshot(["src/A.php" => 4])->vouchesFor("src/A.php", "key-of-src/A.php"));
+	}
+
+	public function testDoesNotVouchForAFileThatHasMoved(): void {
+		self::assertFalse($this->snapshot(["src/A.php" => 4])->vouchesFor("src/A.php", "a new key"));
+	}
+
+	public function testDoesNotVouchForAFileItNeverProved(): void {
+		self::assertFalse($this->snapshot()->vouchesFor("src/A.php", "key-of-src/A.php"));
+	}
+
+	public function testNamesWhatItCannotVouchFor(): void {
+		$snapshot = $this->snapshot(["src/A.php" => 4, "src/B.php" => 2]);
+
+		self::assertSame(["src/B.php", "src/C.php"], $snapshot->outstanding([
+			"src/A.php" => "key-of-src/A.php",
+			"src/B.php" => "moved",
+			"src/C.php" => "key-of-src/C.php",
+		]));
+	}
+
+	public function testCountsTheMutantsItHasProven(): void {
+		self::assertSame(6, $this->snapshot(["src/A.php" => 4, "src/B.php" => 2])->mutants());
+	}
+
+	/**
+	 * A file examined and found to have nothing to mutate is a claim, not an
+	 * absence — which is what lets G1 fail on a file that produced no mutants it
+	 * should have.
+	 *
+	 * @return void
+	 */
+	public function testAFileWithNothingToMutateIsStillProven(): void {
+		$snapshot = $this->snapshot(["src/Interface.php" => 0]);
+
+		self::assertTrue($snapshot->vouchesFor("src/Interface.php", "key-of-src/Interface.php"));
+		self::assertSame(0, $snapshot->mutants());
+	}
+
+	/**
+	 * A run that re-proved three files knows nothing about the other four
+	 * hundred, so its empty sections must not erase them.
+	 *
+	 * @return void
+	 */
+	public function testAPartialRunDoesNotEraseWhatItNeverLookedAt(): void {
+		$merged = $this->snapshot(["src/A.php" => 4, "src/B.php" => 2])
+			->with($this->snapshot(["src/B.php" => 3]));
+
+		self::assertSame(["src/A.php", "src/B.php"], array_keys($merged->verdicts));
+		self::assertSame(3, $merged->verdicts["src/B.php"]->mutants);
+	}
+
+	public function testALaterRunProvingAFileTakesItOutOfUnproven(): void {
+		$merged = $this->snapshot([], ["src/A.php"])->with($this->snapshot(["src/A.php" => 4]));
+
+		self::assertSame([], $merged->unproven);
+		self::assertTrue($merged->vouchesFor("src/A.php", "key-of-src/A.php"));
+	}
+
+	/**
+	 * The half without which a store only ever grows and no claim can be taken
+	 * back.
+	 *
+	 * @return void
+	 */
+	public function testALaterRunFailingToProveAFileTakesTheVerdictAway(): void {
+		$merged = $this->snapshot(["src/A.php" => 4])->with($this->snapshot([], ["src/A.php"]));
+
+		self::assertSame([], $merged->verdicts);
+		self::assertSame(["src/A.php"], $merged->unproven);
+	}
+
+	/**
+	 * Measured on a real project: a gate change left 610 verdicts standing of
+	 * which one run had earned 221. Verdicts proven under another engine, driver
+	 * or mutator set are not old — they are answers to a different question.
+	 *
+	 * @return void
+	 */
+	public function testADifferentToolchainReplacesTheStoreOutright(): void {
+		$merged = $this->snapshot(["src/A.php" => 4, "src/B.php" => 2], ["src/C.php"])
+			->with($this->snapshot(["src/B.php" => 3], [], "a different gate"));
+
+		self::assertSame(["src/B.php"], array_keys($merged->verdicts));
+		self::assertSame([], $merged->unproven);
+		self::assertSame("a different gate", $merged->toolchain);
+	}
+
+	/**
+	 * The store is committed, so two machines that proved the same files have to
+	 * write the same bytes — and the order verdicts arrive in is the order a
+	 * coverage report or a cache happened to list them. Caught by building a
+	 * 404-verdict store twice at real scale, where it was not true.
+	 *
+	 * @return void
+	 */
+	public function testIsCanonicalWhateverOrderItIsBuiltIn(): void {
+		$forwards = $this->snapshot(["src/A.php" => 1, "src/Z.php" => 2], ["src/M.php", "src/B.php"]);
+		$backwards = $this->snapshot(["src/Z.php" => 2, "src/A.php" => 1], ["src/B.php", "src/M.php"]);
+
+		self::assertSame(array_keys($forwards->verdicts), array_keys($backwards->verdicts));
+		self::assertSame(["src/A.php", "src/Z.php"], array_keys($forwards->verdicts));
+		self::assertSame($forwards->unproven, $backwards->unproven);
+	}
+
+	public function testTheUnprovenListCarriesNoRepeats(): void {
+		self::assertSame(["src/A.php"], $this->snapshot([], ["src/A.php", "src/A.php"])->unproven);
+	}
+
+	public function testTheMergedVerdictsAreSorted(): void {
+		$merged = $this->snapshot(["src/Z.php" => 1])->with($this->snapshot(["src/A.php" => 1]));
+
+		self::assertSame(["src/A.php", "src/Z.php"], array_keys($merged->verdicts));
+	}
+
+	public function testTheMergedUnprovenIsSortedAndFreeOfRepeats(): void {
+		$merged = $this->snapshot([], ["src/Z.php", "src/A.php"])
+			->with($this->snapshot([], ["src/A.php", "src/M.php"]));
+
+		self::assertSame(["src/A.php", "src/M.php", "src/Z.php"], $merged->unproven);
+	}
+}
