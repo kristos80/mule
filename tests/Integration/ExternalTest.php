@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Integration;
 
+use Composer\Autoload\ClassLoader;
+use Kristos80\Mule\External\ComposerClasses;
 use Kristos80\Mule\External\PhpCoverageReport;
 use Kristos80\Mule\External\PhpFilesystem;
 use Kristos80\Mule\Failure;
@@ -221,5 +223,52 @@ final class ExternalTest extends TestCase {
 			"a distinctive comment",
 			$this->contents($this->at("out/coverage-xml/Thing.php.xml")),
 		);
+	}
+
+	/**
+	 * Composer's loader, asked about a class it knows and one it does not.
+	 *
+	 * Half of every key is the test files covering a source file, and a coverage
+	 * report names those as classes — so this is the only thing that turns one
+	 * into the other, and it has to be the project's own loader doing it.
+	 *
+	 * @return void
+	 */
+	public function testResolvesAClassToItsFileThroughTheProjectsOwnLoader(): void {
+		$loader = new ClassLoader();
+		$loader->addPsr4("Fixture\\", $this->at("src"));
+
+		$classes = new ComposerClasses($loader);
+		mkdir($this->at("src"), 0o700, TRUE);
+		file_put_contents($this->at("src/Thing.php"), "<?php\nnamespace Fixture;\nclass Thing {}\n");
+
+		self::assertSame($this->at("src/Thing.php"), $classes->fileOf("Fixture\\Thing"));
+	}
+
+	/**
+	 * A covering test the loader cannot place is a test whose edits would
+	 * silently stop invalidating anything — so the port answers, and the caller
+	 * is the one that complains.
+	 *
+	 * @return void
+	 */
+	public function testAnswersFalseForAClassTheLoaderCannotPlace(): void {
+		self::assertFalse(new ComposerClasses(new ClassLoader())->fileOf("Nope\\NotHere"));
+	}
+
+	/**
+	 * It resolves without loading, which is what makes it safe to ask about
+	 * every covering test in a report.
+	 *
+	 * @return void
+	 */
+	public function testResolvingDoesNotLoadTheClass(): void {
+		$loader = new ClassLoader();
+		$loader->addPsr4("Fixture\\", $this->at("src"));
+		mkdir($this->at("src"), 0o700, TRUE);
+		file_put_contents($this->at("src/Unloadable.php"), "<?php\nnamespace Fixture;\nthrow new \\RuntimeException(\"loaded\");\n");
+
+		self::assertIsString(new ComposerClasses($loader)->fileOf("Fixture\\Unloadable"));
+		self::assertFalse(class_exists("Fixture\\Unloadable", FALSE));
 	}
 }

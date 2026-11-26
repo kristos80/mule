@@ -7,7 +7,8 @@
 		// uncovered. See docs/keying.md and CLAUDE.md.
 		"excludes": [
 			"External/PhpFilesystem.php",
-			"External/PhpCoverageReport.php"
+			"External/PhpCoverageReport.php",
+			"External/ComposerClasses.php"
 		]
 	},
 	"mutators": { "@default": true, "@identical": true },

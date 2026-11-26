@@ -302,6 +302,26 @@ This is also what makes a fixture lie. A test that builds coverage by hand must
 use relative paths with an absolute `basePath`, or it exercises a shape that
 cannot occur.
 
+**M18 — two autoloaders claiming mule's namespace put two copies of its classes
+in play.** Half of every key is the test files covering a source file, and a
+coverage report names those as classes — so mule has to ask the *project's* loader
+where they live, through `ClassesInterface`. `vendor/autoload.php` returns
+Composer's `ClassLoader` and `findFile()` answers without loading the class;
+verified on the application, all **327** covering test classes resolved to
+project-relative paths in 5 ms, none of them loaded.
+
+The hazard is in requiring that loader. A project that has mule as a dev
+dependency is the easy case: mule *is* the vendored copy and there is one
+`Kristos80\Mule\` map. A project that vendors mule while mule also runs from
+somewhere else has two, and which one answers depends on registration order —
+which surfaced as a `Call to private __construct()` from a *different* major
+version of the same class.
+
+So the composition root requires mule's own autoloader first, so mule can boot,
+and the project's last, so the loader that answers about the project's tests is
+the project's. And `doctor` should say so when it finds mule among the project's
+own dependencies while running from outside it.
+
 ---
 
 ## 2. Where dependency edges come from

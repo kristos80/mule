@@ -58,6 +58,17 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 	}
 
 	#[Override]
+	public function resolve(string $path): string {
+		$resolved = realpath($path);
+
+		if($resolved === FALSE) {
+			throw new Failure("Cannot resolve {$path}: no such file or directory.");
+		}
+
+		return $resolved;
+	}
+
+	#[Override]
 	public function digest(string $path): string {
 		$digest = @hash_file("sha256", $path);
 

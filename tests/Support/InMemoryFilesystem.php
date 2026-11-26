@@ -21,11 +21,13 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	 * @param array<string, string> $files
 	 * @param array<string, non-empty-string> $digests
 	 * @param list<string> $directories
+	 * @param array<string, string> $resolved
 	 */
 	public function __construct(
 		public array $files = [],
 		private array $digests = [],
 		public array $directories = [],
+		private array $resolved = [],
 	) {}
 
 	#[Override]
@@ -59,6 +61,15 @@ final class InMemoryFilesystem implements FilesystemInterface {
 		}
 
 		$this->directories[] = $path;
+	}
+
+	/**
+	 * Resolution an array cannot do for itself: the test says what a path
+	 * resolves to, or it resolves to itself.
+	 */
+	#[Override]
+	public function resolve(string $path): string {
+		return $this->resolved[$path] ?? $path;
 	}
 
 	#[Override]

@@ -32,6 +32,7 @@
 		<exclude>
 			<file>src/External/PhpFilesystem.php</file>
 			<file>src/External/PhpCoverageReport.php</file>
+			<file>src/External/ComposerClasses.php</file>
 		</exclude>
 	</source>
 </phpunit>

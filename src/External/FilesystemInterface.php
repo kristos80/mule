@@ -59,6 +59,18 @@ interface FilesystemInterface {
 	public function createDirectory(string $path): void;
 
 	/**
+	 * A path with `.`, `..` and symlinks resolved.
+	 *
+	 * Needed because Composer answers `findFile()` with paths like
+	 * `…/vendor/composer/../../tests/X.php`, and a key cannot be taken over two
+	 * spellings of one file.
+	 *
+	 * @param string $path
+	 * @return string
+	 */
+	public function resolve(string $path): string;
+
+	/**
 	 * The digest of a file's bytes.
 	 *
 	 * **This is the only thing mule trusts about a file.** A coverage report
