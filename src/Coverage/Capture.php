@@ -28,9 +28,9 @@ final readonly class Capture {
 
 	/**
 	 * @param ProcessedCodeCoverageData $coverage Line data, keyed by test index.
-	 * @param array<string, mixed> $testResults Keyed by test id; the shape inside belongs to php-code-coverage.
+	 * @param array<non-empty-string, array{size: string, status: string, time: float}> $testResults Keyed by test id.
 	 * @param string $basePath The common root the report's paths are relative to.
-	 * @param array<string, mixed> $buildInformation Carried through untouched.
+	 * @param array<array-key, mixed> $buildInformation Carried through untouched.
 	 */
 	private function __construct(
 		public ProcessedCodeCoverageData $coverage,
@@ -64,7 +64,7 @@ final readonly class Capture {
 
 		return new self(
 			$coverage,
-			self::array(self::at($payload, "testResults"), "A coverage payload's test results"),
+			TestResults::of(self::array(self::at($payload, "testResults"), "A coverage payload's test results"), "A coverage payload's test results"),
 			$basePath,
 			$buildInformation,
 		);
@@ -75,7 +75,7 @@ final readonly class Capture {
 	 * shard still declares the format it was cut from.
 	 *
 	 * @param ProcessedCodeCoverageData $coverage
-	 * @param array<string, mixed> $testResults
+	 * @param array<non-empty-string, array{size: string, status: string, time: float}> $testResults
 	 * @param string $basePath
 	 * @return self
 	 */
@@ -129,13 +129,33 @@ final readonly class Capture {
 	 * @return list<non-empty-string>
 	 */
 	public function testClasses(): array {
-		/** @var list<non-empty-string> $classes */
-		$classes = array_values(array_unique(array_map(
-			static fn(string $id): string => explode(":", $id)[0],
-			$this->testIds(),
-		)));
+		$classes = [];
 
-		return $classes;
+		foreach($this->testIds() as $id) {
+			$classes[] = self::classOf($id);
+		}
+
+		return array_values(array_unique($classes));
+	}
+
+	/**
+	 * The class part of a test id.
+	 *
+	 * **A guard rather than an assumption**: `explode(":", ":x")[0]` is `""`, so
+	 * an id beginning with a colon would yield a class name no JUnit lookup can
+	 * match — and G4 would pass while Infection went on to throw `TestNotFound`.
+	 *
+	 * @param non-empty-string $id
+	 * @return non-empty-string
+	 */
+	private static function classOf(string $id): string {
+		$class = explode(":", $id)[0];
+
+		if($class === "") {
+			throw new Failure("A coverage payload attributes coverage to \"{$id}\", which names no test class.");
+		}
+
+		return $class;
 	}
 
 	/**
@@ -154,16 +174,19 @@ final readonly class Capture {
 	}
 
 	/**
+	 * **`array-key`, not `string`.** `is_array()` proves nothing about the keys,
+	 * and claiming otherwise would be a type standing in for a check. Whoever
+	 * needs string keys says so and guards for it — `TestResults` does.
+	 *
 	 * @param mixed $value
 	 * @param string $what Named in the refusal, so each caller's message differs.
-	 * @return array<string, mixed>
+	 * @return array<array-key, mixed>
 	 */
 	private static function array(mixed $value, string $what): array {
 		if(!is_array($value)) {
 			throw new Failure("{$what} must be an array, " . get_debug_type($value) . " given.");
 		}
 
-		/** @var array<string, mixed> $value */
 		return $value;
 	}
 
@@ -173,7 +196,7 @@ final readonly class Capture {
 	 * declaring a format mule cannot read, and giving them one message between
 	 * them is how the guard between them becomes unkillable.
 	 *
-	 * @param array<string, mixed> $buildInformation
+	 * @param array<array-key, mixed> $buildInformation
 	 * @return void
 	 */
 	private static function assertFormat(array $buildInformation): void {

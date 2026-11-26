@@ -136,7 +136,9 @@ staleness guard.** mule keys from digests it took itself, at capture time.
 **M9 — `basePath` is derived from the set of covered files**, and lands in
 `<project source>`. Merging a subset of shards can produce a *deeper* base path
 than the source root, silently relocating every `href`. mule sets it explicitly
-and never derives it.
+and never derives it. **M17 refines this**: the base path and the relativity of
+the file paths are a matched pair, so one capture's base path cannot be put on
+another's paths.
 
 **M10 — Coverage attribution is deterministic.** Two full runs under
 `executionOrder="random"` produced byte-identical per-line covering-test sets
@@ -272,6 +274,33 @@ carry one of four states (§4).
 
 It is also why `doctor` cannot measure footprints from coverage alone: a test that
 executes no source is invisible in every coverage artifact mule reads.
+
+**M17 — a `.cov` payload's file paths are relative to its `basePath`.** Not
+absolute, which is the natural assumption and the wrong one. PHPUnit reduces them
+on the way out, so a real payload reads:
+
+```
+basePath : /Users/…/hermes-2/src
+a file   : Controller/AbstractController.php
+```
+
+`Node\Builder` then calls `Util\PathReducer::reduce()`, which strips the longest
+common prefix *again* and returns it, and computes
+`rootPath = basePath . "/" . commonPath`. On already-relative paths the reducer
+finds nothing to strip, returns `''`, and the root comes out as `basePath` —
+correct. On **absolute** paths it strips `basePath` a second time and the root
+doubles, every file node is lost, and the index reports `executed="0"` with no
+per-file documents at all.
+
+So **basePath and path-relativity are a matched pair**: a payload's paths mean
+nothing without the basePath they were reduced against, and one capture's
+basePath cannot be put on another's paths. Measured both ways — the real
+613-file capture renders 610 documents and a correct `<project source>`; a
+hand-built capture with absolute paths renders none and doubles the root.
+
+This is also what makes a fixture lie. A test that builds coverage by hand must
+use relative paths with an absolute `basePath`, or it exercises a shape that
+cannot occur.
 
 ---
 

@@ -31,7 +31,7 @@ final readonly class Shard {
 	 * @param non-empty-string $testClass
 	 * @param array<int<0, max>, non-empty-string> $testIds Shard-local; the line data indexes into this. Positional, which `fromArray` asserts.
 	 * @param array<non-empty-string, array<int<1, max>, list<int<0, max>>>> $lines Only test-bearing entries.
-	 * @param array<string, mixed> $testResults
+	 * @param array<non-empty-string, array{size: string, status: string, time: float}> $testResults
 	 * @param array<string, non-empty-string> $digests Path to digest, as measured when this was captured.
 	 */
 	private function __construct(
@@ -127,41 +127,26 @@ final readonly class Shard {
 	/**
 	 * **JSON, not a `require`d PHP file.** A cache entry that is executed is a
 	 * cache entry that can run code, and these live in a working tree beside the
-	 * sources they describe. Decoding costs milliseconds across a whole shard set
-	 * and buys a format a person can read when a verdict looks wrong.
+	 * sources they describe. Decoding all 328 of a real project's costs 0.07 s,
+	 * so the safer format is also the free one.
+	 *
+	 * Reading it is `ShardFormat`'s job: validating four sections down to their
+	 * indices is most of the work and none of the meaning, and together in one
+	 * class they put it over the blueprint's complexity limit.
 	 *
 	 * @param mixed $decoded
 	 * @return self
 	 */
 	public static function fromArray(mixed $decoded): self {
-		if(!is_array($decoded)) {
-			throw new Failure("A shard must be an array, " . get_debug_type($decoded) . " given.");
-		}
+		$read = ShardFormat::read($decoded);
 
-		foreach(["testClass", "testIds", "lines", "testResults", "digests"] as $key) {
-			if(!array_key_exists($key, $decoded)) {
-				throw new Failure("A shard is missing its \"{$key}\" key.");
-			}
-		}
-
-		if(!is_string($decoded["testClass"]) || $decoded["testClass"] === "") {
-			throw new Failure("A shard's \"testClass\" is not a class name.");
-		}
-
-		/**
-		 * @var array<int<0, max>, non-empty-string> $testIds
-		 * @var array<non-empty-string, array<int<1, max>, list<int<0, max>>>> $lines
-		 * @var array<string, mixed> $testResults
-		 * @var array<string, non-empty-string> $digests
-		 */
-		[$testIds, $lines, $testResults, $digests] = [
-			self::listOf($decoded["testIds"], "test ids"),
-			self::arrayOf($decoded["lines"], "line data"),
-			self::arrayOf($decoded["testResults"], "test results"),
-			self::arrayOf($decoded["digests"], "digests"),
-		];
-
-		return new self($decoded["testClass"], $testIds, $lines, $testResults, $digests);
+		return new self(
+			$read["testClass"],
+			$read["testIds"],
+			$read["lines"],
+			$read["testResults"],
+			$read["digests"],
+		);
 	}
 
 	/**
@@ -201,33 +186,5 @@ final readonly class Shard {
 		}
 
 		return $lines;
-	}
-
-	/**
-	 * @param mixed $value
-	 * @param string $what
-	 * @return array<array-key, mixed>
-	 */
-	private static function arrayOf(mixed $value, string $what): array {
-		if(!is_array($value)) {
-			throw new Failure("A shard's {$what} must be an array, " . get_debug_type($value) . " given.");
-		}
-
-		return $value;
-	}
-
-	/**
-	 * @param mixed $value
-	 * @param string $what
-	 * @return list<mixed>
-	 */
-	private static function listOf(mixed $value, string $what): array {
-		$array = self::arrayOf($value, $what);
-
-		if(!array_is_list($array)) {
-			throw new Failure("A shard's {$what} must be a list, which decides what its line data indexes into.");
-		}
-
-		return $array;
 	}
 }

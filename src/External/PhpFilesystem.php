@@ -1,0 +1,70 @@
+<?php
+declare(strict_types=1);
+
+namespace Kristos80\Mule\External;
+
+use Kristos80\Mule\Failure;
+use Override;
+
+/**
+ * The filesystem, as PHP offers it.
+ *
+ * **One primitive per method, plus a guard that throws.** Nothing here decides
+ * anything, so there is nothing to unit test and nothing a mutant could change
+ * that an assertion would notice — which is why this file is the only one
+ * excluded from coverage and from mutation, named in both `phpunit.xml` and
+ * `infection.json5` so the two lists stay visibly in step. Everything moved out
+ * of here is gated at 100 %.
+ *
+ * The `@` is on the primitives that announce a failure twice, once as a warning
+ * and once as `FALSE`. The warning is the copy mule has no use for; the `FALSE`
+ * becomes an exception carrying the path.
+ */
+final readonly class PhpFilesystem implements FilesystemInterface {
+
+	#[Override]
+	public function read(string $path): string {
+		$contents = @file_get_contents($path);
+
+		if($contents === FALSE) {
+			throw new Failure("Cannot read {$path}.");
+		}
+
+		return $contents;
+	}
+
+	#[Override]
+	public function write(string $path, string $contents): void {
+		if(@file_put_contents($path, $contents) === FALSE) {
+			throw new Failure("Cannot write {$path}.");
+		}
+	}
+
+	#[Override]
+	public function exists(string $path): bool {
+		return file_exists($path);
+	}
+
+	#[Override]
+	public function isDirectory(string $path): bool {
+		return is_dir($path);
+	}
+
+	#[Override]
+	public function createDirectory(string $path): void {
+		if(!@mkdir($path, 0o777, TRUE)) {
+			throw new Failure("Cannot create the directory {$path}.");
+		}
+	}
+
+	#[Override]
+	public function digest(string $path): string {
+		$digest = @hash_file("sha256", $path);
+
+		if($digest === FALSE) {
+			throw new Failure("Cannot hash {$path}.");
+		}
+
+		return $digest;
+	}
+}

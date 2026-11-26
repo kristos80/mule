@@ -169,6 +169,25 @@ final class CaptureTest extends TestCase {
 		);
 	}
 
+	/**
+	 * `explode(":", ":x")[0]` is `""`, so an id beginning with a colon yields a
+	 * class name no JUnit lookup can match — G4 would pass and Infection would
+	 * then throw `TestNotFound` somewhere further on.
+	 *
+	 * @return void
+	 */
+	public function testRefusesAnIdThatNamesNoTestClass(): void {
+		$coverage = new ProcessedCodeCoverageData();
+		$coverage->setTestIds([":testOne"]);
+
+		$this->expectException(Failure::class);
+		$this->expectExceptionMessage(
+			'A coverage payload attributes coverage to ":testOne", which names no test class.',
+		);
+
+		Capture::of($this->payload(["codeCoverage" => $coverage]))->testClasses();
+	}
+
 	public function testPayloadRoundTripsBackIntoACapture(): void {
 		$payload = Capture::of($this->payload())->payload();
 

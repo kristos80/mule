@@ -36,6 +36,7 @@
     "scripts": {
         "analyse": "phpstan analyse --memory-limit=2G --no-progress",
         "test": "./vendor/bin/phpunit",
+        "test:integration": "./vendor/bin/phpunit --configuration=phpunit.integration.xml",
         "test:coverage": "herd coverage ./vendor/bin/phpunit --coverage-text --coverage-xml=.cov/coverage-xml --log-junit=.cov/junit.xml --exclude-source-from-xml-coverage",
         "test:mutate": "./vendor/bin/infection --coverage=.cov --skip-initial-tests --threads=max --with-timeouts --min-msi=100 --min-covered-msi=100"
     },

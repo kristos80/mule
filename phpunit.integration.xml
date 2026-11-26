@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	The external layer against the real thing: a real temporary directory, real
+	files, real rendering. Its own configuration because it produces no coverage
+	by design — the two wrappers are excluded from the unit suite's coverage, so
+	measuring them here would report a different line set than the gate does.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+		 bootstrap="vendor/autoload.php"
+		 cacheDirectory=".phpunit.cache"
+		 colors="true"
+		 failOnRisky="true"
+		 failOnWarning="true"
+		 failOnNotice="true"
+		 failOnDeprecation="true"
+		 beStrictAboutOutputDuringTests="true">
+	<testsuites>
+		<testsuite name="integration">
+			<directory>tests/Integration</directory>
+		</testsuite>
+	</testsuites>
+</phpunit>

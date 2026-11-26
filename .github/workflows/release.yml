@@ -61,8 +61,15 @@ jobs:
           --log-junit=.cov/junit.xml
           --exclude-source-from-xml-coverage
 
-      # The integration suite is gone with the implementation it exercised.
-      # It returns when there is an external layer again to point it at.
+      # The external layer against the real thing. Those two wrappers are the
+      # only code excluded from the unit suite's coverage and from the mutation
+      # gate, on the grounds that there is no decision in them to assert — which
+      # is an argument for not unit testing them, not for never running them.
+      #
+      # Its own configuration because it produces no coverage by design:
+      # measuring it here would report a different line set than the gate does.
+      - name: Integration suite
+        run: composer test:integration
 
       # **Plain Infection, not mule on itself.** mule used to gate itself —
       # `new` on a pull request, `full` on master — and that is deliberately

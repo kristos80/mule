@@ -25,7 +25,9 @@ interface FilesystemInterface {
 	public function read(string $path): string;
 
 	/**
-	 * Writes a file, creating the directories above it.
+	 * Writes a file. **Does not create the directories above it**, because
+	 * whether a missing directory is made or complained about is a decision, and
+	 * decisions live on this side of the seam.
 	 *
 	 * @param string $path
 	 * @param string $contents
@@ -38,6 +40,23 @@ interface FilesystemInterface {
 	 * @return bool
 	 */
 	public function exists(string $path): bool;
+
+	/**
+	 * @param string $path
+	 * @return bool
+	 */
+	public function isDirectory(string $path): bool;
+
+	/**
+	 * Creates a directory and whatever is missing above it.
+	 *
+	 * Fails if it is already there: `mkdir` answers `FALSE` for that, and
+	 * deciding whether that is a problem belongs to the caller.
+	 *
+	 * @param string $path
+	 * @return void
+	 */
+	public function createDirectory(string $path): void;
 
 	/**
 	 * The digest of a file's bytes.

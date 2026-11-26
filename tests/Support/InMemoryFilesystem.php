@@ -18,12 +18,14 @@ use Override;
 final class InMemoryFilesystem implements FilesystemInterface {
 
 	/**
-	 * @param array<string, string> $files Path to contents.
-	 * @param array<string, non-empty-string> $digests Path to digest; a file with no entry hashes its contents.
+	 * @param array<string, string> $files
+	 * @param array<string, non-empty-string> $digests
+	 * @param list<string> $directories
 	 */
 	public function __construct(
 		public array $files = [],
 		private array $digests = [],
+		public array $directories = [],
 	) {}
 
 	#[Override]
@@ -43,6 +45,20 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	#[Override]
 	public function exists(string $path): bool {
 		return array_key_exists($path, $this->files);
+	}
+
+	#[Override]
+	public function isDirectory(string $path): bool {
+		return in_array($path, $this->directories, TRUE);
+	}
+
+	#[Override]
+	public function createDirectory(string $path): void {
+		if($this->isDirectory($path)) {
+			throw new Failure("The directory \"{$path}\" is already there.");
+		}
+
+		$this->directories[] = $path;
 	}
 
 	#[Override]

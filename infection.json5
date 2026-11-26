@@ -1,6 +1,15 @@
 {
 	"$schema": "vendor/infection/infection/resources/schema.json",
-	"source": { "directories": ["src"] },
+	"source": {
+		"directories": ["src"],
+		// The same two files phpunit.xml excludes from coverage. One primitive
+		// per method, so every mutant in them is either unkillable or scores as
+		// uncovered. See docs/keying.md and CLAUDE.md.
+		"excludes": [
+			"External/PhpFilesystem.php",
+			"External/PhpCoverageReport.php"
+		]
+	},
 	"mutators": { "@default": true, "@identical": true },
 	"logs": { "json": ".mule/infection.json" },
 	"testFramework": "phpunit",

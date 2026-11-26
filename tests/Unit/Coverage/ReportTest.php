@@ -57,19 +57,48 @@ final class ReportTest extends TestCase {
 		return new Report($this->filesystem, $this->reports);
 	}
 
-	public function testRendersTheAttributionIntoTheDirectoryItWasGiven(): void {
+	/**
+	 * M1: the index Infection's locator matches is `coverage-xml/index.xml`
+	 * inside the directory handed to `--coverage`.
+	 *
+	 * @return void
+	 */
+	public function testRendersTheAttributionIntoTheCoverageXmlDirectory(): void {
 		$this->report()->write($this->merged(), $this->timings(), "/out");
 
 		self::assertCount(1, $this->reports->rendered);
-		self::assertSame("/out", $this->reports->rendered[0]["directory"]);
+		self::assertSame("/out/coverage-xml", $this->reports->rendered[0]["target"]);
 	}
 
-	public function testHandsTheRendererTheMergedPayload(): void {
+	public function testCreatesTheReportDirectoryWhenItIsNotThere(): void {
+		$this->report()->write($this->merged(), $this->timings(), "/out");
+
+		self::assertSame(["/out"], $this->filesystem->directories);
+	}
+
+	/**
+	 * `mkdir` answers FALSE for a directory that already exists, so asking for
+	 * one twice is a failure rather than a no-op — the caller decides, and here
+	 * the decision is to leave it alone.
+	 *
+	 * @return void
+	 */
+	public function testLeavesAReportDirectoryThatIsAlreadyThereAlone(): void {
+		$this->filesystem = new InMemoryFilesystem([], [], ["/out"]);
+
+		$this->report()->write($this->merged(), $this->timings(), "/out");
+
+		self::assertSame(["/out"], $this->filesystem->directories);
+	}
+
+	public function testHandsTheRendererTheMergedAttributionAndTheGivenBasePath(): void {
 		$merged = $this->merged();
 
 		$this->report()->write($merged, $this->timings(), "/out");
 
-		self::assertSame($merged->payload(), $this->reports->rendered[0]["payload"]);
+		self::assertSame($merged->coverage, $this->reports->rendered[0]["coverage"]);
+		self::assertSame($merged->testResults, $this->reports->rendered[0]["testResults"]);
+		self::assertSame("/src", $this->reports->rendered[0]["basePath"]);
 	}
 
 	/**

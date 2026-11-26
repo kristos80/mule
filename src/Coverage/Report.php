@@ -23,8 +23,11 @@ use function implode;
 final readonly class Report {
 
 	/**
-	 * The file name Infection's locator matches, and the directory it looks in.
+	 * What Infection's locators match: `coverage-xml/index.xml` and a file named
+	 * `junit.xml`, both inside the directory handed to `--coverage` (M1).
 	 */
+	private const string COVERAGE_XML = "coverage-xml";
+
 	private const string JUNIT = "junit.xml";
 
 	/**
@@ -45,7 +48,16 @@ final readonly class Report {
 	public function write(Capture $merged, Timings $timings, string $directory): void {
 		$this->assertTimed($merged, $timings);
 
-		$this->reports->renderXml($merged->payload(), $directory);
+		if(!$this->filesystem->isDirectory($directory)) {
+			$this->filesystem->createDirectory($directory);
+		}
+
+		$this->reports->renderXml(
+			$merged->coverage,
+			$merged->testResults,
+			$merged->basePath,
+			"{$directory}/" . self::COVERAGE_XML,
+		);
 		$this->filesystem->write("{$directory}/" . self::JUNIT, $timings->junit());
 	}
 
