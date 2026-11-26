@@ -409,8 +409,8 @@ that looks like success.
 ```
 toolchain() = sha256(
       sig(composer.lock)
-    + sig(the rendered PHPUnit configuration)
-    + sig(the rendered Infection configuration)
+    + sig(the project's PHPUnit configuration)
+    + sig(the Infection configuration mule renders)
     + the resolved mutator set
     + PHP_VERSION
     + coverage driver name and version
@@ -418,10 +418,41 @@ toolchain() = sha256(
 )
 ```
 
-mule renders both tool configurations itself, which is precisely what lets it put
-them in the key. A consumer's `mule.json` names no PHPUnit or Infection key. A
-toolchain change invalidates the whole store at once; that is correct, not an
+A toolchain change invalidates the whole store at once; that is correct, not an
 error.
+
+### The two tool configurations are handled oppositely, and must be
+
+**PHPUnit's is the project's, used as given, and digested.** mule cannot invent a
+bootstrap, a testsuite list or a `<source>` include — only the project knows
+those, and `--coverage-php` produces nothing useful without them. mule overrides
+on the command line what it needs per shard (the test file, `--coverage-php`,
+`--log-junit`) and touches the file itself not at all. It goes in the key because
+`<source><exclude>` decides what is instrumented, which decides coverage, which
+decides every verdict.
+
+**Infection's is rendered by mule, and a project-level one is refused.** Not
+ignored — *refused*, with a message naming the file. Every key that would defeat
+a guard is settable there, and all ten of these exist in Infection 0.32.7's own
+schema:
+
+| key | what it would defeat |
+|---|---|
+| `ignoreMsiWithNoMutations` | **G5** — a zero-mutant run exits 0 |
+| `staticAnalysisTool` | **M15, G8** — test gaps become apparent successes |
+| `timeoutsAsEscaped` | **G8** — a timeout scores as a kill again |
+| `timeout` | **M12** — decides which mutants are silently skipped |
+| `minMsi` / `minCoveredMsi` | **G5** — the floor the gate rests on |
+| `logs` | **M6** — mule parses the JSON log it asked for |
+| `tmpDir` | §4 — mule owns the cache location |
+| `mutators` / `source` | §4 — both are in the cache key |
+
+**Silently ignoring the file is the worse of the two wrong answers.** A consumer
+who writes `ignoreMsiWithNoMutations: true` and sees a green build has been told
+something false by their own configuration. Honouring it defeats the guard;
+ignoring it defeats the person. So mule fails and says where to put what it
+found: `mule.json` carries `mutators`, `exclude`, `min-coverage` and `threads` in
+mule's own vocabulary, and names no PHPUnit or Infection key at all.
 
 ### Where things live, and who ignores them
 
