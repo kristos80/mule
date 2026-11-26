@@ -93,6 +93,20 @@ final readonly class Snapshot {
 	}
 
 	/**
+	 * Whether this snapshot was proven under the environment given.
+	 *
+	 * **Asked separately from vouching**, because the answer is all-or-nothing
+	 * and the run that finds out should be able to say so rather than watch every
+	 * file quietly read as stale.
+	 *
+	 * @param non-empty-string $toolchain
+	 * @return bool
+	 */
+	public function describes(string $toolchain): bool {
+		return $this->toolchain === $toolchain;
+	}
+
+	/**
 	 * Whether this snapshot still vouches for a file keying to `$key`.
 	 *
 	 * @param string $path

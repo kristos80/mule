@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Support;
 
+use Closure;
 use Kristos80\Mule\External\FilesystemInterface;
 use Kristos80\Mule\Failure;
 use Override;
@@ -61,6 +62,34 @@ final class InMemoryFilesystem implements FilesystemInterface {
 		}
 
 		$this->directories[] = $path;
+	}
+
+	/**
+	 * Every path that was locked, in order, so a test can assert the lock was
+	 * taken rather than assume it.
+	 *
+	 * @var list<string>
+	 */
+	public array $locked = [];
+
+	#[Override]
+	public function rename(string $from, string $to): void {
+		$this->files[$to] = $this->read($from);
+
+		unset($this->files[$from]);
+	}
+
+	/**
+	 * @template T
+	 * @param string $path
+	 * @param Closure(): T $critical
+	 * @return T
+	 */
+	#[Override]
+	public function underLock(string $path, Closure $critical): mixed {
+		$this->locked[] = $path;
+
+		return $critical();
 	}
 
 	/**

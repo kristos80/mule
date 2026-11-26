@@ -3,8 +3,11 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\External;
 
+use Closure;
 use Kristos80\Mule\Failure;
 use Override;
+use const LOCK_EX;
+use const LOCK_UN;
 
 /**
  * The filesystem, as PHP offers it.
@@ -55,6 +58,43 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 		if(!@mkdir($path, 0o777, TRUE)) {
 			throw new Failure("Cannot create the directory {$path}.");
 		}
+	}
+
+	#[Override]
+	public function rename(string $from, string $to): void {
+		if(!@rename($from, $to)) {
+			throw new Failure("Cannot move {$from} to {$to}.");
+		}
+	}
+
+	/**
+	 * `c` rather than `w`, so an existing lock file keeps its bytes — it has
+	 * none, and truncating it would be a write to a file another process is
+	 * holding.
+	 *
+	 * @template T
+	 * @param string $path
+	 * @param Closure(): T $critical
+	 * @return T
+	 */
+	#[Override]
+	public function underLock(string $path, Closure $critical): mixed {
+		$handle = @fopen($path, "c");
+
+		if($handle === FALSE) {
+			throw new Failure("Cannot open {$path} to lock it.");
+		}
+
+		if(!flock($handle, LOCK_EX)) {
+			throw new Failure("Cannot take an exclusive lock on {$path}.");
+		}
+
+		$result = $critical();
+
+		flock($handle, LOCK_UN);
+		fclose($handle);
+
+		return $result;
 	}
 
 	#[Override]

@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\External;
 
+use Closure;
+
 /**
  * The disk, behind a seam.
  *
@@ -57,6 +59,34 @@ interface FilesystemInterface {
 	 * @return void
 	 */
 	public function createDirectory(string $path): void;
+
+	/**
+	 * Moves a file over whatever is at the destination.
+	 *
+	 * The replace half of "write beside the old one and move it over": `rename`
+	 * is atomic within a filesystem, so a reader sees one complete file or the
+	 * other and a crash leaves a scratch file rather than half a store.
+	 *
+	 * @param string $from
+	 * @param string $to
+	 * @return void
+	 */
+	public function rename(string $from, string $to): void;
+
+	/**
+	 * Runs something while holding an exclusive lock on a path.
+	 *
+	 * **A closure, because a lock is the one piece of I/O that cannot be a
+	 * statement.** Taking it and releasing it are two calls with the caller's
+	 * work in between, and the alternative — `lock()` and `unlock()` as separate
+	 * methods — puts the releasing in the caller's hands, where a throw loses it.
+	 *
+	 * @template T
+	 * @param string $path
+	 * @param Closure(): T $critical
+	 * @return T
+	 */
+	public function underLock(string $path, Closure $critical): mixed;
 
 	/**
 	 * A path with `.`, `..` and symlinks resolved.
