@@ -17,5 +17,15 @@
 /.infection/
 /.mule/infection.json
 
+# PHPUnit's result cache: it only affects ordering, which M10 showed does not
+# move attribution, so it is hygiene rather than correctness.
+/.phpunit.result.cache
+/tests/Fixture/project/.phpunit.result.cache
+
 # Rendered per run by the differential, the way mule renders one in earnest.
 /tests/Fixture/project/infection.json5
+
+# mule renders the engine's configuration into the project root, because
+# Infection resolves every path in one relative to that file's own directory
+# (M11). It is derived from mule.json and regenerated every run.
+/mule.infection.json

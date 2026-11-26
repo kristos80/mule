@@ -18,6 +18,15 @@ use const JSON_THROW_ON_ERROR;
 final readonly class Store {
 
 	/**
+	 * **Written beside the store, because the store is the one committed thing
+	 * mule produces and the two files it needs around it are not.** A lock and a
+	 * half-written scratch file in a staged commit is the kind of noise that makes
+	 * somebody add `.mule` to their own `.gitignore` wholesale, and then the store
+	 * stops travelling.
+	 */
+	private const string IGNORE = "*.lock\n*.writing\n";
+
+	/**
 	 * @param FilesystemInterface $filesystem
 	 * @param string $path The store itself, absolute.
 	 */
@@ -79,6 +88,8 @@ final readonly class Store {
 		if(!$this->filesystem->isDirectory($directory)) {
 			$this->filesystem->createDirectory($directory);
 		}
+
+		$this->filesystem->write("{$directory}/.gitignore", self::IGNORE);
 
 		return $this->filesystem->underLock("{$this->path}.lock", function () use ($proven): Snapshot {
 			$merged = $this->read($proven->toolchain)->with($proven);

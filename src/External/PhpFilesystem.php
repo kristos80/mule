@@ -4,7 +4,10 @@ declare(strict_types=1);
 namespace Kristos80\Mule\External;
 
 use Closure;
+use FilesystemIterator;
 use Kristos80\Mule\Failure;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Override;
 use const LOCK_EX;
 use const LOCK_UN;
@@ -49,6 +52,13 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 	}
 
 	#[Override]
+	public function remove(string $path): void {
+		if(file_exists($path) && !@unlink($path)) {
+			throw new Failure("Cannot remove {$path}.");
+		}
+	}
+
+	#[Override]
 	public function isDirectory(string $path): bool {
 		return is_dir($path);
 	}
@@ -58,6 +68,27 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 		if(!@mkdir($path, 0o777, TRUE)) {
 			throw new Failure("Cannot create the directory {$path}.");
 		}
+	}
+
+	/**
+	 * The iterator's *keys* are the pathnames, which arrive as strings rather
+	 * than as `SplFileInfo` objects — so there is nothing to narrow and no
+	 * inline type standing in for a check. Sorting is the caller's concern
+	 * nowhere else, so it happens here: a tree walk's order is the filesystem's
+	 * business and mule's decisions must not depend on it.
+	 *
+	 * @param string $directory
+	 * @return list<string>
+	 */
+	#[Override]
+	public function entriesUnder(string $directory): array {
+		$entries = array_keys(iterator_to_array(new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS),
+		)));
+
+		sort($entries);
+
+		return $entries;
 	}
 
 	#[Override]

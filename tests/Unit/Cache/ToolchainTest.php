@@ -17,11 +17,12 @@ final class ToolchainTest extends TestCase {
 		string $phpunit = "pu",
 		string $infection = "inf",
 		array $mutators = ["@default", "@identical"],
+		string $support = "support",
 		string $php = "8.4.28",
 		string $driver = "Xdebug 3.4.0",
 		string $mule = "5.0.0",
 	): string {
-		return Toolchain::of($lock, $phpunit, $infection, $mutators, $php, $driver, $mule);
+		return Toolchain::of($lock, $phpunit, $infection, $mutators, $support, $php, $driver, $mule);
 	}
 
 	public function testTheSameToolchainGivesTheSameDigest(): void {
@@ -48,6 +49,7 @@ final class ToolchainTest extends TestCase {
 		self::assertNotSame($base, $this->chain(phpunit: "excludes one more file"));
 		self::assertNotSame($base, $this->chain(infection: "a different gate"));
 		self::assertNotSame($base, $this->chain(mutators: ["@default"]));
+		self::assertNotSame($base, $this->chain(support: "a fake that behaves differently"));
 		self::assertNotSame($base, $this->chain(php: "8.5.0"));
 		self::assertNotSame($base, $this->chain(driver: "pcov 1.0.11"));
 		self::assertNotSame($base, $this->chain(mule: "5.0.1"));

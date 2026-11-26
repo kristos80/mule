@@ -25,10 +25,24 @@ use const JSON_THROW_ON_ERROR;
 final readonly class Toolchain {
 
 	/**
+	 * **`support` is in here rather than in the key, and that is the only place it
+	 * can go.** A support directory holds the files whose bytes can change a
+	 * verdict and which coverage cannot see: fixtures, fakes, a test base class.
+	 * None of them is instrumented, so none appears in a file's covering tests or
+	 * in what those tests execute — which means no per-file key can tell which
+	 * verdicts one of them affects. The honest answer is all of them, and
+	 * "invalidates everything at once" is exactly what the toolchain section
+	 * already means.
+	 *
+	 * It also makes the failure legible: a changed fake reads as "the verification
+	 * environment has changed" and the run says so, rather than every file in the
+	 * project quietly going stale for no stated reason.
+	 *
 	 * @param string $lock The digest of `composer.lock`: the engine and the runner, pinned.
 	 * @param string $phpunit The digest of the project's PHPUnit configuration — it decides what is instrumented.
 	 * @param string $infection The digest of the configuration mule rendered for the engine.
 	 * @param list<string> $mutators The resolved mutator set, which decides which mutants exist at all.
+	 * @param string $support One digest over every file in `mule.json`'s `support` directories.
 	 * @param string $php `PHP_VERSION`.
 	 * @param string $driver The coverage driver and its version.
 	 * @param string $mule mule's own version.
@@ -39,6 +53,7 @@ final readonly class Toolchain {
 		string $phpunit,
 		string $infection,
 		array $mutators,
+		string $support,
 		string $php,
 		string $driver,
 		string $mule,
@@ -51,6 +66,7 @@ final readonly class Toolchain {
 			"phpunit" => $phpunit,
 			"infection" => $infection,
 			"mutators" => $sorted,
+			"support" => $support,
 			"php" => $php,
 			"driver" => $driver,
 			"mule" => $mule,

@@ -2,13 +2,17 @@
 	"$schema": "vendor/infection/infection/resources/schema.json",
 	"source": {
 		"directories": ["src"],
-		// The same two files phpunit.xml excludes from coverage. One primitive
-		// per method, so every mutant in them is either unkillable or scores as
-		// uncovered. See docs/keying.md and CLAUDE.md.
+		// The same files phpunit.xml excludes from coverage: the external layer,
+		// one primitive per method, so every mutant in them is either unkillable
+		// or scores as uncovered. See docs/keying.md and CLAUDE.md.
 		"excludes": [
-			"External/PhpFilesystem.php",
+			"External/ComposerClasses.php",
 			"External/PhpCoverageReport.php",
-			"External/ComposerClasses.php"
+			"External/PhpEnvironment.php",
+			"External/PhpFilesystem.php",
+			"External/PhpLines.php",
+			"External/ShellProcesses.php",
+			"External/StreamOutput.php"
 		]
 	},
 	"mutators": { "@default": true, "@identical": true },

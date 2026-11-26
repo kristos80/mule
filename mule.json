@@ -1,0 +1,30 @@
+{
+	"source": "src",
+	"tests": "tests/Unit",
+	"support": [
+		"tests/Support"
+	],
+	"exclude": [
+		"src/External/ClassesInterface.php",
+		"src/External/ComposerClasses.php",
+		"src/External/CoverageReportInterface.php",
+		"src/External/EnvironmentInterface.php",
+		"src/External/FilesystemInterface.php",
+		"src/External/LinesInterface.php",
+		"src/External/OutputInterface.php",
+		"src/External/PhpCoverageReport.php",
+		"src/External/PhpEnvironment.php",
+		"src/External/PhpFilesystem.php",
+		"src/External/PhpLines.php",
+		"src/External/ProcessesInterface.php",
+		"src/External/ShellProcesses.php",
+		"src/External/StreamOutput.php",
+		"src/Failure.php"
+	],
+	"mutators": {
+		"@default": true,
+		"@identical": true
+	},
+	"min-coverage": 100,
+	"threads": "max"
+}

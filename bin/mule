@@ -1,0 +1,58 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+namespace Kristos80\Mule;
+
+use Composer\Autoload\ClassLoader;
+use Kristos80\Mule\Console\Application;
+use Kristos80\Mule\Console\Composition;
+use Kristos80\Mule\Console\Summary;
+use Kristos80\Mule\External\ComposerClasses;
+use Kristos80\Mule\External\PhpCoverageReport;
+use Kristos80\Mule\External\PhpEnvironment;
+use Kristos80\Mule\External\PhpFilesystem;
+use Kristos80\Mule\External\PhpLines;
+use Kristos80\Mule\External\ShellProcesses;
+use Kristos80\Mule\External\StreamOutput;
+
+/**
+ * **The only file that names a concrete port.** Everything above it takes
+ * interfaces, which is why the pipeline can be exercised end to end against a
+ * fixture project without a process, a driver or a real filesystem — and why
+ * there is nothing in this file worth testing.
+ *
+ * **The autoloader is kept, not just required.** It is how mule places a covering
+ * test's class on disk, and a test it cannot place is a test whose edits would
+ * silently stop invalidating anything (`Runner\Coverage::fileOf()`). Installed as
+ * a dependency it is `vendor/autoload.php` three levels up; run from a checkout
+ * of mule itself it is the local one.
+ */
+$loader = NULL;
+
+foreach([__DIR__ . "/../../../autoload.php", __DIR__ . "/../vendor/autoload.php"] as $candidate) {
+	if(file_exists($candidate)) {
+		$loader = require $candidate;
+
+		break;
+	}
+}
+
+if(!$loader instanceof ClassLoader) {
+	fwrite(STDERR, "mule cannot find Composer's autoloader. Run composer install.\n");
+
+	exit(2);
+}
+
+exit(new Application(
+	new Composition(
+		new PhpFilesystem(),
+		new ShellProcesses(),
+		new ComposerClasses($loader),
+		new PhpCoverageReport(),
+		new PhpLines(),
+		new PhpEnvironment(),
+	),
+	new Summary(),
+	new StreamOutput(STDOUT),
+)(array_slice($argv, 1)));

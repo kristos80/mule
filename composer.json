@@ -9,6 +9,9 @@
         "cache",
         "ci"
     ],
+    "bin": [
+        "bin/mule"
+    ],
     "require": {
         "php": "^8.4",
         "composer-runtime-api": "^2.0",

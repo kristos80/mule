@@ -44,19 +44,34 @@ final readonly class Gate {
 	 * exactly the ones keyed: a file with no key was not re-proven, and a key with
 	 * no file is a caller bug rather than a verdict.
 	 *
+	 * **A file the suite does not reach arrives here already decided.** The engine
+	 * files `uncovered` mutants for most of them, which would make the file
+	 * unproven anyway — but an uncovered line whose statements are unmutable
+	 * produces no mutant at all, so a file can reach MSI 100 % with part of it
+	 * never run (`Coverage\Soundness`). Those skip G1, because the reason they are
+	 * unproven is already known and a zero-mutant message would name the wrong
+	 * cause.
+	 *
 	 * @param Outcome $outcome
 	 * @param array<string, non-empty-string> $keys The files re-proven, and what each one keys to now.
 	 * @param non-empty-string $toolchain
 	 * @param array<string, list<string>> $tests What each test file was seen to run.
+	 * @param list<string> $uncovered Files the report does not cover to the floor.
 	 * @return Snapshot
 	 */
-	public function proven(Outcome $outcome, array $keys, string $toolchain, array $tests): Snapshot {
+	public function proven(
+		Outcome $outcome,
+		array $keys,
+		string $toolchain,
+		array $tests,
+		array $uncovered = [],
+	): Snapshot {
 		$this->assertNothingUnverified($outcome);
 
 		$verdicts = [];
-		$unproven = [];
+		$unproven = array_values(array_intersect($uncovered, array_keys($keys)));
 
-		foreach($keys as $path => $key) {
+		foreach(array_diff_key($keys, array_flip($unproven)) as $path => $key) {
 			$this->assertExamined($outcome, $path);
 
 			if($outcome->mutants($path) === $outcome->count($path, "killed")) {

@@ -134,7 +134,20 @@ final class StoreTest extends TestCase {
 	public function testTheStoreIsReplacedRatherThanEdited(): void {
 		$this->store()->bank($this->snapshot(["src/A.php" => 4]));
 
-		self::assertSame([self::PATH], array_keys($this->filesystem->files));
+		self::assertSame(["/p/.mule/.gitignore", self::PATH], array_keys($this->filesystem->files));
+	}
+
+	/**
+	 * The lock and the half-written scratch file are mule's, transient and not to
+	 * be committed — and a consumer who finds them staged is a consumer who
+	 * ignores `.mule` wholesale, after which the store stops travelling.
+	 *
+	 * @return void
+	 */
+	public function testTheStoreIgnoresItsOwnTransientNeighbours(): void {
+		$this->store()->bank($this->snapshot(["src/A.php" => 4]));
+
+		self::assertSame("*.lock\n*.writing\n", $this->filesystem->read("/p/.mule/.gitignore"));
 	}
 
 	public function testBankingCreatesTheDirectoryWhenItIsNotThere(): void {

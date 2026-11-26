@@ -44,6 +44,20 @@ interface FilesystemInterface {
 	public function exists(string $path): bool;
 
 	/**
+	 * Takes a file away, and is content if it was not there.
+	 *
+	 * **What this exists for is a log a crashed run left behind.** The engine's
+	 * verdicts go to a path that is digested into the cache key and therefore
+	 * cannot be made unique per run, so the file from last time has to be gone
+	 * before the engine starts — otherwise a run whose engine died on startup
+	 * reads yesterday's verdicts and banks them against today's keys.
+	 *
+	 * @param string $path
+	 * @return void
+	 */
+	public function remove(string $path): void;
+
+	/**
 	 * @param string $path
 	 * @return bool
 	 */
@@ -59,6 +73,18 @@ interface FilesystemInterface {
 	 * @return void
 	 */
 	public function createDirectory(string $path): void;
+
+	/**
+	 * Every file under a directory, recursively, in a stable order.
+	 *
+	 * **G9 enumerates the tree, not the store.** A store-driven loop can only
+	 * rediscover what it already knows, which is how a file silently stops being
+	 * gated — so something has to be able to list a directory.
+	 *
+	 * @param string $directory
+	 * @return list<string>
+	 */
+	public function entriesUnder(string $directory): array;
 
 	/**
 	 * Moves a file over whatever is at the destination.

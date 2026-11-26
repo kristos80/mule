@@ -22,7 +22,7 @@
 
 		<!--
 			The external layer: one primitive per method, no decision to assert.
-			infection.json5 excludes the same two files, so the two lists stay
+			infection.json5 excludes the same files, so the two lists stay
 			visibly in step — one of them drifting is how a file stops being
 			gated without anybody choosing that.
 
@@ -30,9 +30,13 @@
 			against a real temporary directory.
 		-->
 		<exclude>
-			<file>src/External/PhpFilesystem.php</file>
-			<file>src/External/PhpCoverageReport.php</file>
 			<file>src/External/ComposerClasses.php</file>
+			<file>src/External/PhpCoverageReport.php</file>
+			<file>src/External/PhpEnvironment.php</file>
+			<file>src/External/PhpFilesystem.php</file>
+			<file>src/External/PhpLines.php</file>
+			<file>src/External/ShellProcesses.php</file>
+			<file>src/External/StreamOutput.php</file>
 		</exclude>
 	</source>
 </phpunit>

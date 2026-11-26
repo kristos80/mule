@@ -51,8 +51,37 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	}
 
 	#[Override]
+	public function remove(string $path): void {
+		unset($this->files[$path]);
+	}
+
+	#[Override]
 	public function isDirectory(string $path): bool {
 		return in_array($path, $this->directories, TRUE);
+	}
+
+	/**
+	 * **Prefix matching, because that is what a recursive walk amounts to.** A
+	 * test that wants a tree writes the files; nothing has to declare the
+	 * directories above them.
+	 *
+	 * @param string $directory
+	 * @return list<string>
+	 */
+	#[Override]
+	public function entriesUnder(string $directory): array {
+		$prefix = rtrim($directory, "/") . "/";
+		$entries = [];
+
+		foreach(array_keys($this->files) as $path) {
+			if(str_starts_with($path, $prefix)) {
+				$entries[] = $path;
+			}
+		}
+
+		sort($entries);
+
+		return $entries;
 	}
 
 	#[Override]
