@@ -144,6 +144,31 @@ final class CaptureTest extends TestCase {
 		self::assertSame([], $derived->testResults);
 	}
 
+	/**
+	 * The class is what the timings are keyed by (G4), so this has to agree with
+	 * `JUnitTestExecutionInfoAdder`: split on the first `:`, not on `::`.
+	 *
+	 * @return void
+	 */
+	public function testNamesTheTestClassesItAttributesCoverageTo(): void {
+		$coverage = new ProcessedCodeCoverageData();
+		$coverage->setTestIds([
+			"Demo\\AaaTest::testOne",
+			"Demo\\BbbTest::testTwo",
+			// a second method of a class already seen, which must not repeat
+			"Demo\\AaaTest::testThree",
+			// a provider case, whose dataset name may itself contain a colon
+			"Demo\\CccTest::testFour#a: dataset",
+			// and an id with no colon at all
+			"Demo\\DddTest",
+		]);
+
+		self::assertSame(
+			["Demo\\AaaTest", "Demo\\BbbTest", "Demo\\CccTest", "Demo\\DddTest"],
+			Capture::of($this->payload(["codeCoverage" => $coverage]))->testClasses(),
+		);
+	}
+
 	public function testPayloadRoundTripsBackIntoACapture(): void {
 		$payload = Capture::of($this->payload())->payload();
 

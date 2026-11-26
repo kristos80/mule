@@ -112,6 +112,33 @@ final readonly class Capture {
 	}
 
 	/**
+	 * The test classes this capture attributes coverage to.
+	 *
+	 * **Split the way Infection splits it**, which is on the first `:` rather
+	 * than on `::` — `JUnitTestExecutionInfoAdder::createCompleteTestLocation()`
+	 * does `explode(":", $method, 2)[0]`, and the timings this is checked against
+	 * have to be keyed by whatever *that* produces. Deriving the class any other
+	 * way would pass G4 and still leave Infection unable to find the class it
+	 * looked for.
+	 *
+	 * Infection's limit of 2 is not copied, because only `[0]` is ever read and
+	 * the limit cannot change it — `explode(":", "A::b", 2)[0]` and
+	 * `explode(":", "A::b", 3)[0]` are both `"A"`. The gate made that argument
+	 * first, by surviving the change.
+	 *
+	 * @return list<non-empty-string>
+	 */
+	public function testClasses(): array {
+		/** @var list<non-empty-string> $classes */
+		$classes = array_values(array_unique(array_map(
+			static fn(string $id): string => explode(":", $id)[0],
+			$this->testIds(),
+		)));
+
+		return $classes;
+	}
+
+	/**
 	 * One required key's value.
 	 *
 	 * @param array<array-key, mixed> $payload
