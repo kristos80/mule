@@ -71,6 +71,22 @@ jobs:
       - name: Integration suite
         run: composer test:integration
 
+      # **The differential, and it is the point of the whole design.** mule's
+      # pipeline is driven end to end over a fixture project, and compared
+      # against what Infection produces from PHPUnit's own report — at mutant
+      # identity, not at MSI.
+      #
+      # Aggregates cannot see the failure this exists for: when merging shard
+      # JUnits silently skipped 40 of 1,174 mutants on a real project, both runs
+      # still reported exactly 1,174 and MSI moved 95.32 -> 95.15. One of its
+      # four cases puts that defect back and asserts the comparison goes red, so
+      # a green differential means something.
+      #
+      # Not `composer test:differential`: that wraps the local coverage driver,
+      # and here pcov is already on from the setup step.
+      - name: Differential
+        run: ./vendor/bin/phpunit --configuration=phpunit.differential.xml
+
       # **Plain Infection, not mule on itself.** mule used to gate itself —
       # `new` on a pull request, `full` on master — and that is deliberately
       # not what happens here any more.

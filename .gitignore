@@ -16,3 +16,6 @@
 /.cov/
 /.infection/
 /.mule/infection.json
+
+# Rendered per run by the differential, the way mule renders one in earnest.
+/tests/Fixture/project/infection.json5

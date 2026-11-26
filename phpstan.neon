@@ -8,6 +8,13 @@ parameters:
 		- src
 		- tests
 
+	# The fixture is a project the differential runs mule against, not mule's
+	# own code. It is deliberately under-tested — that is what gives the
+	# differential an escaped mutant to compare — so analysing it would report
+	# on decisions made for the fixture's sake.
+	excludePaths:
+		- tests/Fixture/project
+
 	# The blueprint's limits. A method that needs more than this is a method
 	# that is making more than one decision.
 	cognitive_complexity:

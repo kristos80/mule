@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	The differential: mule's whole pipeline against Infection's own output, over
+	one project state, compared at mutant identity.
+
+	Its own configuration because it needs a coverage driver and starts child
+	processes, and because it produces no coverage of mule itself — it is a test
+	of the assembled system rather than of a class.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+		 bootstrap="vendor/autoload.php"
+		 cacheDirectory=".phpunit.cache"
+		 colors="true"
+		 failOnRisky="true"
+		 failOnWarning="true"
+		 failOnNotice="true"
+		 failOnDeprecation="true">
+	<testsuites>
+		<testsuite name="differential">
+			<directory>tests/Differential</directory>
+		</testsuite>
+	</testsuites>
+</phpunit>
