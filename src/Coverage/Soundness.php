@@ -78,7 +78,7 @@ final readonly class Soundness {
 	 * @return void
 	 */
 	private function assertLinesValid(string $path, array $lines, array $executable): void {
-		$invalid = array_values(array_diff(array_keys($lines), $executable));
+		$invalid = array_diff(array_keys($lines), $executable);
 
 		if($invalid === []) {
 			return;

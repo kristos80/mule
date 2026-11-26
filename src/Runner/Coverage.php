@@ -81,17 +81,16 @@ final readonly class Coverage {
 	/**
 	 * The dirty test files re-measured, everything else taken off disk.
 	 *
-	 * @param list<string> $dirty Project-relative test files whose coverage can no longer be trusted.
-	 * @param list<string> $known Every test file the store has a record of.
-	 * @param array<string, list<string>> $recorded What the store says each one runs.
+	 * @param array<string, list<string>> $recorded What the store says each test file runs.
+	 * @param array<string, non-empty-string> $digests Every file on disk mule cares about, and its digest.
 	 * @return Measured
 	 */
-	public function refresh(array $dirty, array $known, array $recorded): Measured {
+	public function refresh(array $recorded, array $digests): Measured {
 		$this->shards->prepare();
 
 		$tests = $recorded;
 
-		foreach($dirty as $test) {
+		foreach($this->dirty($recorded, $digests) as $test) {
 			$capture = $this->capture($test);
 			$classes = $capture->testClasses();
 
@@ -109,7 +108,35 @@ final readonly class Coverage {
 			$tests[$test] = $touches;
 		}
 
-		return new Measured($this->merged($known), $this->shards->readTimings(), $tests);
+		return new Measured($this->merged(array_keys($recorded)), $this->shards->readTimings(), $tests);
+	}
+
+	/**
+	 * The test files the cache cannot vouch for: no shard at all, or a shard whose
+	 * recorded digests have moved.
+	 *
+	 * **Asked of the shard rather than of the outstanding list, because the shard
+	 * knows what it was measured against.** A test file is dirty when its own bytes
+	 * moved or when anything it ran did, and a shard records exactly those digests
+	 * — so one comparison covers both, including the case the outstanding list
+	 * cannot reach: a test that covered nothing, edited to cover something. Nothing
+	 * it touched is stale, because it touched nothing, and the file it now covers
+	 * would stay looking unreached on every run from here on.
+	 *
+	 * @param array<string, list<string>> $recorded
+	 * @param array<string, non-empty-string> $digests
+	 * @return list<string>
+	 */
+	private function dirty(array $recorded, array $digests): array {
+		$dirty = [];
+
+		foreach(array_keys($recorded) as $test) {
+			if(!$this->shards->has($test) || !$this->shards->read($test)->matches($digests)) {
+				$dirty[] = $test;
+			}
+		}
+
+		return $dirty;
 	}
 
 	/**
@@ -130,7 +157,7 @@ final readonly class Coverage {
 			);
 		}
 
-		return Capture::of(require $payload);
+		return Capture::of($this->filesystem->payload($payload));
 	}
 
 	/**
@@ -175,6 +202,12 @@ final readonly class Coverage {
 	/**
 	 * What a shard covered, in the store's spelling rather than the capture's.
 	 *
+	 * **An excluded file is left out, and that has a consequence worth stating.**
+	 * Its digest is then tracked nowhere, so editing it invalidates nothing — which
+	 * is the price of `exclude` meaning "not mule's to answer for". A file whose
+	 * bytes can change a verdict belongs in `support` instead, where a change
+	 * invalidates the store outright.
+	 *
 	 * @param Capture $shard
 	 * @return list<string>
 	 */
@@ -182,17 +215,25 @@ final readonly class Coverage {
 		$touched = [];
 
 		foreach($shard->coverage->lineCoverage() as $file => $lines) {
+			$path = "{$this->configuration->source}/{$file}";
+
+			if($this->configuration->excludes($path)) {
+				continue;
+			}
+
 			foreach($lines as $tests) {
 				if(is_array($tests) && $tests !== []) {
-					$touched[] = "{$this->configuration->source}/{$file}";
+					$touched[] = $path;
 
 					break;
 				}
 			}
 		}
 
-		sort($touched);
-
+		// **Not sorted here.** `setLineCoverage()` sorts its own keys (M19), so a
+		// shard's files arrive in order and a `sort` on top of them was an
+		// operation with no result behind it. The order still matters — it reaches
+		// the store — and `Coverage\SplitTest` is where it is held down.
 		return $touched;
 	}
 

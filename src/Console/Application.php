@@ -60,7 +60,10 @@ final readonly class Application {
 			return 0;
 		}
 
-		$unknown = array_values(array_diff($arguments, ["--whole"]));
+		// Not reindexed: the keys reach neither the check nor the message, and the
+		// gate proved an `array_values` here to be an operation with no result
+		// behind it.
+		$unknown = array_diff($arguments, ["--whole"]);
 
 		if($unknown !== []) {
 			return $this->failed("mule does not know " . implode(" ", $unknown) . ". Try --help.");

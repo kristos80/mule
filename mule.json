@@ -5,6 +5,7 @@
 		"tests/Support"
 	],
 	"exclude": [
+		"src/Console/Assembly.php",
 		"src/External/ClassesInterface.php",
 		"src/External/ComposerClasses.php",
 		"src/External/CoverageReportInterface.php",
@@ -19,7 +20,8 @@
 		"src/External/ProcessesInterface.php",
 		"src/External/ShellProcesses.php",
 		"src/External/StreamOutput.php",
-		"src/Failure.php"
+		"src/Failure.php",
+		"src/Runner/Measured.php"
 	],
 	"mutators": {
 		"@default": true,

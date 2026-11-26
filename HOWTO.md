@@ -301,7 +301,19 @@ store sitting beside it at `.mule/verified.json` is committed on purpose. One
 
 mule places Infection's `tmpDir` and its coverage output inside that cache
 rather than at your project root, because it renders the engine's configuration
-itself and so gets to choose.
+itself and so gets to choose. It also writes `.mule/.gitignore` carrying
+`*.lock` and `*.writing`, so the lock it takes while banking and the file it
+writes beside the store before moving it over never turn up staged.
+
+**One file does land at your project root**, and it has to:
+`mule.infection.json`, the configuration mule hands the engine. Infection
+resolves every path in a configuration relative to *that file's own directory*,
+so a declaration one level down would have to name `../src`. It is regenerated
+every run and derived entirely from `mule.json`, so ignore it:
+
+```
+/mule.infection.json
+```
 
 **One thing is yours:** `cacheDirectory` in your `phpunit.xml` — commonly
 `.phpunit.cache`. Ignore it, but for hygiene rather than for correctness:
@@ -324,10 +336,37 @@ it if it is tracked. mule will not move it for you.
 }
 ```
 
-Add `"narrow": true` only after reading §4.
+`"narrow": true` is **rejected with an error** rather than ignored, and so is
+`"signature": "code"`. Neither is built (§4), and refusing them is how nobody comes
+to depend on a mode that does not exist.
 
-`exclude` names files that are neither mutated nor required to have coverage — thin
-I/O wrappers you test another way. Keep the same list in your PHPUnit
+`exclude` names files that are neither mutated nor required to have coverage —
+thin I/O wrappers you test another way, interfaces, and value objects with no
+mutable statement in them. Keep the same list in your PHPUnit
 `<source><exclude>` so the two cannot drift. No PHPUnit key and no Infection key
-appears here: mule renders both configurations itself, which is what lets it put
-them in the cache key.
+appears here: mule renders the engine's configuration itself, which is what lets
+it put it in the cache key.
+
+**`exclude` and `support` are not interchangeable, and the difference bites.** An
+excluded file is one mule is not answerable for, so its digest is tracked nowhere:
+it is in no key, in no test's footprint, and **editing it invalidates nothing**. A
+`support` file's bytes go into the toolchain digest instead, so editing one
+invalidates the whole store at once.
+
+So the question to ask about a file you do not want mutated is *can its bytes
+change another file's verdict?*
+
+- **No** — an interface, an enum of constants, a value object. `exclude` it.
+- **Yes** — a thin wrapper your tests go through, a trait, a base class.
+  `exclude` it from mutation **and** keep it somewhere `support` names, or accept
+  that mule will not notice when it changes.
+
+A test double or a fixture is the easy case: it is not under `source` at all, so
+`support` is the only place for it.
+
+**A file mule asks about and the engine files no mutants against fails the run
+(G1)**, with a message naming `exclude`. That is not pedantry: a file whose
+coverage has gone stale produces no mutants either, disappears from the report,
+and a run without this guard exits 0 having proven nothing about it. The first
+`mule` on a real project usually ends with two or three interfaces to name here,
+and after that it stays quiet.

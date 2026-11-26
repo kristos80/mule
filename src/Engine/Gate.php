@@ -69,7 +69,7 @@ final readonly class Gate {
 		$this->assertNothingUnverified($outcome);
 
 		$verdicts = [];
-		$unproven = array_values(array_intersect($uncovered, array_keys($keys)));
+		$unproven = $this->decided($uncovered, $keys);
 
 		foreach(array_diff_key($keys, array_flip($unproven)) as $path => $key) {
 			$this->assertExamined($outcome, $path);
@@ -84,6 +84,30 @@ final readonly class Gate {
 		}
 
 		return new Snapshot($verdicts, $unproven, $tests, $toolchain);
+	}
+
+	/**
+	 * The files that arrive already decided: the ones the suite does not reach,
+	 * less any this run was not asked about.
+	 *
+	 * **Only the files keyed.** A caller may know about a gap in a file this run
+	 * never examined, and recording that as a finding of *this* run would put a
+	 * verdict's worth of weight on something nobody measured.
+	 *
+	 * @param list<string> $uncovered
+	 * @param array<string, non-empty-string> $keys
+	 * @return list<string>
+	 */
+	private function decided(array $uncovered, array $keys): array {
+		$decided = [];
+
+		foreach($uncovered as $path) {
+			if(isset($keys[$path])) {
+				$decided[] = $path;
+			}
+		}
+
+		return $decided;
 	}
 
 	/**

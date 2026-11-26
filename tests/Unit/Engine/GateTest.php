@@ -175,4 +175,60 @@ final class GateTest extends TestCase {
 		self::assertSame("chain", $snapshot->toolchain);
 		self::assertSame(["tests/ATest.php" => ["src/A.php"]], $snapshot->tests);
 	}
+
+	/**
+	 * **A file the suite does not reach arrives already decided.** The engine files
+	 * `uncovered` mutants for most of them, which would make the file unproven
+	 * anyway — but an uncovered line whose statements are unmutable produces no
+	 * mutant at all, so a file can reach MSI 100 % with part of it never run.
+	 *
+	 * It skips G1 too, because the reason it is unproven is already known and a
+	 * zero-mutant message would name the wrong cause.
+	 *
+	 * @return void
+	 */
+	public function testAFileTheSuiteDoesNotReachIsNotBanked(): void {
+		$snapshot = new Gate()->proven(
+			$this->outcome(),
+			["src/A.php" => "key-a", "src/Bare.php" => "key-b"],
+			"chain",
+			[],
+			["src/Bare.php"],
+		);
+
+		self::assertSame(["src/A.php"], array_keys($snapshot->verdicts));
+		self::assertSame(["src/Bare.php"], $snapshot->unproven);
+	}
+
+	/**
+	 * **Only the files this run was asked about.** A caller may know of a gap in a
+	 * file this run never examined, and recording that as a finding of *this* run
+	 * would put a verdict's worth of weight on something nobody measured.
+	 *
+	 * @return void
+	 */
+	public function testAGapInAFileThisRunDidNotExamineIsNotItsFinding(): void {
+		$snapshot = new Gate()->proven(
+			$this->outcome(),
+			["src/A.php" => "key-a"],
+			"chain",
+			[],
+			["src/Elsewhere.php"],
+		);
+
+		self::assertSame(["src/A.php"], array_keys($snapshot->verdicts));
+		self::assertSame([], $snapshot->unproven);
+	}
+
+	public function testEveryFileTheSuiteDoesNotReachIsNamed(): void {
+		$snapshot = new Gate()->proven(
+			$this->outcome(),
+			["src/A.php" => "key-a", "src/Bare.php" => "key-b", "src/Barer.php" => "key-c"],
+			"chain",
+			[],
+			["src/Bare.php", "src/Barer.php"],
+		);
+
+		self::assertSame(["src/Bare.php", "src/Barer.php"], $snapshot->unproven);
+	}
 }

@@ -96,7 +96,6 @@ final readonly class Composition {
 
 		return new Assembly(
 			new Run(
-				$configuration,
 				$universe,
 				new Coverage(
 					$this->filesystem,
@@ -161,8 +160,11 @@ final readonly class Composition {
 		return Toolchain::of(
 			$this->digest($project, "composer.lock", "the pinned toolchain mule digests"),
 			$this->digest($project, $this->phpunit($project), "what PHPUnit instruments"),
-			Toolchain::digest(["declaration" => $declaration->rendered()]),
-			array_keys($configuration->mutators),
+			// Handed over whole rather than pre-digested: `Toolchain::of()` hashes
+			// the structure it is given, so hashing this one first was a digest of a
+			// digest — and the gate proved the inner one made no difference.
+			$declaration->rendered(),
+			$configuration->mutators,
 			$support,
 			$this->environment->php(),
 			$this->environment->driver(),

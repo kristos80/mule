@@ -34,10 +34,11 @@ final readonly class Standing {
 	/**
 	 * @param Snapshot $stored
 	 * @param array<string, non-empty-string> $digests Every file on disk mule cares about, and its digest.
+	 * @param list<string> $gated The source files mule is answerable for.
 	 * @param non-empty-string $toolchain
 	 * @return self
 	 */
-	public static function of(Snapshot $stored, array $digests, string $toolchain): self {
+	public static function of(Snapshot $stored, array $digests, array $gated, string $toolchain): self {
 		if(!$stored->describes($toolchain)) {
 			return new self(
 				FALSE,
@@ -57,7 +58,11 @@ final readonly class Standing {
 			);
 		}
 
-		return new self(TRUE, self::outstanding($stored, $digests, $toolchain), "the store describes this tree");
+		return new self(
+			TRUE,
+			self::outstanding($stored, $digests, $gated, $toolchain),
+			"the store describes this tree",
+		);
 	}
 
 	/**
@@ -89,28 +94,110 @@ final readonly class Standing {
 	 * everything those tests execute — and the store holds the shape of that,
 	 * not a digest of it. Recomputing is how a change two files away is noticed.
 	 *
+	 * **A gated file the store classifies neither way is outstanding too**, and
+	 * that case is reachable rather than theoretical: a file edited while the
+	 * engine ran is deliberately left out of the store, because its verdict would
+	 * belong to neither version of it. Without this it would be mentioned by the
+	 * store — as something a test touches — and so not read as having appeared,
+	 * while having no verdict to go stale either. Silently ungated, which is the
+	 * failure that looks exactly like success (G9).
+	 *
+	 * **The question is asked about what is gated now, not about what the store
+	 * holds.** A verdict survives the file being deleted or named in `exclude`,
+	 * because merging a run's findings never removes what it said nothing about —
+	 * so without this a deleted file would be reported outstanding on every run
+	 * from now on, and every one of those runs would take a coverage pass to
+	 * discover it has nothing to prove.
+	 *
 	 * @param Snapshot $stored
 	 * @param array<string, non-empty-string> $digests
+	 * @param list<string> $gated
 	 * @param non-empty-string $toolchain
 	 * @return list<string>
 	 */
-	private static function outstanding(Snapshot $stored, array $digests, string $toolchain): array {
-		$outstanding = $stored->unproven;
-
-		foreach($stored->verdicts as $path => $verdict) {
-			if(!$verdict->holds(self::keyOf($stored, $path, $digests, $toolchain))) {
-				$outstanding[] = $path;
-			}
-		}
+	private static function outstanding(
+		Snapshot $stored,
+		array $digests,
+		array $gated,
+		string $toolchain,
+	): array {
+		$wanted = array_flip($gated);
 
 		// **No de-duplication**, and that is an invariant rather than an
 		// oversight: `Snapshot::with()` takes anything newly proven out of the
 		// unproven list and anything newly unproven out of the verdicts, so the
-		// two are disjoint and nothing can be in this list twice. The gate found
-		// the `array_unique` here by removing it with no effect.
+		// first two are disjoint — and the third adds only paths that are in
+		// neither. Nothing can be in this list twice. The gate found the
+		// `array_unique` here by removing it with no effect.
+		$outstanding = [
+			...self::stillUnproven($stored, $wanted),
+			...self::moved($stored, $digests, $wanted, $toolchain),
+			...self::unclassified($stored, $gated),
+		];
+
 		sort($outstanding);
 
 		return $outstanding;
+	}
+
+	/**
+	 * What an earlier run examined and could not prove, and is still mule's to
+	 * answer for.
+	 *
+	 * @param Snapshot $stored
+	 * @param array<string, int> $wanted
+	 * @return list<string>
+	 */
+	private static function stillUnproven(Snapshot $stored, array $wanted): array {
+		$unproven = [];
+
+		foreach($stored->unproven as $path) {
+			if(isset($wanted[$path])) {
+				$unproven[] = $path;
+			}
+		}
+
+		return $unproven;
+	}
+
+	/**
+	 * The proven files whose key is no longer what it was.
+	 *
+	 * @param Snapshot $stored
+	 * @param array<string, non-empty-string> $digests
+	 * @param array<string, int> $wanted
+	 * @param non-empty-string $toolchain
+	 * @return list<string>
+	 */
+	private static function moved(Snapshot $stored, array $digests, array $wanted, string $toolchain): array {
+		$moved = [];
+
+		foreach($stored->verdicts as $path => $verdict) {
+			if(isset($wanted[$path]) && !$verdict->holds(self::keyOf($stored, $path, $digests, $toolchain))) {
+				$moved[] = $path;
+			}
+		}
+
+		return $moved;
+	}
+
+	/**
+	 * The gated files the store puts in neither state.
+	 *
+	 * @param Snapshot $stored
+	 * @param list<string> $gated
+	 * @return list<string>
+	 */
+	private static function unclassified(Snapshot $stored, array $gated): array {
+		$unclassified = [];
+
+		foreach($gated as $path) {
+			if(!isset($stored->verdicts[$path]) && !in_array($path, $stored->unproven, TRUE)) {
+				$unclassified[] = $path;
+			}
+		}
+
+		return $unclassified;
 	}
 
 	/**

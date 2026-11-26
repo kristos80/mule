@@ -41,7 +41,7 @@ final readonly class Toolchain {
 	 * @param string $lock The digest of `composer.lock`: the engine and the runner, pinned.
 	 * @param string $phpunit The digest of the project's PHPUnit configuration — it decides what is instrumented.
 	 * @param string $infection The digest of the configuration mule rendered for the engine.
-	 * @param list<string> $mutators The resolved mutator set, which decides which mutants exist at all.
+	 * @param array<string, bool> $mutators The resolved mutator set, which decides which mutants exist at all.
 	 * @param string $support One digest over every file in `mule.json`'s `support` directories.
 	 * @param string $php `PHP_VERSION`.
 	 * @param string $driver The coverage driver and its version.
@@ -58,8 +58,12 @@ final readonly class Toolchain {
 		string $driver,
 		string $mule,
 	): string {
+		// **Keys *and* values**, because `{"@default": false}` is not the gate
+		// `{"@default": true}` is — a set digested by its names alone would call a
+		// disabled mutator the same arrangement as an enabled one. The gate found
+		// that by unwrapping an `array_keys` here and nothing noticing.
 		$sorted = $mutators;
-		sort($sorted);
+		ksort($sorted);
 
 		return self::digest([
 			"lock" => $lock,

@@ -44,6 +44,21 @@ interface FilesystemInterface {
 	public function exists(string $path): bool;
 
 	/**
+	 * Whatever a PHP file returns when it is included.
+	 *
+	 * **Behind the port because `require` is a filesystem read**, and the one
+	 * thing mule ever includes is `--coverage-php`'s output, which is a PHP file
+	 * returning an array. Leaving the `require` inline would make the whole
+	 * coverage pipeline untestable without a disk: a test would have to write a
+	 * real file for the include to find, which is the arrangement the unit suite
+	 * exists not to need.
+	 *
+	 * @param string $path
+	 * @return mixed
+	 */
+	public function payload(string $path): mixed;
+
+	/**
 	 * Takes a file away, and is content if it was not there.
 	 *
 	 * **What this exists for is a log a crashed run left behind.** The engine's

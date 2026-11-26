@@ -1,97 +1,136 @@
 {
-    "toolchain": "aaf6dd4200c4caabe893d2d9d9ac5e2b052f0949925600f0be98e59d46f05a36",
+    "toolchain": "9e363adac7c0c683050c39f139cfc71922ec7caac6406a6063522f90f4523f67",
     "verdicts": {
         "src/Cache/Key.php": {
-            "key": "a1b37d77a0848af46023e091d01ea9e8c62ecf4a04cf6953c5e62beaf961afaf",
+            "key": "5076a7c30202cdc9e5cc1135f16c01216af9e5fbaa46658a200abaf1c0a9d787",
             "mutants": 5
         },
         "src/Cache/Snapshot.php": {
-            "key": "3cf78f174502934fd2fbcf704760729784bc3418d49717b7d09c48e92896eb2f",
-            "mutants": 63
+            "key": "c5fe36c6320ff6bc8518a8481d2815151817d887e5abe183407104f259247308",
+            "mutants": 58
         },
         "src/Cache/Standing.php": {
-            "key": "7625d5e8467b3d2b1533ff30e5bf57ed2544164ccd568b5c18d298a4d4175632",
-            "mutants": 28
+            "key": "33455a78fb70530c1a2582be50a7e8414ba63843915c0362f3b81db19e84eab5",
+            "mutants": 49
         },
         "src/Cache/Store.php": {
-            "key": "179e1a96fd7ae0839dc36d5e9f505d8dce7fbc2c39e37d77ee05326c8be6ad26",
-            "mutants": 8
+            "key": "a5200076b1a039cdccfc01079afc7f429b9b9f148185e45e4c20becaabec03e9",
+            "mutants": 9
         },
         "src/Cache/StoreFormat.php": {
-            "key": "97d4beb9ea8792718c5b7c3180bde6d0d733703cec433d17e038c903025d8be0",
+            "key": "d707e8b84d73274ac1e089eca55375752ce125e84980da43caeff287356b24cc",
             "mutants": 92
         },
         "src/Cache/Toolchain.php": {
-            "key": "3da106daf884973e98719e2df32722d9e6e30b3740c532d55cb8fda6ff3ec537",
+            "key": "ec6d65d36e49329cfb3c2719dd8a0768e7cf02f7e2d3a5a3d74f8ba6b0411e54",
             "mutants": 4
         },
         "src/Cache/Verdict.php": {
-            "key": "ac41ee0929b28ec6e45b1cd764f0a0502b5f785684a921f6c1302a0c19473adb",
+            "key": "038831b5e76140f4cafd08270d21aae32a319f3e10c5bd8cdf71ee1360b53ba7",
             "mutants": 2
         },
+        "src/Config/Configuration.php": {
+            "key": "1868462c80de4203528058f4c86df9cf86092d0e7c10ec9fc61c3270b89683aa",
+            "mutants": 109
+        },
+        "src/Console/Application.php": {
+            "key": "b84187bdb095403a450cff1446a5c7ee414585f1f4e04476bb59f1b60f88a2cd",
+            "mutants": 30
+        },
+        "src/Console/Composition.php": {
+            "key": "85a9e41ede40306c24dfb44b5abef18fbb434c897a8ead9b50655f3c0142ef39",
+            "mutants": 27
+        },
+        "src/Console/Summary.php": {
+            "key": "197de42acf439161f8ce0023fdfd31eda45e4834a0db45f0f8cca3000a500013",
+            "mutants": 68
+        },
         "src/Coverage/Attribution.php": {
-            "key": "4e3a3daacd88488d1f83ea0b1f48978ff1ced4c15581d50adfb7cc6df9bc820d",
+            "key": "23d8ea6cf287681eb653531e0232f64aac35047f5e4023e1128c13edeba6ad36",
             "mutants": 20
         },
         "src/Coverage/Capture.php": {
-            "key": "0a90d6ddbc1738f6d0f0f0a271754d94b8681d3daa38a5132c16a96626fa3392",
+            "key": "cfe010b2bd5a04a19a286b04c6e2f32dbfd3e89068b96823cbd5d7faf84ffd7d",
             "mutants": 46
         },
         "src/Coverage/Merge.php": {
-            "key": "477e2a99749d91899a047b7d2857378eac8d9c65882043db31aa7bb33a537955",
+            "key": "b472f56374a2d0054b492056b9fc8abbefcf5880a9c29736a3a5814057c2c69f",
             "mutants": 11
         },
         "src/Coverage/Report.php": {
-            "key": "e6ea11dc8d4791c5807cd9289ed0fae8dc265140ff5d2b702e336e30623f81a7",
+            "key": "86aad9356cdb205e3fe9c73f1f4dedd0327060c96eb6e7b31b9fcedd147d7558",
             "mutants": 27
         },
         "src/Coverage/Shard.php": {
-            "key": "0f8bff965e4c4f9bff8562a1b15a163084fc6eb182d82cecfb8a8daa755ed312",
+            "key": "6cd53567e2383ea742fa5611d9e66f77a9e976809e40cf50bf25642ed879a878",
             "mutants": 35
         },
         "src/Coverage/ShardFormat.php": {
-            "key": "a05621b90c12e2be74d2fac12636948e49d1a1f9bca563d45ee0140d50737bd9",
+            "key": "4e15fa011d18ed4da2a146589f1e86556237e32e1b3b1d3d26c1261eb42bc5ce",
             "mutants": 74
         },
+        "src/Coverage/Soundness.php": {
+            "key": "72da2d50b61a5ff0a0be4fe5369b6603763fb46ddd8f954c118d40111d810484",
+            "mutants": 38
+        },
         "src/Coverage/Split.php": {
-            "key": "478f50b2e1c69527289866537ef74a3200a170e02e3ff5873d1559e84b6509be",
+            "key": "8286a08eaf480612b5aab4240d4f8dd2822b4911d879340e794914154293da33",
             "mutants": 21
         },
         "src/Coverage/TestResults.php": {
-            "key": "f3ec132395d0533c0c15912a16b9087cafd95fb993d0dbeb3822ebaa205360b5",
+            "key": "34eb3765cf25053343effeb8096390441019b2eea1466273ffb232f24a17dd1f",
             "mutants": 20
         },
         "src/Coverage/Timings.php": {
-            "key": "058f528d45e8062cac62031d118a36d6cfee0be31ef40a77e1e371152543173a",
+            "key": "aa17883d4fff7b13808db508ab33b42a4653cbb411fb41c0c7d19f0844173ddb",
             "mutants": 43
         },
+        "src/Engine/Declaration.php": {
+            "key": "c043b5741434ec9c45842baa85b781a716acbe7670f5dd0036c77f41001c820b",
+            "mutants": 22
+        },
+        "src/Engine/Gate.php": {
+            "key": "8cf829610b052c9085158496ebc1c4ce5b3f10e06f7e3649b95e8b1992ff3afe",
+            "mutants": 29
+        },
         "src/Engine/Outcome.php": {
-            "key": "f090d6129552b503e0b825595e1af9ac7100a4f57608b3bdd9a54ee746b4f9d8",
+            "key": "a8e902f3f0642b308993585bb37226b400f7e65f34fcc8ca6ecfb568a276e663",
             "mutants": 58
         },
         "src/Project.php": {
-            "key": "6f7f660784e9fcb5cfd7836a1ed5a92729c80b68bc57d9d49eb29dadc4c24718",
+            "key": "4cecad01a3b8d56e78422a4b806070cab4772902236c0087dcb7eeb6812e67c4",
             "mutants": 5
+        },
+        "src/Runner/Commands.php": {
+            "key": "f2080c1509f4155d89131bf6763415b4bf059cfe3554fdfbe2bbb620f270935e",
+            "mutants": 20
+        },
+        "src/Runner/Coverage.php": {
+            "key": "07ba2317db7a7c0205f99f19bef27527583d97a543579238358aefbeab7ff80b",
+            "mutants": 60
+        },
+        "src/Runner/Engine.php": {
+            "key": "f94c7edc49656fe71722a9f1f08636ad06b63f2488f318d17bec16ead40e1b7b",
+            "mutants": 15
+        },
+        "src/Runner/Finding.php": {
+            "key": "a7bd2deb853545c8c7c0e7d2a1a1c6d488c4bdc284dfe3a984b4940136f8e36f",
+            "mutants": 18
+        },
+        "src/Runner/Run.php": {
+            "key": "22019b75e95b78b4c8777c4ef3711beed8cf7552a1bcc09660722b29692d61c9",
+            "mutants": 31
+        },
+        "src/Runner/Shards.php": {
+            "key": "445200a1e647f1dcd6e780245a26f34df974995a287a29a2ae90162e98c95df1",
+            "mutants": 23
+        },
+        "src/Runner/Universe.php": {
+            "key": "492504f9dca07361b6c49f69d752df7b26e2462c2c7520ebc3574e4050a1cbb9",
+            "mutants": 24
         }
     },
-    "unproven": [
-        "src/Config/Configuration.php",
-        "src/Console/Application.php",
-        "src/Console/Assembly.php",
-        "src/Console/Composition.php",
-        "src/Console/Summary.php",
-        "src/Coverage/Soundness.php",
-        "src/Engine/Declaration.php",
-        "src/Engine/Gate.php",
-        "src/Runner/Commands.php",
-        "src/Runner/Coverage.php",
-        "src/Runner/Engine.php",
-        "src/Runner/Finding.php",
-        "src/Runner/Measured.php",
-        "src/Runner/Run.php",
-        "src/Runner/Shards.php",
-        "src/Runner/Universe.php"
-    ],
+    "unproven": [],
     "tests": {
         "tests/Unit/Cache/KeyTest.php": [
             "src/Cache/Key.php",
@@ -125,6 +164,65 @@
         "tests/Unit/Cache/VerdictTest.php": [
             "src/Cache/Verdict.php"
         ],
+        "tests/Unit/Config/ConfigurationTest.php": [
+            "src/Config/Configuration.php"
+        ],
+        "tests/Unit/Console/ApplicationTest.php": [
+            "src/Cache/Key.php",
+            "src/Cache/Snapshot.php",
+            "src/Cache/Standing.php",
+            "src/Cache/Store.php",
+            "src/Cache/StoreFormat.php",
+            "src/Cache/Toolchain.php",
+            "src/Cache/Verdict.php",
+            "src/Config/Configuration.php",
+            "src/Console/Application.php",
+            "src/Console/Composition.php",
+            "src/Console/Summary.php",
+            "src/Coverage/Capture.php",
+            "src/Coverage/Report.php",
+            "src/Coverage/Shard.php",
+            "src/Coverage/Soundness.php",
+            "src/Coverage/Split.php",
+            "src/Coverage/TestResults.php",
+            "src/Coverage/Timings.php",
+            "src/Engine/Declaration.php",
+            "src/Engine/Gate.php",
+            "src/Engine/Outcome.php",
+            "src/Project.php",
+            "src/Runner/Commands.php",
+            "src/Runner/Coverage.php",
+            "src/Runner/Engine.php",
+            "src/Runner/Finding.php",
+            "src/Runner/Run.php",
+            "src/Runner/Shards.php",
+            "src/Runner/Universe.php"
+        ],
+        "tests/Unit/Console/CompositionTest.php": [
+            "src/Cache/Store.php",
+            "src/Cache/Toolchain.php",
+            "src/Config/Configuration.php",
+            "src/Console/Composition.php",
+            "src/Coverage/Report.php",
+            "src/Coverage/Soundness.php",
+            "src/Engine/Declaration.php",
+            "src/Project.php",
+            "src/Runner/Commands.php",
+            "src/Runner/Coverage.php",
+            "src/Runner/Engine.php",
+            "src/Runner/Run.php",
+            "src/Runner/Shards.php",
+            "src/Runner/Universe.php"
+        ],
+        "tests/Unit/Console/SummaryTest.php": [
+            "src/Cache/Key.php",
+            "src/Cache/Snapshot.php",
+            "src/Cache/Standing.php",
+            "src/Cache/Toolchain.php",
+            "src/Cache/Verdict.php",
+            "src/Console/Summary.php",
+            "src/Runner/Finding.php"
+        ],
         "tests/Unit/Coverage/AttributionTest.php": [
             "src/Coverage/Attribution.php",
             "src/Coverage/Capture.php",
@@ -156,6 +254,13 @@
             "src/Coverage/ShardFormat.php",
             "src/Coverage/TestResults.php"
         ],
+        "tests/Unit/Coverage/SoundnessTest.php": [
+            "src/Config/Configuration.php",
+            "src/Coverage/Capture.php",
+            "src/Coverage/Soundness.php",
+            "src/Coverage/TestResults.php",
+            "src/Project.php"
+        ],
         "tests/Unit/Coverage/SplitTest.php": [
             "src/Coverage/Capture.php",
             "src/Coverage/Split.php",
@@ -166,6 +271,10 @@
         ],
         "tests/Unit/Coverage/TimingsTest.php": [
             "src/Coverage/Timings.php"
+        ],
+        "tests/Unit/Engine/DeclarationTest.php": [
+            "src/Config/Configuration.php",
+            "src/Engine/Declaration.php"
         ],
         "tests/Unit/Engine/GateTest.php": [
             "src/Cache/Snapshot.php",
@@ -178,6 +287,80 @@
         ],
         "tests/Unit/ProjectTest.php": [
             "src/Project.php"
+        ],
+        "tests/Unit/Runner/CommandsTest.php": [
+            "src/Config/Configuration.php",
+            "src/Runner/Commands.php"
+        ],
+        "tests/Unit/Runner/CoverageTest.php": [
+            "src/Config/Configuration.php",
+            "src/Coverage/Capture.php",
+            "src/Coverage/Merge.php",
+            "src/Coverage/Shard.php",
+            "src/Coverage/ShardFormat.php",
+            "src/Coverage/Split.php",
+            "src/Coverage/TestResults.php",
+            "src/Coverage/Timings.php",
+            "src/Project.php",
+            "src/Runner/Commands.php",
+            "src/Runner/Coverage.php",
+            "src/Runner/Shards.php"
+        ],
+        "tests/Unit/Runner/EngineTest.php": [
+            "src/Config/Configuration.php",
+            "src/Coverage/Capture.php",
+            "src/Coverage/Report.php",
+            "src/Coverage/TestResults.php",
+            "src/Coverage/Timings.php",
+            "src/Engine/Declaration.php",
+            "src/Engine/Outcome.php",
+            "src/Project.php",
+            "src/Runner/Commands.php",
+            "src/Runner/Engine.php"
+        ],
+        "tests/Unit/Runner/RunTest.php": [
+            "src/Cache/Key.php",
+            "src/Cache/Snapshot.php",
+            "src/Cache/Standing.php",
+            "src/Cache/Store.php",
+            "src/Cache/StoreFormat.php",
+            "src/Cache/Toolchain.php",
+            "src/Cache/Verdict.php",
+            "src/Config/Configuration.php",
+            "src/Coverage/Capture.php",
+            "src/Coverage/Merge.php",
+            "src/Coverage/Report.php",
+            "src/Coverage/Shard.php",
+            "src/Coverage/ShardFormat.php",
+            "src/Coverage/Soundness.php",
+            "src/Coverage/Split.php",
+            "src/Coverage/TestResults.php",
+            "src/Coverage/Timings.php",
+            "src/Engine/Declaration.php",
+            "src/Engine/Gate.php",
+            "src/Engine/Outcome.php",
+            "src/Project.php",
+            "src/Runner/Commands.php",
+            "src/Runner/Coverage.php",
+            "src/Runner/Engine.php",
+            "src/Runner/Finding.php",
+            "src/Runner/Run.php",
+            "src/Runner/Shards.php",
+            "src/Runner/Universe.php"
+        ],
+        "tests/Unit/Runner/ShardsTest.php": [
+            "src/Coverage/Capture.php",
+            "src/Coverage/Shard.php",
+            "src/Coverage/ShardFormat.php",
+            "src/Coverage/TestResults.php",
+            "src/Coverage/Timings.php",
+            "src/Runner/Shards.php"
+        ],
+        "tests/Unit/Runner/UniverseTest.php": [
+            "src/Cache/Toolchain.php",
+            "src/Config/Configuration.php",
+            "src/Project.php",
+            "src/Runner/Universe.php"
         ]
     }
 }

@@ -24,6 +24,13 @@ final class StandingTest extends TestCase {
 	];
 
 	/**
+	 * The source files mule is answerable for, as the tree on disk has them.
+	 *
+	 * @var list<string>
+	 */
+	private const array GATED = ["src/A.php", "src/B.php", "src/Hub.php"];
+
+	/**
 	 * @return array<string, non-empty-string>
 	 */
 	private function digests(): array {
@@ -68,7 +75,7 @@ final class StandingTest extends TestCase {
 	}
 
 	public function testAStoreThatDescribesTheTreeHasNothingOutstanding(): void {
-		$standing = Standing::of($this->stored(), $this->digests(), "chain");
+		$standing = Standing::of($this->stored(), $this->digests(), self::GATED, "chain");
 
 		self::assertTrue($standing->usable);
 		self::assertSame([], $standing->outstanding);
@@ -91,7 +98,7 @@ final class StandingTest extends TestCase {
 
 		self::assertSame(
 			["src/A.php", "src/Hub.php"],
-			Standing::of($this->stored(), $digests, "chain")->outstanding,
+			Standing::of($this->stored(), $digests, self::GATED, "chain")->outstanding,
 		);
 	}
 
@@ -107,7 +114,7 @@ final class StandingTest extends TestCase {
 
 		self::assertSame(
 			["src/A.php", "src/B.php", "src/Hub.php"],
-			Standing::of($this->stored(), $digests, "chain")->outstanding,
+			Standing::of($this->stored(), $digests, self::GATED, "chain")->outstanding,
 		);
 	}
 
@@ -116,7 +123,7 @@ final class StandingTest extends TestCase {
 
 		self::assertSame(
 			["src/A.php", "src/Hub.php"],
-			Standing::of($this->stored(), $digests, "chain")->outstanding,
+			Standing::of($this->stored(), $digests, self::GATED, "chain")->outstanding,
 		);
 	}
 
@@ -125,17 +132,25 @@ final class StandingTest extends TestCase {
 	 *
 	 * @return void
 	 */
-	public function testAFileThatHasGoneIsOutstanding(): void {
+	public function testAFileMuleCannotHashIsOutstanding(): void {
 		$digests = $this->digests();
-		unset($digests["src/A.php"]);
+		unset($digests["src/Hub.php"]);
 
-		self::assertContains("src/A.php", Standing::of($this->stored(), $digests, "chain")->outstanding);
+		self::assertSame(
+			["src/A.php", "src/B.php", "src/Hub.php"],
+			Standing::of($this->stored(), $digests, self::GATED, "chain")->outstanding,
+		);
 	}
 
 	public function testWhatWasNeverProvenIsOutstanding(): void {
-		$standing = Standing::of($this->stored(["src/Later.php"]), $this->digests(), "chain");
+		$standing = Standing::of(
+			$this->stored(["src/Later.php", "src/Soon.php"]),
+			$this->digests(),
+			[...self::GATED, "src/Later.php", "src/Soon.php"],
+			"chain",
+		);
 
-		self::assertSame(["src/Later.php"], $standing->outstanding);
+		self::assertSame(["src/Later.php", "src/Soon.php"], $standing->outstanding);
 	}
 
 	/**
@@ -145,7 +160,7 @@ final class StandingTest extends TestCase {
 	 * @return void
 	 */
 	public function testAChangedToolchainMakesTheStoreUnusable(): void {
-		$standing = Standing::of($this->stored(), $this->digests(), "a different gate");
+		$standing = Standing::of($this->stored(), $this->digests(), self::GATED, "a different gate");
 
 		self::assertFalse($standing->usable);
 		self::assertSame([], $standing->outstanding);
@@ -162,7 +177,7 @@ final class StandingTest extends TestCase {
 	public function testAFileTheStoreHasNeverHeardOfMakesItUnusable(): void {
 		$digests = [...$this->digests(), "tests/NewTest.php" => "n"];
 
-		$standing = Standing::of($this->stored(), $digests, "chain");
+		$standing = Standing::of($this->stored(), $digests, self::GATED, "chain");
 
 		self::assertFalse($standing->usable);
 		self::assertSame(
@@ -178,7 +193,7 @@ final class StandingTest extends TestCase {
 		self::assertSame(
 			"2 file(s) the store has never heard of have appeared, starting with src/New.php;"
 			. " what they cover cannot be worked out from digests",
-			Standing::of($this->stored(), $digests, "chain")->because,
+			Standing::of($this->stored(), $digests, self::GATED, "chain")->because,
 		);
 	}
 
@@ -188,12 +203,81 @@ final class StandingTest extends TestCase {
 	 *
 	 * @return void
 	 */
+	/**
+	 * **A gated file the store classifies neither way is outstanding**, and the
+	 * case is reachable: a file edited while the engine ran is left out of the
+	 * store on purpose. The store still *mentions* it — a test touches it — so it
+	 * does not read as having appeared, and it has no verdict to go stale either.
+	 * Without this it would be silently ungated, which is the failure that looks
+	 * exactly like success (G9).
+	 *
+	 * @return void
+	 */
+	public function testAGatedFileWithNoVerdictAtAllIsOutstanding(): void {
+		$stored = new Snapshot([], [], self::TESTS, "chain");
+
+		self::assertSame(
+			["src/A.php", "src/B.php", "src/Hub.php"],
+			Standing::of($stored, $this->digests(), self::GATED, "chain")->outstanding,
+		);
+	}
+
+	public function testAnExcludedFileIsNotOutstandingForWantOfAVerdict(): void {
+		self::assertSame(
+			[],
+			Standing::of(
+				$this->stored(),
+				[...$this->digests(), "src/Generated.php" => "g"],
+				self::GATED,
+				"chain",
+			)->outstanding,
+		);
+	}
+
+	/**
+	 * **A verdict outlives the file.** Merging a run's findings never removes what
+	 * it said nothing about, so a deleted file keeps its verdict — and without
+	 * asking about what is gated *now*, it would be reported outstanding on every
+	 * run from here on, each one taking a coverage pass to discover it has nothing
+	 * to prove.
+	 *
+	 * @return void
+	 */
+	public function testADeletedFileStopsBeingOutstanding(): void {
+		$digests = $this->digests();
+		unset($digests["src/A.php"]);
+
+		// `Hub.php` is still owed, because it shares a test with the file that went
+		// — which is the same closure a mere edit to `A.php` would reach.
+		self::assertSame(
+			["src/Hub.php"],
+			Standing::of($this->stored(), $digests, ["src/B.php", "src/Hub.php"], "chain")->outstanding,
+		);
+	}
+
+	public function testAFileNewlyExcludedStopsBeingOutstanding(): void {
+		self::assertSame(
+			[],
+			Standing::of(
+				$this->stored(["src/Legacy.php"]),
+				$this->digests(),
+				self::GATED,
+				"chain",
+			)->outstanding,
+		);
+	}
+
 	public function testTheOutstandingListIsSorted(): void {
 		$digests = [...$this->digests(), "src/A.php" => "edited"];
 
 		self::assertSame(
 			["src/A.php", "src/Hub.php", "src/Zzz.php"],
-			Standing::of($this->stored(["src/Zzz.php"]), $digests, "chain")->outstanding,
+			Standing::of(
+				$this->stored(["src/Zzz.php"]),
+				$digests,
+				[...self::GATED, "src/Zzz.php"],
+				"chain",
+			)->outstanding,
 		);
 	}
 }

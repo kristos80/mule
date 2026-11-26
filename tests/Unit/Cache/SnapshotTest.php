@@ -220,17 +220,23 @@ final class SnapshotTest extends TestCase {
 	}
 
 	/**
-	 * The record of what each test runs is written over the same way the
-	 * verdicts are: a partial run knows nothing about the tests it did not
-	 * re-capture.
+	 * **The test record replaces rather than merges, and it is the one section
+	 * that does.** A run's verdicts are only ever about the files it examined, but
+	 * its record of what each test executes is the whole current picture: a warm
+	 * run starts from what the store said and writes the re-measured test over it.
+	 *
+	 * Merging the old map back in would resurrect a test file that has since been
+	 * deleted, and a deleted test that keeps appearing among a file's covering
+	 * tests gives that file a key nothing can ever reproduce — so it reads as
+	 * outstanding on every run from then on.
 	 *
 	 * @return void
 	 */
-	public function testTheTestRecordIsWrittenOverRatherThanReplaced(): void {
+	public function testTheTestRecordIsTheNewerRunsWhole(): void {
 		$merged = $this->snapshot([], [], "chain", ["tests/ATest.php" => ["src/A.php"]])
 			->with($this->snapshot([], [], "chain", ["tests/BTest.php" => ["src/B.php"]]));
 
-		self::assertSame(["tests/ATest.php", "tests/BTest.php"], array_keys($merged->tests));
+		self::assertSame(["tests/BTest.php"], array_keys($merged->tests));
 	}
 
 	public function testTheMergedVerdictsAreSorted(): void {

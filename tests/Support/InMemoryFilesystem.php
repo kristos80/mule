@@ -23,12 +23,14 @@ final class InMemoryFilesystem implements FilesystemInterface {
 	 * @param array<string, non-empty-string> $digests
 	 * @param list<string> $directories
 	 * @param array<string, string> $resolved
+	 * @param array<string, mixed> $payloads
 	 */
 	public function __construct(
 		public array $files = [],
 		private array $digests = [],
 		public array $directories = [],
 		private array $resolved = [],
+		public array $payloads = [],
 	) {}
 
 	#[Override]
@@ -50,6 +52,20 @@ final class InMemoryFilesystem implements FilesystemInterface {
 		return array_key_exists($path, $this->files);
 	}
 
+	/**
+	 * **The payload is a value a test hands over, not a file to include.** What
+	 * the real wrapper includes is `--coverage-php`'s output; here the test says
+	 * what that would have returned.
+	 */
+	#[Override]
+	public function payload(string $path): mixed {
+		if(!array_key_exists($path, $this->payloads)) {
+			throw new Failure("There is no payload at \"{$path}\".");
+		}
+
+		return $this->payloads[$path];
+	}
+
 	#[Override]
 	public function remove(string $path): void {
 		unset($this->files[$path]);
@@ -62,14 +78,22 @@ final class InMemoryFilesystem implements FilesystemInterface {
 
 	/**
 	 * **Prefix matching, because that is what a recursive walk amounts to.** A
-	 * test that wants a tree writes the files; nothing has to declare the
-	 * directories above them.
+	 * test that wants a tree writes the files and declares the root they are under;
+	 * nothing has to declare the directories in between.
+	 *
+	 * **A directory that is not there throws**, the way the real one does: a walk
+	 * that answered an empty list would make a missing-directory guard look like an
+	 * operation with no result behind it.
 	 *
 	 * @param string $directory
 	 * @return list<string>
 	 */
 	#[Override]
 	public function entriesUnder(string $directory): array {
+		if(!$this->isDirectory($directory)) {
+			throw new Failure("There is no directory at \"{$directory}\".");
+		}
+
 		$prefix = rtrim($directory, "/") . "/";
 		$entries = [];
 

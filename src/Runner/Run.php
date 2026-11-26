@@ -7,7 +7,6 @@ use Kristos80\Mule\Cache\Key;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Standing;
 use Kristos80\Mule\Cache\Store;
-use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Coverage\Soundness;
 use Kristos80\Mule\Engine\Gate;
 
@@ -33,7 +32,6 @@ use Kristos80\Mule\Engine\Gate;
 final readonly class Run {
 
 	/**
-	 * @param Configuration $configuration
 	 * @param Universe $universe
 	 * @param Coverage $coverage
 	 * @param Soundness $soundness
@@ -43,7 +41,6 @@ final readonly class Run {
 	 * @param non-empty-string $toolchain
 	 */
 	public function __construct(
-		private Configuration $configuration,
 		private Universe $universe,
 		private Coverage $coverage,
 		private Soundness $soundness,
@@ -59,23 +56,19 @@ final readonly class Run {
 	 */
 	public function __invoke(bool $whole = FALSE): Finding {
 		$digests = $this->universe->digests();
+		$gated = $this->universe->sources();
 		$stored = $this->store->read($this->toolchain);
-		$standing = Standing::of($stored, $digests, $this->toolchain);
-		$partial = !$whole && $standing->usable && $stored->tests !== [];
+		$standing = Standing::of($stored, $digests, $gated, $this->toolchain);
+		$live = $this->live($stored, $digests);
+		$partial = !$whole && $standing->usable && $live !== [];
 
 		if($partial && $standing->outstanding === []) {
 			return Finding::settled($stored, $standing);
 		}
 
-		$measured = $partial
-			? $this->coverage->refresh(
-				$this->dirty($stored, $standing, $digests),
-				array_keys($stored->tests),
-				$stored->tests,
-			)
-			: $this->coverage->whole();
+		$measured = $partial ? $this->coverage->refresh($live, $digests) : $this->coverage->whole();
 
-		$owed = $this->keys($partial ? $standing->outstanding : $this->universe->sources(), $measured, $digests);
+		$owed = $this->keys($partial ? $standing->outstanding : $gated, $measured, $digests);
 
 		// **Before the engine, because G3 is about the report it is being handed.**
 		// A shard describing a version of a file that is gone makes every mutant
@@ -96,42 +89,30 @@ final readonly class Run {
 	}
 
 	/**
-	 * The test files whose coverage can no longer be trusted: the ones the store
-	 * says execute something outstanding, and the ones that changed themselves.
+	 * What the store says each test executes, less the tests the tree no longer
+	 * has.
 	 *
-	 * **Every one of them, not only the ones whose own bytes moved.** A file is
-	 * being re-keyed and what covers it is what proves it, so a run that
-	 * re-measured only some of its covering tests would read the rest of its
-	 * coverage off a cache written against bytes that have since changed.
-	 *
-	 * A test file the tree no longer has is skipped rather than re-measured. Its
-	 * shard still merges, which is harmless: everything it covered is outstanding
-	 * anyway, because the digest of a covering test that is gone matches nothing.
+	 * **A deleted test file is dropped here rather than merged and skipped.** Its
+	 * shard is still in the cache, and reassembling it would hand the engine a
+	 * report naming tests that cannot be run — whereupon Infection runs each
+	 * mutant against a missing test file, the run fails, and a failing run is
+	 * scored as a kill. Dropping it instead leaves whatever it covered looking
+	 * unreached, which is exactly what it now is.
 	 *
 	 * @param Snapshot $stored
-	 * @param Standing $standing
 	 * @param array<string, non-empty-string> $digests
-	 * @return list<string>
+	 * @return array<string, list<string>>
 	 */
-	private function dirty(Snapshot $stored, Standing $standing, array $digests): array {
-		$outstanding = array_flip($standing->outstanding);
-		$dirty = [];
+	private function live(Snapshot $stored, array $digests): array {
+		$live = [];
 
 		foreach($stored->tests as $test => $touches) {
-			if(!isset($digests[$test])) {
-				continue;
-			}
-
-			foreach([$test, ...$touches] as $path) {
-				if(isset($outstanding[$path])) {
-					$dirty[] = $test;
-
-					break;
-				}
+			if(isset($digests[$test])) {
+				$live[$test] = $touches;
 			}
 		}
 
-		return $dirty;
+		return $live;
 	}
 
 	/**
@@ -156,6 +137,11 @@ final readonly class Run {
 	/**
 	 * What to ask the engine about, and what each one keys to.
 	 *
+	 * **Nothing filters out an excluded path here, and nothing needs to.** The
+	 * cold list comes from `Universe::sources()` and the partial list from
+	 * `Cache\Standing`, and both are already the files mule is answerable for —
+	 * a second check was a branch the gate proved nothing could reach.
+	 *
 	 * @param list<string> $paths
 	 * @param Measured $measured
 	 * @param array<string, non-empty-string> $digests
@@ -166,10 +152,6 @@ final readonly class Run {
 		$keys = [];
 
 		foreach($paths as $path) {
-			if($this->configuration->excludes($path)) {
-				continue;
-			}
-
 			$keys[$path] = Key::of(
 				$path,
 				$digests[$path] ?? "gone",

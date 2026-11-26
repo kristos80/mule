@@ -60,10 +60,14 @@ final readonly class Finding {
 	 * run could not prove is still not proven, and a run that happened to touch
 	 * none of those files has not made the project green.
 	 *
+	 * **A file abandoned mid-run counts against it too.** It has no verdict in
+	 * either direction — which is the honest record, and also not a project
+	 * anybody should call proven. The next run picks it up.
+	 *
 	 * @return bool
 	 */
 	public function holds(): bool {
-		return $this->store->unproven === [];
+		return $this->store->unproven === [] && $this->abandoned === [];
 	}
 
 	/**

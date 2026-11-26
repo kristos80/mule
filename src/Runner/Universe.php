@@ -59,6 +59,9 @@ final readonly class Universe {
 			}
 		}
 
+		// **Sorted, because the first name in it reaches a message.** A file the
+		// store has never heard of makes the run whole, and which one gets named is
+		// otherwise whichever root happened to be walked first.
 		ksort($digests);
 
 		return $digests;
@@ -79,8 +82,10 @@ final readonly class Universe {
 			}
 		}
 
-		ksort($digests);
-
+		// **Not sorted here.** The paths arrive from `entriesUnder()`, which sorts a
+		// tree walk because mule's decisions must not depend on the filesystem's
+		// order — so a `ksort` on top of it was an operation with no result behind
+		// it, and the gate said so.
 		return Toolchain::digest($digests);
 	}
 

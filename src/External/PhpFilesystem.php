@@ -52,6 +52,15 @@ final readonly class PhpFilesystem implements FilesystemInterface {
 	}
 
 	#[Override]
+	public function payload(string $path): mixed {
+		if(!file_exists($path)) {
+			throw new Failure("There is no payload at {$path}.");
+		}
+
+		return require $path;
+	}
+
+	#[Override]
 	public function remove(string $path): void {
 		if(file_exists($path) && !@unlink($path)) {
 			throw new Failure("Cannot remove {$path}.");

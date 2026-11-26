@@ -180,10 +180,18 @@ final readonly class Snapshot {
 			$verdicts[$path] = $verdict;
 		}
 
+		// **The test record replaces rather than merges, and it is the one section
+		// that does.** A run's verdicts are only ever about the files it examined,
+		// but its record of what each test executes is the whole current picture:
+		// a warm run starts from what the store said and writes the re-measured
+		// test over it. Merging the old map back in would resurrect a test file
+		// that has since been deleted — and a deleted test that keeps appearing
+		// among a file's covering tests gives that file a key nothing can ever
+		// reproduce, so it reads as outstanding on every run from then on.
 		return new self(
 			$verdicts,
 			$this->mergedUnproven($newer, $verdicts),
-			[...$this->tests, ...$newer->tests],
+			$newer->tests,
 			$this->toolchain,
 		);
 	}

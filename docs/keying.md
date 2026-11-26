@@ -1099,10 +1099,12 @@ something to engineer around.
 - **The 20× figure is one edit on one project.** It is an observation, not a
   distribution. `doctor` should report the distribution over every file rather
   than let a median stand in for it.
-- **No guard on this page exists in executable form.** The mechanics are
-  established by experiment; that the assembled system enforces them is not. The
-  differential fixture (§7) is what would establish it, and it should be written
-  before the pipeline it checks.
+- **~~No guard on this page exists in executable form.~~** Settled. G1–G9 are
+  enforced by `src/`, the differential fixture (§7) checks the pipeline against
+  Infection's own verdicts, and mule proves itself: 32 files, 1,093 mutants, 0
+  unproven, which is the same figure a direct `infection` run reports. The one
+  remaining asymmetry is that the gate runs over mule, a 36-file library — a Tier C
+  project (§8) — so what is *measured* here is correctness, not saving.
 - **Narrowing has only been exercised on toy fixtures.** M7, GN1 and the 10 → 3
   mutant collapse were measured on a four-class scratch project, not on either
   real codebase. The application does not need narrowing (§2), so this stays
@@ -1110,6 +1112,24 @@ something to engineer around.
   unimplemented rather than optional.
 - **`"signature": "code"` is deferred**, not designed. §3 states the conditions it
   would have to meet; nothing has been built or measured against them.
+- **`doctor` is not built.** §8's tier detection, the invalidation distribution and
+  the four-state report are specified and unimplemented. What `mule` prints today
+  is three of the four states — proven, not proven, excluded — because the other
+  two are narrowing-only and so cannot occur.
+- **The saving has not been re-measured end to end through the command.** The
+  figures in §2 and §5 were taken by hand from the same mechanics the pipeline now
+  uses, and mule's own run reproduces Infection's verdict exactly — but a cold-vs-warm
+  figure on the 613-file application, taken through `bin/mule`, has not been
+  recorded. On mule itself the warm "nothing is owed" answer is **0.85 s against a
+  70 s cold run**, and a one-file edit re-proves 31 of 32 files, which is Tier C
+  behaving exactly as §8 predicts for a project this size.
+- **An excluded file's digest is tracked nowhere.** `exclude` means "not mule's to
+  answer for", so a file named there is left out of the digest map, out of every
+  test's footprint and out of every key — and editing it therefore invalidates
+  nothing. A file whose bytes can change a verdict belongs in `support`, where a
+  change invalidates the store outright. This is a decision rather than an
+  oversight, but it is a sharp edge and `doctor` should report an excluded file that
+  the coverage report nonetheless attributes.
 
 ---
 

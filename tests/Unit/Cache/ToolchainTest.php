@@ -9,14 +9,14 @@ use PHPUnit\Framework\TestCase;
 final class ToolchainTest extends TestCase {
 
 	/**
-	 * @param list<string> $mutators
+	 * @param array<string, bool> $mutators
 	 * @return non-empty-string
 	 */
 	private function chain(
 		string $lock = "lock",
 		string $phpunit = "pu",
 		string $infection = "inf",
-		array $mutators = ["@default", "@identical"],
+		array $mutators = ["@default" => TRUE, "@identical" => TRUE],
 		string $support = "support",
 		string $php = "8.4.28",
 		string $driver = "Xdebug 3.4.0",
@@ -31,8 +31,23 @@ final class ToolchainTest extends TestCase {
 
 	public function testTheMutatorSetIsOrderIndependent(): void {
 		self::assertSame(
-			$this->chain(mutators: ["@default", "@identical"]),
-			$this->chain(mutators: ["@identical", "@default"]),
+			$this->chain(mutators: ["@default" => TRUE, "@identical" => TRUE]),
+			$this->chain(mutators: ["@identical" => TRUE, "@default" => TRUE]),
+		);
+	}
+
+	/**
+	 * **A disabled mutator is not an absent one.** `{"@default": false}` is a
+	 * different gate from `{"@default": true}`, so a set digested by its names
+	 * alone would call the two the same arrangement — which the mutation gate
+	 * found by unwrapping an `array_keys` and nothing noticing.
+	 *
+	 * @return void
+	 */
+	public function testTurningAMutatorOffIsADifferentGate(): void {
+		self::assertNotSame(
+			$this->chain(mutators: ["@default" => TRUE]),
+			$this->chain(mutators: ["@default" => FALSE]),
 		);
 	}
 
@@ -48,7 +63,7 @@ final class ToolchainTest extends TestCase {
 		self::assertNotSame($base, $this->chain(lock: "upgraded"));
 		self::assertNotSame($base, $this->chain(phpunit: "excludes one more file"));
 		self::assertNotSame($base, $this->chain(infection: "a different gate"));
-		self::assertNotSame($base, $this->chain(mutators: ["@default"]));
+		self::assertNotSame($base, $this->chain(mutators: ["@default" => TRUE]));
 		self::assertNotSame($base, $this->chain(support: "a fake that behaves differently"));
 		self::assertNotSame($base, $this->chain(php: "8.5.0"));
 		self::assertNotSame($base, $this->chain(driver: "pcov 1.0.11"));

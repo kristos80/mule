@@ -13,7 +13,7 @@ pinned tools rather than by reading their documentation.
 
 | | |
 |---|---|
-| `docs/keying.md` | **the specification.** M1–M16 verified mechanics, G1–G9 guards, GN1–GN3 narrowing-only, §11 the v1 scope and build order |
+| `docs/keying.md` | **the specification.** M1–M19 verified mechanics, G1–G9 guards, GN1–GN3 narrowing-only, §10 what is *not* established, §11 the v1 scope and build order |
 | `HOWTO.md` | the contract a consumer accepts: preconditions, and what happens when each is broken |
 | `docs/decisions.md` | why the repository is shaped the way it is. Written for v4; the release machinery, the conventions and the external-layer reasoning still hold. Its cache design is superseded by `docs/keying.md` |
 
@@ -55,8 +55,11 @@ builds the same command line and writes the same store bytes.
   ternary, `??`, `?->` — belongs in a tested class on the other side. That layer
   is the only code not unit tested; it is exercised by an integration suite
   against a real temporary directory and real child processes.
-  *(The v4 external layer went with the rest of `src/`. It returns as the
-  pipeline needs it; `docs/decisions.md` records what shape it had and why.)*
+
+  **The exclusion lists in `phpunit.xml` and `infection.json5` name the same
+  files, and keeping them in step is not housekeeping** — one of them drifting is
+  how a file stops being gated without anybody choosing that. A new wrapper goes
+  into both, or into neither.
 - **Everything else is gated at 100 % line coverage and 100 % MSI.**
 - **`mixed` is narrowed once, where it enters.** `Coverage\Capture` is the only
   place a coverage payload stops being `mixed`; nothing downstream re-checks.
@@ -89,17 +92,27 @@ builds the same command line and writes the same store bytes.
 | `composer test` | the unit suite |
 | `composer test:coverage` | the suite through Herd's coverage driver |
 | `composer analyse` | PHPStan at max plus cognitive complexity (9 per method, 40 per class) |
+| `composer test:integration` | the external layer against a real temporary directory |
+| `composer test:differential` | the pipeline against Infection's own verdicts |
 | `composer test:mutate` | the mutation gate: Infection at MSI 100 %, `--with-timeouts` |
+| `herd coverage bin/mule` | mule gating itself, through its own cache |
 
-**mule does not gate itself any more, and that is deliberate.** Measured here:
-~29 source files, each test executing about five of them — 17 % of the project
-per test — so a file's closure is the whole project and a comment-only edit marks
-29 of 36 files stale. The cache is sound and saves nothing.
+**mule gates itself, and it is Tier C about it.** Measured: 32 gated files, 1,093
+mutants, 0 unproven — the same figure a direct `infection` run reports, which is
+the strongest evidence the pipeline reproduces the engine's verdicts rather than
+approximating them. A cold run is 70 s; the "nothing has changed" answer is 0.85 s.
 
-That is a property of **size**, not of the tests. The application mule was
-written for has the same per-test footprint and invalidates 2.7 % per edit. See
-`docs/keying.md` §2 and §8. A three-second gate has nothing to gain from a cache,
-so self-hosting would add a failure mode and buy no time.
+But **a one-file edit re-proves 31 of the 32**, because almost every test here
+runs through almost everything. That is a property of **size**, not of the tests:
+the application mule was written for has the same per-test footprint and
+invalidates 2.7 % per edit. See `docs/keying.md` §2 and §8. So self-hosting buys
+the cheap question and nothing else — and it is kept because the cheap question is
+worth having and because a tool that will not run on itself is a tool nobody
+should trust.
+
+`composer test:mutate` runs Infection directly and is the gate CI uses, because a
+gate that depends on mule's own cache being right cannot be what proves mule's
+cache is right.
 
 **Never pass `--ignore-msi-with-no-mutations`.** A zero-mutant run exits 1 under
 `--min-msi=100` and exits 0 once that flag is added (G5).
@@ -131,16 +144,41 @@ GitHub honours for that reason.
 ## Layout
 
 ```
+bin/mule          the only file that names a concrete port
 src/
-  Coverage/   Capture, Split — the shard pipeline (M2, M3, M4)
-  Failure.php
-tests/Unit/   mirrors src/; no disk, no chmod, no skips
+  Cache/          Key, Toolchain, Verdict, Snapshot, Standing, Store, StoreFormat
+  Config/         Configuration — mule.json, and the whole vocabulary a consumer has
+  Console/        Application, Composition, Assembly, Summary
+  Coverage/       Capture, Split, Shard, Merge, Timings, Report, Attribution,
+                  TestResults, Soundness — the shard pipeline (M2–M4, M19) and G3
+  Engine/         Declaration, Outcome, Gate — what mule asks Infection and what
+                  it refuses to accept back (G1, G2, G5, G8)
+  External/       the ports and their wrappers; the only code not unit tested
+  Runner/         Universe, Coverage, Engine, Commands, Shards, Measured, Run,
+                  Finding — one run, start to finish
+  Failure.php     the one exception type
+  Project.php     project-relative paths, resolved
+tests/
+  Unit/           mirrors src/; no disk, no chmod, no skips
+  Integration/    the external layer against a real temporary directory
+  Differential/   the pipeline against Infection's own verdicts — the only thing
+                  that catches M13, which was invisible to every aggregate
+  Support/        the in-memory ports a unit test drives the program through
+  Fixture/        the differential's project
 docs/
-  keying.md     the specification
-  decisions.md  why the repository is shaped this way
-HOWTO.md        the consumer's contract
+  keying.md       the specification
+  decisions.md    why the repository is shaped this way
+  v4-readme.md    archived; none of it applies
+HOWTO.md          the consumer's contract
 ```
 
-`src/` is deliberately small right now. `docs/keying.md` §11 is the build order,
-and the differential fixture at step 3 comes before anything is allowed to skip
-work on the strength of the pipeline.
+**The composition root is `Console\Composition`, and it is the only place that
+knows a path by heart** — `.mule/verified.json` committed, `.mule/cache/` ignored,
+`mule.infection.json` at the project root because Infection resolves a
+configuration's paths relative to that file's own directory (M11). Every path it
+hands downstream is project-relative, and that is a correctness property: the
+rendered configuration is digested into the cache key, so an absolute path in it
+is a key no other machine can reproduce.
+
+`docs/keying.md` §10 is the honest list of what is still not established —
+`doctor`, the end-to-end saving on a large project, and narrowing in any form.
