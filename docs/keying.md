@@ -183,6 +183,30 @@ the most recent monolithic reference capture. Verified: substituting the
 monolithic `junit.xml` into the merged report took the warm run from 149 killed
 / 10 skipped to **159 killed / 0 skipped**, same 165 mutants.
 
+**And the artifact is per test *class*, not per test.**
+`JUnitTestExecutionInfoAdder::createCompleteTestLocation()` reduces a covering
+test to `explode(':', $method, 2)[0]` and looks *that* up;
+`TestTotalTimeCalculator::uniqueTestLocations()` then keeps one time per distinct
+class. So:
+
+```
+nominal = Σ over distinct test CLASSES covering the mutant, of that class's time
+```
+
+A mutant covered by forty methods of one class costs that class's total once. A
+hub file covered by sixty-five classes sums sixty-five totals — which is why
+inflation bites hardest exactly where the cache is least use, and why the 40
+skipped mutants clustered in `Domain/` value objects.
+
+`JUnitTestFileDataProvider::getTestFileInfo()` reads exactly two attributes off
+`//testsuite[@name="…"][1]` — **`file` and `time`** — and throws `TestNotFound`
+for a class it cannot find. That is G4, with a real exception behind it.
+
+**So mule synthesises the report rather than caching PHPUnit's.** One
+`<testsuite name file time>` node per class is all Infection reads. Verified on
+the application: a **71 KB** synthesised report drove the same warm run as the
+original **1,881 KB** one — 165 mutants, 159 killed, **0 skipped**, identical.
+
 **M14 — MSI counts timeouts, errors and syntax errors as kills, and drops skipped
 and ignored mutants from the denominator.** From `Metrics\Calculator` and
 `MetricsCalculator::getTestedMutantsCount()`:
