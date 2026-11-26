@@ -18,6 +18,7 @@ final class StoreFormatTest extends TestCase {
 		return new Snapshot(
 			["src/A.php" => new Verdict("key-a", 4), "src/B.php" => new Verdict("key-b", 0)],
 			["src/C.php"],
+			["tests/ATest.php" => ["src/A.php", "src/B.php"], "tests/BTest.php" => ["src/B.php"]],
 			"chain",
 		);
 	}
@@ -31,6 +32,7 @@ final class StoreFormatTest extends TestCase {
 			"toolchain" => "chain",
 			"verdicts" => ["src/A.php" => ["key" => "key-a", "mutants" => 4]],
 			"unproven" => ["src/C.php"],
+			"tests" => ["tests/ATest.php" => ["src/A.php"], "tests/BTest.php" => ["src/B.php"]],
 			...$overrides,
 		];
 	}
@@ -66,7 +68,7 @@ final class StoreFormatTest extends TestCase {
 	public function testNamesWhicheverSectionIsMissing(): void {
 		$caught = [];
 
-		foreach(["toolchain", "verdicts", "unproven"] as $section) {
+		foreach(["toolchain", "verdicts", "unproven", "tests"] as $section) {
 			$stored = $this->stored();
 			unset($stored[$section]);
 
@@ -81,6 +83,7 @@ final class StoreFormatTest extends TestCase {
 			"toolchain" => 'A store is missing its "toolchain" section.',
 			"verdicts" => 'A store is missing its "verdicts" section.',
 			"unproven" => 'A store is missing its "unproven" section.',
+			"tests" => 'A store is missing its "tests" section.',
 		], $caught);
 	}
 
@@ -151,6 +154,63 @@ final class StoreFormatTest extends TestCase {
 		$this->expectExceptionMessage("A store's unproven list includes something that is not a file path.");
 
 		StoreFormat::read($this->stored(["unproven" => [42]]));
+	}
+
+	public function testRefusesATestMapThatIsNotAnArray(): void {
+		$this->expectException(Failure::class);
+		$this->expectExceptionMessage("A store's test map must be an array, int given.");
+
+		StoreFormat::read($this->stored(["tests" => 42]));
+	}
+
+	public function testRefusesATestMapKeyedBySomethingOtherThanATestFile(): void {
+		$this->expectException(Failure::class);
+		$this->expectExceptionMessage("A store's test map is keyed by something that is not a test file.");
+
+		StoreFormat::read($this->stored(["tests" => [42 => ["src/A.php"]]]));
+	}
+
+	public function testRefusesARecordOfWhatATestRunsThatIsNotAnArray(): void {
+		$this->expectException(Failure::class);
+		$this->expectExceptionMessage('A store\'s record of what "tests/ATest.php" runs must be an array, string given.');
+
+		StoreFormat::read($this->stored(["tests" => ["tests/ATest.php" => "src/A.php"]]));
+	}
+
+	/**
+	 * The record is what lets a run decide it has nothing to do without
+	 * generating a coverage report, so an entry that is not a path is a
+	 * dependency edge pointing nowhere.
+	 *
+	 * @return void
+	 */
+	public function testRefusesARecordEntryThatIsNotAPath(): void {
+		$this->expectException(Failure::class);
+		$this->expectExceptionMessage('A store\'s record of what "tests/ATest.php" runs includes something that is not a file path.');
+
+		StoreFormat::read($this->stored(["tests" => ["tests/ATest.php" => [42]]]));
+	}
+
+	public function testCarriesTheTestMapThroughTheRoundTrip(): void {
+		$written = StoreFormat::write($this->snapshot());
+
+		self::assertSame(
+			["tests/ATest.php" => ["src/A.php", "src/B.php"], "tests/BTest.php" => ["src/B.php"]],
+			StoreFormat::read(json_decode($written, TRUE, 512, JSON_THROW_ON_ERROR))->tests,
+		);
+	}
+
+	/**
+	 * Every entry, not just the first: the record is what a run decides from,
+	 * and a map read down to one test is a project with one test in it.
+	 *
+	 * @return void
+	 */
+	public function testReadsEveryEntryInTheTestMap(): void {
+		self::assertSame(
+			["tests/ATest.php", "tests/BTest.php"],
+			array_keys(StoreFormat::read($this->stored())->tests),
+		);
 	}
 
 	/**

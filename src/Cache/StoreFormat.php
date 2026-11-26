@@ -41,6 +41,7 @@ final readonly class StoreFormat {
 			"toolchain" => $snapshot->toolchain,
 			"verdicts" => $verdicts,
 			"unproven" => $snapshot->unproven,
+			"tests" => $snapshot->tests,
 		], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
 	}
 
@@ -53,7 +54,7 @@ final readonly class StoreFormat {
 			throw new Failure("A store must be an array, " . get_debug_type($decoded) . " given.");
 		}
 
-		foreach(["toolchain", "verdicts", "unproven"] as $key) {
+		foreach(["toolchain", "verdicts", "unproven", "tests"] as $key) {
 			if(!array_key_exists($key, $decoded)) {
 				throw new Failure("A store is missing its \"{$key}\" section.");
 			}
@@ -67,7 +68,8 @@ final readonly class StoreFormat {
 
 		return new Snapshot(
 			self::verdicts($decoded["verdicts"]),
-			self::unproven($decoded["unproven"]),
+			self::paths($decoded["unproven"], "unproven list"),
+			self::tests($decoded["tests"]),
 			$toolchain,
 		);
 	}
@@ -124,24 +126,50 @@ final readonly class StoreFormat {
 	}
 
 	/**
+	 * **What each test was seen to execute**, which is what lets a run decide it
+	 * has nothing to do without generating a coverage report.
+	 *
 	 * @param mixed $value
-	 * @return list<string>
+	 * @return array<string, list<string>>
 	 */
-	private static function unproven(mixed $value): array {
+	private static function tests(mixed $value): array {
 		if(!is_array($value)) {
-			throw new Failure("A store's unproven list must be an array, " . get_debug_type($value) . " given.");
+			throw new Failure("A store's test map must be an array, " . get_debug_type($value) . " given.");
 		}
 
-		$unproven = [];
+		$tests = [];
+
+		foreach($value as $test => $touches) {
+			if(!is_string($test) || $test === "") {
+				throw new Failure("A store's test map is keyed by something that is not a test file.");
+			}
+
+			$tests[$test] = self::paths($touches, "record of what \"{$test}\" runs");
+		}
+
+		return $tests;
+	}
+
+	/**
+	 * @param mixed $value
+	 * @param string $what
+	 * @return list<string>
+	 */
+	private static function paths(mixed $value, string $what): array {
+		if(!is_array($value)) {
+			throw new Failure("A store's {$what} must be an array, " . get_debug_type($value) . " given.");
+		}
+
+		$paths = [];
 
 		foreach($value as $path) {
 			if(!is_string($path) || $path === "") {
-				throw new Failure("A store's unproven list includes something that is not a file path.");
+				throw new Failure("A store's {$what} includes something that is not a file path.");
 			}
 
-			$unproven[] = $path;
+			$paths[] = $path;
 		}
 
-		return $unproven;
+		return $paths;
 	}
 }

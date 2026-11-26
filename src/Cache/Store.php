@@ -42,7 +42,7 @@ final readonly class Store {
 	 */
 	public function read(string $toolchain): Snapshot {
 		if(!$this->filesystem->exists($this->path)) {
-			return new Snapshot([], [], $toolchain);
+			return new Snapshot([], [], [], $toolchain);
 		}
 
 		// Named arguments, so the depth is not passed at all. Spelling out its

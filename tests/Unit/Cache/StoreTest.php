@@ -30,9 +30,15 @@ final class StoreTest extends TestCase {
 	/**
 	 * @param array<string, int<0, max>> $proven
 	 * @param list<string> $unproven
+	 * @param array<string, list<string>> $tests
 	 * @return Snapshot
 	 */
-	private function snapshot(array $proven = [], array $unproven = [], string $toolchain = "chain"): Snapshot {
+	private function snapshot(
+		array $proven = [],
+		array $unproven = [],
+		string $toolchain = "chain",
+		array $tests = [],
+	): Snapshot {
 		/** @var non-empty-string $toolchain */
 		$verdicts = [];
 
@@ -40,7 +46,7 @@ final class StoreTest extends TestCase {
 			$verdicts[$path] = new Verdict("key-of-{$path}", $mutants);
 		}
 
-		return new Snapshot($verdicts, $unproven, $toolchain);
+		return new Snapshot($verdicts, $unproven, $tests, $toolchain);
 	}
 
 	/**

@@ -26,6 +26,23 @@ final readonly class Snapshot {
 	public array $unproven;
 
 	/**
+	 * What each test file was seen to execute, keyed by project-relative path.
+	 *
+	 * **This is the half that makes the cheap question cheap.** Which files are
+	 * stale was otherwise knowable only by generating a coverage report, which
+	 * made the cheap question depend on the expensive answer — a run had to spend
+	 * the whole coverage pass to discover it had nothing to do. Recording what
+	 * each test runs turns the same question into a few hundred digests.
+	 *
+	 * The covering tests of a file, and therefore everything its verdict rests
+	 * on, are derivable from this alone: a test covers `F` when `F` is among what
+	 * it executed.
+	 *
+	 * @var array<string, list<string>>
+	 */
+	public array $tests;
+
+	/**
 	 * **Canonical on the way in, once.** The store is committed, so two machines
 	 * that proved the same files have to write the same bytes — and the order
 	 * verdicts arrive in is the order a coverage report or a cache happened to
@@ -34,14 +51,17 @@ final readonly class Snapshot {
 	 *
 	 * @param array<string, Verdict> $verdicts
 	 * @param list<string> $unproven
+	 * @param array<string, list<string>> $tests
 	 * @param non-empty-string $toolchain The environment every verdict here was proven under.
 	 */
 	public function __construct(
 		array $verdicts,
 		array $unproven,
+		array $tests,
 		public string $toolchain,
 	) {
 		ksort($verdicts);
+		ksort($tests);
 
 		// `sort()` reindexes, so wrapping this in `array_values()` would be an
 		// operation with no result behind it — and the gate said so.
@@ -50,6 +70,77 @@ final readonly class Snapshot {
 
 		$this->verdicts = $verdicts;
 		$this->unproven = $unique;
+		$this->tests = $tests;
+	}
+
+	/**
+	 * The test files whose coverage includes a given source file.
+	 *
+	 * @param string $file
+	 * @return list<string>
+	 */
+	public function coveredBy(string $file): array {
+		$covering = [];
+
+		foreach($this->tests as $test => $touches) {
+			if(in_array($file, $touches, TRUE)) {
+				$covering[] = $test;
+			}
+		}
+
+		return $covering;
+	}
+
+	/**
+	 * Everything a verdict for a file rests on besides itself: the union of what
+	 * its covering tests execute.
+	 *
+	 * The same rule `Coverage\Attribution` applies to a fresh report, answered
+	 * from the store instead — which is what lets a run decide it has nothing to
+	 * do without generating one.
+	 *
+	 * @param string $file
+	 * @return list<string>
+	 */
+	public function dependenciesOf(string $file): array {
+		$deps = [];
+
+		foreach($this->coveredBy($file) as $test) {
+			foreach($this->tests[$test] as $touched) {
+				$deps[] = $touched;
+			}
+		}
+
+		$unique = array_unique($deps);
+		sort($unique);
+
+		return $unique;
+	}
+
+	/**
+	 * Every path the store has heard of.
+	 *
+	 * **What it is for is the file it has *not* heard of.** A test that has
+	 * appeared since the last run may cover anything, so its effect on a key
+	 * cannot be worked out from digests — and a source file nobody recorded is a
+	 * file no verdict covers. Either one means the cheap question cannot be
+	 * answered and a coverage run is owed (G9).
+	 *
+	 * @return list<string>
+	 */
+	public function known(): array {
+		$known = [...array_keys($this->verdicts), ...$this->unproven, ...array_keys($this->tests)];
+
+		foreach($this->tests as $touches) {
+			foreach($touches as $touched) {
+				$known[] = $touched;
+			}
+		}
+
+		$unique = array_unique($known);
+		sort($unique);
+
+		return $unique;
 	}
 
 	/**
@@ -89,7 +180,12 @@ final readonly class Snapshot {
 			$verdicts[$path] = $verdict;
 		}
 
-		return new self($verdicts, $this->mergedUnproven($newer, $verdicts), $this->toolchain);
+		return new self(
+			$verdicts,
+			$this->mergedUnproven($newer, $verdicts),
+			[...$this->tests, ...$newer->tests],
+			$this->toolchain,
+		);
 	}
 
 	/**

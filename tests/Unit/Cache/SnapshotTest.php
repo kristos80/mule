@@ -12,9 +12,15 @@ final class SnapshotTest extends TestCase {
 	/**
 	 * @param array<string, int<0, max>> $proven Path to mutant count; the key is derived from the path.
 	 * @param list<string> $unproven
+	 * @param array<string, list<string>> $tests
 	 * @return Snapshot
 	 */
-	private function snapshot(array $proven = [], array $unproven = [], string $toolchain = "chain"): Snapshot {
+	private function snapshot(
+		array $proven = [],
+		array $unproven = [],
+		string $toolchain = "chain",
+		array $tests = [],
+	): Snapshot {
 		/** @var non-empty-string $toolchain */
 		$verdicts = [];
 
@@ -22,7 +28,84 @@ final class SnapshotTest extends TestCase {
 			$verdicts[$path] = new Verdict("key-of-{$path}", $mutants);
 		}
 
-		return new Snapshot($verdicts, $unproven, $toolchain);
+		return new Snapshot($verdicts, $unproven, $tests, $toolchain);
+	}
+
+	/**
+	 * A store whose sections overlap the way a real one does: two tests sharing
+	 * a hub file, verdicts for files no test record mentions, and everything
+	 * handed over in the wrong order.
+	 *
+	 * @return Snapshot
+	 */
+	private function rich(): Snapshot {
+		return $this->snapshot(
+			["src/V2.php" => 1, "src/V1.php" => 2],
+			["src/U.php"],
+			"chain",
+			[
+				"tests/ZzzTest.php" => ["src/Zzz.php", "src/Hub.php"],
+				"tests/AaaTest.php" => ["src/Hub.php", "src/Aaa.php"],
+			],
+		);
+	}
+
+	public function testTheTestRecordIsCanonicallyOrdered(): void {
+		self::assertSame(["tests/AaaTest.php", "tests/ZzzTest.php"], array_keys($this->rich()->tests));
+	}
+
+	/**
+	 * Both of them, which is the case that matters: a hub file covered by
+	 * several classes is how a change reaches files that never mention it.
+	 *
+	 * @return void
+	 */
+	public function testNamesEveryTestCoveringAFile(): void {
+		self::assertSame(
+			["tests/AaaTest.php", "tests/ZzzTest.php"],
+			$this->rich()->coveredBy("src/Hub.php"),
+		);
+	}
+
+	public function testNamesNoTestForAFileNothingCovers(): void {
+		self::assertSame([], $this->rich()->coveredBy("src/V1.php"));
+	}
+
+	/**
+	 * The union, de-duplicated and sorted: `Hub.php` arrives from both tests,
+	 * and the raw order is neither.
+	 *
+	 * @return void
+	 */
+	public function testTheDependenciesAreTheUnionOfWhatTheCoveringTestsRun(): void {
+		self::assertSame(
+			["src/Aaa.php", "src/Hub.php", "src/Zzz.php"],
+			$this->rich()->dependenciesOf("src/Hub.php"),
+		);
+	}
+
+	public function testAFileNothingCoversDependsOnNothing(): void {
+		self::assertSame([], $this->rich()->dependenciesOf("src/V1.php"));
+	}
+
+	/**
+	 * Every section contributes, which is what makes "a file the store has
+	 * never heard of" answerable: verdicts, the unproven list, the test files
+	 * themselves, and everything those tests were seen to run.
+	 *
+	 * @return void
+	 */
+	public function testKnowsEveryPathAnySectionMentions(): void {
+		self::assertSame([
+			"src/Aaa.php",
+			"src/Hub.php",
+			"src/U.php",
+			"src/V1.php",
+			"src/V2.php",
+			"src/Zzz.php",
+			"tests/AaaTest.php",
+			"tests/ZzzTest.php",
+		], $this->rich()->known());
 	}
 
 	public function testVouchesForAFileThatStillKeysTheSame(): void {
@@ -134,6 +217,20 @@ final class SnapshotTest extends TestCase {
 
 	public function testTheUnprovenListCarriesNoRepeats(): void {
 		self::assertSame(["src/A.php"], $this->snapshot([], ["src/A.php", "src/A.php"])->unproven);
+	}
+
+	/**
+	 * The record of what each test runs is written over the same way the
+	 * verdicts are: a partial run knows nothing about the tests it did not
+	 * re-capture.
+	 *
+	 * @return void
+	 */
+	public function testTheTestRecordIsWrittenOverRatherThanReplaced(): void {
+		$merged = $this->snapshot([], [], "chain", ["tests/ATest.php" => ["src/A.php"]])
+			->with($this->snapshot([], [], "chain", ["tests/BTest.php" => ["src/B.php"]]));
+
+		self::assertSame(["tests/ATest.php", "tests/BTest.php"], array_keys($merged->tests));
 	}
 
 	public function testTheMergedVerdictsAreSorted(): void {
