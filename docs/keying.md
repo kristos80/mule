@@ -1068,12 +1068,25 @@ a changed file). That decoupling is most of the warm-path win.
 | one source file | 12–43 | 2–3 s |
 | `--only-covering-test-cases` on the full gate | 902 | 53 s — not worth passing |
 
-**Both projects, nothing changed:** 0.4 s, on digests alone — no coverage driver,
-no test process. The cheap question this design exists to make cheap, and the one
-a pull request should ask.
+**The cheap question, measured through `Cache\Standing`** on the application's 404
+verdicts and 327 test records — no coverage driver, no test process, digests only:
+
+| | outstanding | |
+|---|---|---|
+| nothing changed | 0 | **40 ms** |
+| one median file edited | **11 / 404 — 2.7 %** | 42 ms |
+| a hub file edited | 215 / 404 — 53.2 % | |
+| a new test appears | *unusable*, and says why (G9) | |
+| the gate widens | *unusable*, and says why | |
+
+**2.7 % and 53.2 % are the figures §2 predicted from the coverage report**, now
+produced from the store instead — which is the point: the expensive answer is no
+longer needed in order to ask the cheap question. The store is 187 KB for that
+project, committed, and it is the artifact the whole design turns on.
 
 Ubiquitous types stay expensive under any scheme — a shared base class invalidates
-half the project. That is correct, and not something to engineer around.
+half the project, and the 53.2 % above is exactly that. It is correct, and not
+something to engineer around.
 
 ---
 
