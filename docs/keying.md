@@ -499,7 +499,12 @@ that it is tracked; mule must not move it.
 - `coverage`: `path => { executable, executed, unreached[] }`
 - `tests`: `path => { sig, touches[] }` — what each test file was seen to execute
 - `timings`: `{ key, capturedAt, tests: path => seconds }` — the reference capture
-  (§5), keyed separately so a changed test body marks it stale on its own
+  (§5), keyed separately so a changed test body marks it stale
+
+Shards are **JSON, one file per test class**, under `.mule/cache/`. Not a
+`require`d PHP file: a cache entry that is executed is a cache entry that can run
+code, and these live in a working tree beside the sources they describe. Decoding
+all 328 of the application's costs 0.07 s, so the safer format is also free. on its own
 - `toolchain`: the digest above
 
 **Every mutable source file is in exactly one of four states, and the state is
@@ -563,9 +568,19 @@ came from.
 
 **Persist only the entries that name a test.** The ones that name none are
 recoverable, because a complete shard set contains every line any test executed —
-so their union is the capture. Verified on the application: thinning all 328
-shards and merging them reproduced the monolithic `lineCoverage` exactly, 404
-files and 8,629 entries identical, at **4.0 MB against 46.4 MB — 12×**.
+so their union is the capture. Measured end to end on the application, through the
+real cache format:
+
+| | |
+|---|---|
+| 328 shards written as JSON | **0.35 s, 2.1 MB total** (mean 6 KB) |
+| read back and rehydrated | 0.07 s |
+| merged | 0.09 s |
+| against the fat `.cov` equivalent | 61 MB — **29× smaller** |
+
+and the round trip is exact: 404 files, 8,629 entries, 4,393 test results, all
+identical to the monolithic capture. Half a second to rebuild the whole report
+from cache is what makes the warm path worth having.
 
 An earlier draft of this section proposed storing the skeleton once as a separate
 artifact. That is unnecessary: there is no skeleton to store. The only case where
