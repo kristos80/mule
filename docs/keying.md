@@ -91,9 +91,14 @@ first. `merge()` handles the remapping itself.
 
 **M4 — A monolithic capture can be split into per-test-class shards.**
 Partition `lineCoverage()` by the indices belonging to each class, re-index them
-shard-locally, and carry the matching `testResults` slice. The executable-line
-skeleton (the `NULL` entries) must be kept for every file, because that is what
-makes a merged report's denominator correct.
+shard-locally, and carry the matching `testResults` slice. Lines the shard's own
+tests did not execute are kept as `[]` rather than dropped, so a split shard is
+byte-comparable with a natively captured one.
+
+**`lineCoverage()` holds only lines some test executed** — on the application,
+8,629 entries over 610 files with no `NULL` and no `[]` among them. There is no
+executable-but-unexecuted skeleton in the data; a line nothing runs is simply
+absent. That is what makes thinning safe (§5).
 
 *Verified:* all **328** shards split out of one monolithic capture were
 semantically identical to 328 natively captured ones, compared by resolved test-ID
@@ -550,18 +555,27 @@ same shards. Never shard the cold path directly.
 
 **Warm path: re-capture only the dirty test files, then merge.**
 
-**A shard is 99 % skeleton, and storing it that way is a mistake worth not
-making.** Measured on one application shard: 610 files and 8,629 line entries, of
-which **88 — 1.02 % — actually carry a test**, for 178 KB on disk and 61 MB across
-all 334. The bulk is the executable-line skeleton (M4), which is *identical in
-every shard* because it describes the project rather than the test.
+**A shard is 99 % entries that name no test, and none of them need storing.**
+Measured on one application shard: 610 files and 8,629 line entries, of which
+**88 — 1.02 % — actually carry a test**. The rest are lines some *other* test
+executed, which the split records as `[]` so the shard mirrors the capture it
+came from.
 
-So persist the skeleton **once**, keyed with the digests of the files it
-describes, and persist per shard only the entries that name a test. Merging
-reassembles the two. That is the difference between a ~61 MB cache and a ~1.5 MB
-one, and it matters because the cache is read and rewritten on every warm run.
-Gzip is the lazier answer and buys 7× where this buys ~40×; it is also the wrong
-axis, since the redundancy is structural rather than textual.
+**Persist only the entries that name a test.** The ones that name none are
+recoverable, because a complete shard set contains every line any test executed —
+so their union is the capture. Verified on the application: thinning all 328
+shards and merging them reproduced the monolithic `lineCoverage` exactly, 404
+files and 8,629 entries identical, at **4.0 MB against 46.4 MB — 12×**.
+
+An earlier draft of this section proposed storing the skeleton once as a separate
+artifact. That is unnecessary: there is no skeleton to store. The only case where
+a line would go missing is one no test executes at all, and such a line is absent
+from the monolithic capture too — so the two agree.
+
+Note this does **not** make `Split`'s `[]` entries pointless. Split is faithful
+to the capture on purpose, which is what lets a split shard be compared against a
+natively captured one (M4). Thinning is a property of *persistence*, applied on
+the way to disk.
 
 **Each shard records** its test file's digest *and the digest of every source file
 it recorded non-null line data for, at capture time.*
