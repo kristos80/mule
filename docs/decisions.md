@@ -1154,3 +1154,79 @@ The shape worth remembering, since it has now happened twice in this repository:
 **a fact that decides what a verdict means, and that is not a file, is invisible
 to a cache built out of file digests.** The configuration files were the first
 one. This was the second.
+
+## The gate is hashed as a decision, and a dead entry bricked a real cache
+
+The release before this one recorded the engine's version beside the verdicts
+and compared it before reusing any of them. The entry above calls that the
+second time a fact that decides what a verdict means turned out to be invisible
+to a cache built out of file digests. This entry is about the *first* one coming
+back, in the form of its own fix.
+
+**The symptom.** On a 610-file project, every run did everything. Full coverage,
+all 6,720 mutants, "221 file(s) recorded" — and then the next `mule new`
+answered *"0 of 610 files verified, 610 stale"* and did it all again. The store
+was written, read back, and rejected by the version that had just written it.
+
+**The cause was one entry nothing could delete.** The `configuration` section
+held a digest per configuration file. When mule stopped reading the engine's
+config — it renders one per run now, so a file in the project changes nothing —
+the section stopped being written with an `infection.json5` key. But the store
+already had one, and `Snapshot::merged()` merged the sections: the stored keys
+and the measured keys, unioned. So the dead key was copied forward on every
+write, `describes()` compares for equality, and the comparison could never
+match again. There was no sequence of runs that recovered. The only fix
+available to the project was deleting `.mule/verified.json` by hand, which is
+the cache.
+
+Two things were wrong, and both are fixed, because either alone would have been
+enough to cause this and neither alone prevents the next one.
+
+**A newer definition replaces the stored one rather than merging into it.**
+`Snapshot::merged()` returns the newer snapshot outright when it declares a gate
+at all and that gate differs — `supersedes()`. Merging a definition forward is
+how a record of something mule has stopped declaring survives forever: nothing
+deletes it, the comparison is for equality, and the store is unusable from then
+on with no way back. A narrowed run still carries the stored definition forward,
+because it declares none and must not wipe the record; that asymmetry is the
+whole of `later()`.
+
+**And the gate is hashed as a decision, not as bytes.** `Cache\Declared` now
+returns one entry, `gate`, over the six settings that decide what a mutant
+proves: `source`, `exclude`, `tests`, `mutators`, `mutate-uncovered`, `timeout`.
+Digesting whole files was wrong in both directions, and the bricked cache was
+only the louder half:
+
+- `composer.json` moved whenever a dependency did, so `composer require` threw
+  away every verdict in the store. Measured on the same project: removing two
+  unused dev dependencies cost 610 verdicts. It is not consulted here at all
+  now — the only thing in it that changes a verdict is where the source lives,
+  and that arrives already parsed as `source`.
+- `mule.json` moved whenever `threads` or `min-coverage` did, neither of which
+  can change what a mutant proves, so tuning a run's speed re-proved the
+  project. `narrow` is the same: it is how coverage is measured, not what was
+  proven.
+- A file that stops being read cannot leave a key behind, because there are no
+  per-file keys left to leave.
+
+Reformatting either file, reordering its keys, or writing a default out
+explicitly now all change nothing, which is the property a content-addressed
+cache should have had from the start.
+
+**The payload is a list, not a map.** The settings were first hashed as
+`["tests" => $tests, …]`, and the `ArrayItem` mutator rewrites `=>` as `>`,
+turning the value into `"tests" > $tests`. For a boolean like
+`mutate-uncovered` that comparison still flips when the setting flips, so no
+test that can be written kills it — the mutant is equivalent for every input
+the setting has. Positions carry the same information with nothing to rewrite,
+since a digest never reads its own keys. Designed out rather than suppressed,
+which is what this repository asks for; dropping a position is still a mutant,
+and it is killed by the case for that setting.
+
+**What generalises.** The shape in the entry above was *a fact that decides what
+a verdict means, and that is not a file*. This one is its mirror: **a fact that
+stops deciding anything is as dangerous as one that was never recorded**, and a
+union is the wrong merge for a set that is supposed to be a complete
+description. The store section that says what a verdict *means* is now replaced
+wholesale or not at all; only the sections that say what a verdict is *about*
+accumulate.

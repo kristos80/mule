@@ -101,30 +101,6 @@ final class SnapshotTest extends TestCase {
 		self::assertSame(["src/A.php"], $current->staleAgainst($stored));
 	}
 
-	public function testKnowsWhenEveryTestInItCoversExactlyOneFile(): void {
-		$snapshot = Snapshot::of([], [
-			"tests/ATest.php" => new Touched("tt", ["src/A.php"]),
-			"tests/BTest.php" => new Touched("uu", ["src/B.php"]),
-		]);
-
-		self::assertTrue($snapshot->isAttributionBound());
-	}
-
-	public function testKnowsWhenATestRunsMoreThanOneFile(): void {
-		$snapshot = Snapshot::of([], [
-			"tests/ATest.php" => new Touched("tt", ["src/A.php", "src/B.php"]),
-			"tests/BTest.php" => new Touched("uu", ["src/B.php"]),
-		]);
-
-		self::assertFalse($snapshot->isAttributionBound());
-	}
-
-	public function testTreatsTooFewTestsAsEvidenceOfNothing(): void {
-		$snapshot = Snapshot::of([], ["tests/ATest.php" => new Touched("tt", ["src/A.php"])]);
-
-		self::assertFalse($snapshot->isAttributionBound());
-	}
-
 	public function testNamesWhichOfThePathsGivenItHoldsAVerdictFor(): void {
 		$snapshot = self::snapshot(["src/A.php" => "aa", "src/B.php" => "bb", "src/C.php" => "cc"]);
 
@@ -346,6 +322,53 @@ final class SnapshotTest extends TestCase {
 		$snapshot = Snapshot::of([], [], [], [], [], [], ["z/engine" => "1.0", "a/engine" => "2.0"]);
 
 		self::assertSame(["a/engine", "z/engine"], array_keys($snapshot->engine()));
+	}
+
+	/**
+	 * **The bug this exists for.** A version of mule stopped declaring a file
+	 * and the store went on recording it; the comparison is for equality, so
+	 * the store was unusable from then on, and nothing could remove the entry
+	 * because merging wrote it back every run. It bricked the cache of the
+	 * project this tool was written for.
+	 *
+	 * @return void
+	 */
+	public function testForgetsADeclarationMuleNoLongerMakes(): void {
+		$stored = Snapshot::of([], [], [], [], ["gone.json" => "xx", "gate" => "gg"]);
+
+		$merged = $stored->merged(Snapshot::of([], [], [], [], ["gate" => "gg"]));
+
+		self::assertSame(["gate" => "gg"], $merged->configuration());
+	}
+
+	/**
+	 * A redefined gate does not make the old verdicts old, it makes them
+	 * answers to a different question. Merging them forward is how a store
+	 * comes to claim more than anything proved.
+	 *
+	 * @return void
+	 */
+	public function testDropsTheVerdictsOfAGateThatNoLongerApplies(): void {
+		$stored = Snapshot::of(["src/A.php" => "aa", "src/B.php" => "bb"], [], [], [], ["gate" => "old"]);
+
+		$merged = $stored->merged(Snapshot::of(["src/A.php" => "aa"], [], [], [], ["gate" => "new"]));
+
+		self::assertSame(["src/A.php"], $merged->paths());
+	}
+
+	/**
+	 * A narrowed run cannot say what the whole gate is, so its silence must
+	 * not erase what the store already knew.
+	 *
+	 * @return void
+	 */
+	public function testKeepsTheRecordedGateWhenTheNewerSnapshotCannotSayIt(): void {
+		$stored = Snapshot::of(["src/A.php" => "aa"], [], [], [], ["gate" => "gg"]);
+
+		$merged = $stored->merged(Snapshot::of(["src/B.php" => "bb"], []));
+
+		self::assertSame(["gate" => "gg"], $merged->configuration());
+		self::assertSame(["src/A.php", "src/B.php"], $merged->paths());
 	}
 
 	public function testRejectsNarrowingToAPathItDoesNotHold(): void {

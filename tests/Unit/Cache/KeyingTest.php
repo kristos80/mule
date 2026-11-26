@@ -213,17 +213,14 @@ final class KeyingTest extends TestCase {
 		$this->filesystem->given("/project/infection.json5", '{"mutators": {"@default": true}}');
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
 
-		self::assertSame(["composer.json"], array_keys($this->decoded()["configuration"]));
+		self::assertSame(["gate"], array_keys($this->decoded()["configuration"]));
 	}
 
-	public function testRecordsItsOwnConfigurationBecauseEveryKeyInItDefinesTheGate(): void {
+	public function testRecordsTheGateTheVerdictsWereProvenUnder(): void {
 		$this->filesystem->given("/project/mule.json", '{"mutators": {"default": true}}');
 		$this->givenReport("Cache/Key.php", "Key.php", "/Cache", ["Acme\\Tests\\KeyTest::testOne"]);
 
-		self::assertSame(
-			["composer.json", "mule.json"],
-			array_keys($this->decoded()["configuration"]),
-		);
+		self::assertSame(["gate"], array_keys($this->decoded()["configuration"]));
 		self::assertArrayNotHasKey("mule.json", $this->decoded()["watched"]);
 	}
 
@@ -481,6 +478,17 @@ final class KeyingTest extends TestCase {
 	 * @return Declared
 	 */
 	private function declared(): Declared {
-		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem, new MappedClasses([], [], ["infection/infection" => "0.32.7"]));
+		return new Declared($this->configuration(), new MappedClasses([], [], ["infection/infection" => "0.32.7"]));
+	}
+
+	/**
+	 * @return Configuration
+	 */
+	private function configuration(): Configuration {
+		return Configuration::load(
+			Project::containing("/project", $this->filesystem),
+			$this->filesystem,
+			new CoveringProcesses($this->filesystem),
+		);
 	}
 }

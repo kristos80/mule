@@ -101,6 +101,7 @@ final class GateTest extends TestCase {
 			"mule: 0 of 2 files verified, 2 stale.\n"
 			. "mule: 2 of 2 lines covered (100.0%).\n"
 			. "mule: every test here covers exactly one file, so no change can mark another file stale — see the README on coverage attribution.\n"
+			. "mule: mutating one process at a time; set threads in mule.json to use more.\n"
 			. "mule: 2 file(s) recorded at the full score in .mule/verified.json.",
 			$this->output->text(),
 		);
@@ -287,10 +288,7 @@ final class GateTest extends TestCase {
 
 		$this->gate()->narrowed();
 
-		self::assertSame(
-			["composer.json", "mule.json"],
-			array_keys($this->storedSnapshot()->configuration()),
-		);
+		self::assertSame(["gate"], array_keys($this->storedSnapshot()->configuration()));
 	}
 
 	/**
@@ -521,6 +519,32 @@ final class GateTest extends TestCase {
 			. "from infection/infection 0.32.0 to infection/infection 0.32.7.",
 			$this->output->text(),
 		);
+	}
+
+	/**
+	 * Mule will not choose concurrency for a project — a mutant killed by a
+	 * test made flaky by parallelism is a mutant recorded as dead that nothing
+	 * proved — but silence is how a six-thousand mutant run went
+	 * single-threaded on a project whose own tooling had always asked for
+	 * every core.
+	 *
+	 * @return void
+	 */
+	public function testSaysSoBeforeMutatingOneProcessAtATime(): void {
+		$this->gate()->full();
+
+		self::assertStringContainsString(
+			"mule: mutating one process at a time; set threads in mule.json to use more.",
+			$this->output->text(),
+		);
+	}
+
+	public function testSaysNothingAboutThreadsWhenTheProjectAskedForMore(): void {
+		$this->filesystem->given("/project/mule.json", '{"threads": "max"}');
+
+		$this->gate()->full();
+
+		self::assertStringNotContainsString("one process at a time", $this->output->text());
 	}
 
 	public function testHasSomethingToMutateWhileAnythingIsNotCoveredInFull(): void {
@@ -900,10 +924,7 @@ final class GateTest extends TestCase {
 
 	public function testLeavesNoScratchDirectoryBehindWhenStatusHasToMeasure(): void {
 		$this->gate()->full();
-		$this->filesystem->given(
-			"/project/composer.json",
-			'{"name": "acme/thing", "autoload": {"psr-4": {"Acme\\\\": "src"}}}',
-		);
+		$this->filesystem->given("/project/src/Appeared.php", "<?php class Appeared {}");
 		$this->processes = new CoveringProcesses($this->filesystem, [
 			"Key.php" => ["Acme\\Tests\\KeyTest::testOne"],
 			"Gate.php" => ["Acme\\Tests\\GateTest::testOne"],
@@ -1062,6 +1083,17 @@ final class GateTest extends TestCase {
 	 * @return Declared
 	 */
 	private function declared(): Declared {
-		return new Declared(Project::containing("/project", $this->filesystem), $this->filesystem, new MappedClasses([], [], $this->versions));
+		return new Declared($this->configuration(), new MappedClasses([], [], $this->versions));
+	}
+
+	/**
+	 * @return Configuration
+	 */
+	private function configuration(): Configuration {
+		return Configuration::load(
+			Project::containing("/project", $this->filesystem),
+			$this->filesystem,
+			new CoveringProcesses($this->filesystem),
+		);
 	}
 }

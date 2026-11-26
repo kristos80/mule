@@ -61,7 +61,7 @@ final class MuleTest extends TestCase {
 		self::assertSame([], $store["unproven"]);
 		self::assertSame(["src/A.php" => ["executable" => 1, "executed" => 1]], $store["coverage"]);
 		self::assertIsArray($store["configuration"]);
-		self::assertArrayHasKey("composer.json", $store["configuration"]);
+		self::assertArrayHasKey("gate", $store["configuration"], "the gate is digested as one answer, not file by file.");
 	}
 
 	/**

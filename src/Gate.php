@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule;
 
+use Kristos80\Mule\Cache\Attribution;
 use Kristos80\Mule\Cache\Freshness;
 use Kristos80\Mule\Cache\Keying;
 use Kristos80\Mule\Cache\Reading;
@@ -206,6 +207,10 @@ final readonly class Gate {
 				return $this->shortfall($reach);
 			}
 
+			foreach(Summary::singleThreaded($this->configuration->threads) as $line) {
+				$this->output->line($line);
+			}
+
 			$this->scratch->declare($run, $this->declaration->json($run->mutantsJson()));
 
 			$status = $this->processes->run($this->engine->command($run, $scope), $this->project->root);
@@ -345,7 +350,7 @@ final readonly class Gate {
 	 * @return void
 	 */
 	private function caution(Snapshot $snapshot): void {
-		foreach(Summary::attributionBound($snapshot->isAttributionBound()) as $line) {
+		foreach(Summary::attributionBound(Attribution::bindsEveryTestToOneFile($snapshot->tests())) as $line) {
 			$this->output->line($line);
 		}
 	}
