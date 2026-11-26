@@ -227,6 +227,11 @@ jobs:
             Merging this triggers no further release — the squash commit's subject starts
             with `chore(release):`, which the `release` job skips.
 
+      # `--delete-branch` rather than the repository's own `delete_branch_on_merge`:
+      # that setting is on and did not fire, because the merge is performed by
+      # the Actions app rather than by a person, and the branch outlived its own
+      # release. Asking for it here does not depend on which actor merges.
+      #
       # The one thing that lands on master without a human reading it, and it is
       # a changelog the release already published. GitHub merges it when the
       # gates go green, so the ruleset still decides — nothing is bypassed, the
@@ -237,4 +242,4 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ steps.opened.outputs.pull-request-number }}
-        run: gh pr merge --auto --squash "$PR" --repo "$GITHUB_REPOSITORY"
+        run: gh pr merge --auto --squash --delete-branch "$PR" --repo "$GITHUB_REPOSITORY"
