@@ -19,9 +19,9 @@
         "ext-json": "*",
         "ext-libxml": "*",
         "ext-xmlwriter": "*",
-        "infection/infection": "0.32.7",
+        "infection/infection": "0.35.12",
         "phpunit/php-code-coverage": "^14.5.2",
-        "phpunit/phpunit": "~13.1.14"
+        "phpunit/phpunit": "^13.1.14"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.3",
@@ -43,7 +43,7 @@
         "test:integration": "./vendor/bin/phpunit --configuration=phpunit.integration.xml",
         "test:differential": "herd coverage ./vendor/bin/phpunit --configuration=phpunit.differential.xml",
         "test:coverage": "herd coverage ./vendor/bin/phpunit --coverage-text --coverage-xml=.cov/coverage-xml --log-junit=.cov/junit.xml --exclude-source-from-xml-coverage",
-        "test:mutate": "./vendor/bin/infection --coverage=.cov --skip-initial-tests --threads=max --with-timeouts --min-msi=100 --min-covered-msi=100"
+        "test:mutate": "php -d auto_prepend_file= ./vendor/bin/infection --coverage=.cov --skip-initial-tests --threads=max --with-timeouts --min-msi=100 --min-covered-msi=100"
     },
     "config": {
         "allow-plugins": {

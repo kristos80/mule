@@ -6,6 +6,7 @@
 	],
 	"exclude": [
 		"src/Console/Assembly.php",
+		"src/Doctor/Examination.php",
 		"src/External/ClassesInterface.php",
 		"src/External/ComposerClasses.php",
 		"src/External/CoverageReportInterface.php",

@@ -82,6 +82,15 @@ final readonly class Commands {
 	public function mutate(string $configuration, string $coverage, array $files): array {
 		$command = [
 			$this->interpreter,
+			// **`auto_prepend_file` is cleared, and that restores a guarantee rather
+			// than bypassing a check.** Infection 0.35 refuses to run when one is
+			// set, because a preloaded file executes before its mutant interceptor
+			// can be installed — so it cannot promise the tests ran mutated code.
+			// Measured: Herd sets one (`dump-loader.php`), and every run died before
+			// the first mutant. Clearing it for the engine's own process lets the
+			// interceptor work; Infection sets its own per mutant afterwards.
+			"-d",
+			"auto_prepend_file=",
 			"vendor/bin/infection",
 			"--configuration={$configuration}",
 			"--coverage={$coverage}",

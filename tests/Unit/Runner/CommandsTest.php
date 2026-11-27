@@ -73,8 +73,24 @@ final class CommandsTest extends TestCase {
 	public function testTheEngineIsNotHandedTheCoverageDriver(): void {
 		$command = $this->commands()->mutate("/p/mule.infection.json", "/p/.mule/cache/coverage", []);
 
-		self::assertSame(["/usr/bin/php", "vendor/bin/infection"], array_slice($command, 0, 2));
 		self::assertNotContains("-c", $command);
+		self::assertNotContains("/etc/php.ini", $command);
+	}
+
+	/**
+	 * **Clearing `auto_prepend_file` restores a guarantee rather than bypassing a
+	 * check.** Infection 0.35 refuses to run when one is set, because a preloaded
+	 * file executes before its mutant interceptor can be installed — so it cannot
+	 * promise the tests ran mutated code. Measured: Herd sets one, and every run
+	 * died before the first mutant.
+	 *
+	 * @return void
+	 */
+	public function testTheEngineIsStartedWithNoPreloadedFile(): void {
+		self::assertSame(
+			["/usr/bin/php", "-d", "auto_prepend_file=", "vendor/bin/infection"],
+			array_slice($this->commands()->mutate("/c.json", "/cov", []), 0, 4),
+		);
 	}
 
 	/**
@@ -124,6 +140,8 @@ final class CommandsTest extends TestCase {
 		self::assertSame(
 			[
 				"/usr/bin/php",
+				"-d",
+				"auto_prepend_file=",
 				"vendor/bin/infection",
 				"--configuration=/c.json",
 				"--coverage=/cov",

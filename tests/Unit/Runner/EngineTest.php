@@ -195,7 +195,8 @@ final class EngineTest extends TestCase {
 
 		$this->expectExceptionMessage(
 			"The engine wrote no verdicts, so there is nothing to check and nothing was written.\n"
-			. "/usr/bin/php vendor/bin/infection --configuration=/p/mule.infection.json"
+			. "/usr/bin/php -d auto_prepend_file= vendor/bin/infection"
+			. " --configuration=/p/mule.infection.json"
 			. " --coverage=/p/.mule/cache/coverage --skip-initial-tests --with-timeouts --threads=max"
 			. " --min-msi=100 --min-covered-msi=100 --no-progress -n\n"
 			. "Unable to locate a phpunit executable",

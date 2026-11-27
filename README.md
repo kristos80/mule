@@ -211,29 +211,22 @@ All nine, with the measurements: [`docs/keying.md`](docs/keying.md) §7.
 
 - **[`HOWTO.md`](HOWTO.md)** — the consumer's contract. The three preconditions,
   what happens if you do not meet them, and what to put where.
-- **[`docs/keying.md`](docs/keying.md)** — the specification. Nineteen verified
-  mechanics (M1–M19), the nine guards (G1–G9), what is *not* yet established, and
+- **[`docs/keying.md`](docs/keying.md)** — the specification. Twenty verified
+  mechanics (M1–M20), the nine guards (G1–G9), what is *not* yet established, and
   the measurements behind every number on this page.
 
 ---
 
 ## Requirements
 
-PHP 8.4+. PHPUnit 13.1 and Infection 0.32.7 are pinned dependencies rather than
-things you install alongside: what a verdict means depends on them, so they are in
-the cache key and mule has to know exactly which ones it got.
+PHP 8.4+. PHPUnit `^13.1.14` and Infection `0.35.12` are pinned dependencies
+rather than things you install alongside: what a verdict means depends on them, so
+they are in the cache key and mule has to know exactly which ones it got.
 
-> [!IMPORTANT]
-> **The PHPUnit pin is `~13.1.14`, and that ceiling is a consequence rather than a
-> choice.** Infection 0.32.7 accepts `sebastian/diff` up to `^8`; PHPUnit 13.2 and
-> up require `^9`. So mule cannot currently be installed alongside PHPUnit ≥ 13.2,
-> which includes any project whose runner is **Pest 5**. Infection 0.35 lifts the
-> restriction and bumping it is on the list — it costs re-verifying the nineteen
-> mechanics `docs/keying.md` establishes against 0.32.7.
->
-> This is about the *constraint*, not the test style: plain
-> `PHPUnit\Framework\TestCase` classes are what mule runs, and a project whose
-> tests are those needs no adapter.
+Verified to resolve alongside **Pest 5** — mule, Pest 5.3.7, PHPUnit 13.4.7 and
+Infection 0.35.12 install together. mule runs plain
+`PHPUnit\Framework\TestCase` classes through `vendor/bin/phpunit`, so a project
+whose tests are those needs no adapter whichever runner it normally uses.
 
 A coverage driver — Xdebug or PCOV — for the capture. The mutation run needs none,
 and is deliberately not given one.

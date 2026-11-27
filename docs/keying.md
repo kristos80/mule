@@ -7,9 +7,15 @@ and a green build on broken code.
 every piece of PHPUnit and Infection behaviour it leans on — all of it verified by
 running the pinned versions, none of it inferred.
 
-Pinned: **PHPUnit 13.1.14**, **Infection 0.32.7**, **php-code-coverage 14.5.2**,
-**nikic/php-parser 5.9** (already present transitively via Infection),
-**PHP ≥ 8.4**.
+Pinned: **PHPUnit ^13.1.14** (13.4.8 at the time of writing), **Infection
+0.35.12**, **php-code-coverage 14.5.2**, **nikic/php-parser 5.9** (already present
+transitively via Infection), **PHP ≥ 8.4**.
+
+**Everything below M1–M19 was first established against Infection 0.32.7**, and
+re-verified against 0.35.12 when the engine was bumped: identical mutant counts
+on the same source (1,354 across 38 files, file for file), an identical JSON log
+shape, and the differential fixture's 343 assertions passing unchanged. The two
+differences found are recorded in M6 and M20.
 
 Measured on two projects throughout: **the application** (613 source files, 404
 covered, 51,662 lines, 334 test files / 328 test classes, 6,720 mutants) and **the
@@ -113,9 +119,17 @@ outside the filter need no fresh coverage.
 `timeouted`, `killed`, `killedByStaticAnalysis`, `errored`, `syntaxErrors`,
 `uncovered`, `ignored`. Note `uncovered`, **not** `notCovered`. Each entry carries
 `mutator.{mutatorName, originalFilePath, originalStartLine, originalSourceCode,
-mutatedSourceCode}`, `diff` and `processOutput`. **There is no mutant ID in the
-log** — the console prints `[ID] <md5>` and `--id` can re-run one, but a
-mutant-level cache would have to derive that hash itself. mule keys per file.
+mutatedSourceCode}`, `diff` and `processOutput`.
+
+**0.32.7 carried no mutant ID in the log**; the console printed `[ID] <md5>` and
+`--id` could re-run one, so a mutant-level cache would have had to derive that
+hash itself. **0.35.12 adds an `id` to every entry.** mule keys per file and does
+not read it, so the change costs nothing — but it is the one shape difference
+between the two versions, and a mutant-level cache is now cheaper than this
+document assumed.
+
+Also note the asymmetry inside `stats`: the section is `uncovered` and the
+statistic is `notCoveredCount`. Both spellings are live, in the same file.
 
 **M7 — Attribution in the report decides which tests a mutant faces.** Infection
 selects covering tests from `<covered by="Class::method"/>`. Narrowing those
@@ -322,6 +336,19 @@ and the project's last, so the loader that answers about the project's tests is
 the project's. And `doctor` should say so when it finds mule among the project's
 own dependencies while running from outside it.
 
+**M20 — Infection refuses to run under `auto_prepend_file`.** From 0.35:
+`PreloadedSourceFound` aborts the run before the first mutant, because a preloaded
+file executes before the mutant interceptor can be installed — so the engine
+cannot promise the tests ran mutated code. Measured: Herd sets one
+(`valet/dump-loader.php`), so every run under Herd died with a usage dump and no
+verdicts. 0.32.7 ran anyway.
+
+**Clearing it is restoring a guarantee, not bypassing a check.** mule starts the
+engine with `-d auto_prepend_file=`, after which the interceptor installs normally
+and Infection sets its own per mutant. The capture keeps the parent's ini, because
+that is what loads the coverage driver — the two commands differ here on purpose
+(`Runner\Commands`).
+
 **M19 — `setLineCoverage()` sorts its own keys**, so `lineCoverage()` always
 arrives in canonical file order. Measured: handing it `Zzz, Aaa, Mmm` reads back
 `Aaa, Mmm, Zzz`.
@@ -527,7 +554,7 @@ decides every verdict.
 
 **Infection's is rendered by mule, and a project-level one is refused.** Not
 ignored — *refused*, with a message naming the file. Every key that would defeat
-a guard is settable there, and all ten of these exist in Infection 0.32.7's own
+a guard is settable there, and all ten of these exist in Infection's own
 schema:
 
 | key | what it would defeat |
@@ -1167,8 +1194,9 @@ something to engineer around.
   altogether — and the owed list is a comparison of fresh keys against banked
   verdicts. One consequence is an improvement: a file that has appeared now makes
   the *capture* whole but the mutation run filtered to what actually moved.
-- **The pinned toolchain has a ceiling nobody chose, and it blocks the intended
-  consumer.** Measured by trying to install v5 into the 613-file application:
+- **~~The pinned toolchain has a ceiling nobody chose.~~** Settled, and the trail
+  is worth keeping. Measured by trying to install v5 into the 613-file application
+  and failing:
 
   | package | requires `sebastian/diff` |
   |---|---|
@@ -1176,28 +1204,21 @@ something to engineer around.
   | PHPUnit 13.1.14 | `^8.3.0` |
   | PHPUnit **13.2.0 and up** | `^9.0` |
 
-  So pinning Infection `0.32.7` caps PHPUnit at **13.1.x**, and the declared
-  `^13.1.14` admitted 13.2–13.5, none of which can resolve. The constraint is
-  `~13.1.14` now, which fails with one legible line instead of a conflict tree —
-  but the ceiling is real and it is not where anybody wanted it.
+  So pinning Infection `0.32.7` capped PHPUnit at **13.1.x**, while the declared
+  `^13.1.14` admitted 13.2–13.5 — none of which could resolve. The application
+  installs **Pest 5**, which requires PHPUnit `^13.4`, so v5 could not be installed
+  there at all.
 
-  The consequence for the application: it installs **Pest 5** as its runner, and
-  Pest requires PHPUnit `^13.4` — so the two cannot share a `composer.json` and
-  the end-to-end saving figure (§2, §5) is still a hand measurement for that
-  reason rather than for want of trying.
+  **The test *style* was never the problem**, and an earlier draft of this
+  paragraph said it was. Checked: the application's tests are plain
+  `PHPUnit\Framework\TestCase` classes and it has a `phpunit.xml`, so
+  `vendor/bin/phpunit` runs them and no Pest adapter is needed.
 
-  **The test *style* is not the problem**, and an earlier draft of this paragraph
-  said it was. Checked: the application's tests are plain `PHPUnit\Framework\TestCase`
-  classes and it has a `phpunit.xml`, so `vendor/bin/phpunit` runs them and mule
-  needs no Pest adapter. The single blocker is the `sebastian/diff` ceiling above.
-
-  **Infection 0.35.12 accepts `sebastian/diff ^9.0`**, so bumping it lifts the
-  ceiling. What that costs is re-verification: M1–M19 and G1–G9 were all
-  established against 0.32.7 — the JSON log's shape, the `uncovered` key name
-  (M6), `killedByStaticAnalysis` (M15), the MSI arithmetic (M14), the skipped-mutant
-  behaviour (M12). The differential fixture (§7) is the instrument for that,
-  because it compares the pipeline against the engine's own verdicts mutant by
-  mutant; it is not a substitute for re-reading the log format.
+  Infection **0.35.12** accepts `sebastian/diff ^9.0`, and the engine is pinned
+  there now. Verified: mule, Pest 5.3.7, PHPUnit 13.4.7 and Infection 0.35.12
+  resolve together. What the bump cost is in the header above — identical mutant
+  counts, identical log shape, the differential unchanged — plus M20, which is a
+  new refusal in 0.35 and a correct one.
 
 - **`doctor`'s thresholds are judgements, not findings.** 25 % for dense, 40 % for
   a hot spot, 100 files for small. They were chosen to put the two projects this

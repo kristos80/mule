@@ -222,11 +222,18 @@ final class PipelineTest extends TestCase {
 	private function mutate(string $coverage, string $log): array {
 		$this->configure($log);
 
+		// **No preloaded file, and no coverage driver either.** Infection refuses to
+		// run under `auto_prepend_file` — a preloaded file executes before its
+		// mutant interceptor can be installed, so it cannot promise the tests ran
+		// mutated code — and Herd sets one. Mutation reads a report that already
+		// exists, so it needs no driver; `Runner\Commands::mutate()` builds the same
+		// two decisions for the real thing.
 		$command = sprintf(
-			"cd %s && %s --coverage=%s --skip-initial-tests --with-timeouts --threads=4"
-			. " --no-progress -n 2>&1",
+			"cd %s && %s -d auto_prepend_file= %s --coverage=%s --skip-initial-tests"
+			. " --with-timeouts --threads=4 --no-progress -n 2>&1",
 			escapeshellarg(self::FIXTURE),
-			self::interpreter() . " " . escapeshellarg(self::binary("infection")),
+			escapeshellarg(PHP_BINARY),
+			escapeshellarg(self::binary("infection")),
 			escapeshellarg($coverage),
 		);
 

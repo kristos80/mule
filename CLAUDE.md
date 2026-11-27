@@ -13,7 +13,7 @@ pinned tools rather than by reading their documentation.
 
 | | |
 |---|---|
-| `docs/keying.md` | **the specification.** M1–M19 verified mechanics, G1–G9 guards, GN1–GN3 narrowing-only, §10 what is *not* established, §11 the v1 scope and build order |
+| `docs/keying.md` | **the specification.** M1–M20 verified mechanics, G1–G9 guards, GN1–GN3 narrowing-only, §10 what is *not* established, §11 the v1 scope and build order |
 | `HOWTO.md` | the contract a consumer accepts: preconditions, and what happens when each is broken |
 | `docs/decisions.md` | why the repository is shaped the way it is. Written for v4; the release machinery, the conventions and the external-layer reasoning still hold. Its cache design is superseded by `docs/keying.md` |
 
