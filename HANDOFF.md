@@ -232,7 +232,12 @@ strict: three `TRUE` values nothing read, three redundant `array_values()` after
 a `sort()`, and five exception-message assertions matching a substring and so
 blind to a concat mutation. Assert whole messages.
 
-## 9. Remaining, in order
+## 9. Remaining
+
+**See `PLAN.md`** for the sequence the run executes, every class with its
+signature, the build order, the guarantees each gate enforces, the twelve
+validation scenarios, and what is deliberately not built. The list below is the
+summary only.
 
 1. `Domain/Coverage/` — `CoverageMetaReader` (project-relative `sourceRoot`,
    refuse `schemaVersion !== 1`) and per-file executable/executed from
