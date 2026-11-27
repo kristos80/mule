@@ -18,13 +18,14 @@ One command, one pass, no modes. `bin/mule` builds the container and calls
 |---|---|---|---|
 | 1 | list the tests | `InventoryCommand` → `ProcessRunner` → `InventoryReader` | separate process; `--list-tests-xml` is list-and-exit (mechanic 1) |
 | 2 | run the suite once, with coverage | `BatchCommand` → `ProcessRunner` | emits `coverage-xml`, `jsonl`, `junit.xml` together (mechanic 2) |
+| 2a | **refuse unless the suite was green** | `SuiteOutcomeReader` → `SuiteGate` | reads the JUnit log already produced; a failing test makes every verdict meaningless, and a test that failed *after* covering a file leaves the file looking covered |
 | 3 | read the report's metadata | `CoverageMetaReader` | gives the project-relative source root; refuses `schemaVersion !== 1` |
 | 4 | read per-file reach | `CoverageReader` | executable/executed per gated source |
 | 5 | build the ownership relation | `OwnershipReader` | **built** |
 | 6 | refuse missing coverage | `CoverageGate` | before any identity is computed; mechanic 7 means Infection will not catch this |
 | 7 | digest every source and test file once | `DigestMapReader` | one read per file for the whole run |
 | 8 | derive and digest the support boundary | `SupportBoundaryResolver` | the part coverage cannot see (mechanic 5) |
-| 9 | digest the toolchain | `ToolchainReader` | |
+| 9 | digest the toolchain and both rendered configurations | `ToolchainReader`, `ConfigurationsReader` | the `config` term; see §7 |
 | 10 | compute an identity per gated source | `IdentityCalculator` + `CoexecutionResolver` | **resolver built** |
 | 11 | load banked verdicts | `JsonVerdictLedgerRepository` | a corrupt ledger reads as empty, never as partially valid |
 | 12 | partition | `VerificationPlanner` | reusable vs owed |
@@ -120,6 +121,18 @@ interface ToolchainReaderInterface {
 	public function read(): Toolchain;
 }
 
+final readonly class Configurations {               // anemic
+	public function __construct(
+		public string $engine,                      // the rendered mule.infection.json
+		public string $suite,                       // the coverage-relevant phpunit configuration
+		public string $digest,
+	) {}
+}
+
+interface ConfigurationsReaderInterface {
+	public function read(): Configurations;
+}
+
 final readonly class VerificationId {               // value object
 	public function __construct(public string $value) {}
 }
@@ -131,6 +144,7 @@ interface IdentityCalculatorInterface {
 		DigestMap $digests,
 		SupportBoundary $support,
 		Toolchain $toolchain,
+		Configurations $configurations,
 	): VerificationId;
 }
 ```
@@ -143,7 +157,7 @@ extension, since hermes-2 carries 4 `.json` fixtures; skipping dotfiles, because
 a `.DS_Store` in the digest breaks P3.
 
 `IdentityCalculator` depends on `CoexecutionResolverInterface` and hashes exactly
-the five terms in `HANDOFF.md` §5, in that order, with both lists sorted.
+the six terms in `HANDOFF.md` §5, in that order, with both lists sorted.
 
 ### `Domain/Verdict/`
 
@@ -188,6 +202,23 @@ interface OutcomeReaderInterface {
 ```php
 final readonly class Refusal {                      // anemic
 	public function __construct(public string $file, public string $reason) {}
+}
+
+final readonly class SuiteOutcome {                 // anemic
+	public function __construct(
+		public int $tests,
+		public int $failures,
+		public int $errors,
+	) {}
+}
+
+interface SuiteOutcomeReaderInterface {
+	public function read(string $junitXml): SuiteOutcome;
+}
+
+interface SuiteGateInterface {
+	/** @return list<Refusal> */
+	public function check(SuiteOutcome $outcome): array;
 }
 
 interface CoverageGateInterface {
@@ -435,3 +466,67 @@ case, none.
 | declared list of fixture-executing production files | less sound and more expensive than the one-hop term, and a hand-maintained list was explicitly rejected |
 | narrowing mode, doctor tiers, plugins, extra modes, v5 cache compatibility | not in the brief; each is a second architecture |
 | runtime enforcement of unit isolation | a precondition, and not checkable from attribution (mechanic 6) |
+
+## 7. Ideas taken from `fallow`, and ideas declined
+
+Read `fallow`'s mutation-testing design (a Rust/JS tool, `docs/mutation-testing.md`)
+for prior art. It is a different shape — it samples mutants and ships modes mule
+will not have — but three things in it were worth taking, and one of them was a
+defect here.
+
+### Taken: the rendered configuration belongs in the cache key
+
+`fallow`'s result-cache key includes "scope, runner selection, and targets".
+mule's identity had package versions and nothing about what the engine was told
+to do, so enabling a mutator in `mule.json` would have changed which mutants
+exist while every identity stayed put. Fixed — `HANDOFF.md` §5 now carries a
+`config` term. **This was the most valuable thing in the document**, and it was
+found by comparison rather than by reasoning about mule's own design.
+
+### Taken: completeness, not emptiness, is what makes a result conclusive
+
+`fallow`: *"Only `completion.status: complete` makes an empty survivor list
+conclusive"*, and a run whose baseline failures leave mutants without a test
+result exits non-zero rather than reporting a clean sheet. mule had the per-file
+half of this and was missing the suite half: nothing in the plan asserted the
+test suite was **green** before verdicts were trusted. Added as step 2a. A
+failing suite yields partial attribution, and a test that fails after covering a
+file leaves the file looking covered — so the coverage gate alone would not catch
+it.
+
+### Taken, as an experiment: identity that survives reformatting
+
+`fallow`: *"a mutant id depends on the text of its function, not on the offset of
+the block, so an edit of the template keeps the ids"*. mule digests whole file
+bytes, so reindenting `AbstractController` or reflowing one of its docblocks
+invalidates 215 verdicts for no semantic change — and this codebase is
+deliberately comment-heavy, so that churn is not hypothetical.
+
+A tokenizer-normalised digest gets most of it without an AST. Verified:
+`ext-tokenizer` is core, and dropping `T_WHITESPACE` makes a reformatted file
+digest identically while a changed `return 1;` → `return 2;` still differs.
+
+**What stopped it going straight in**: dropping comments as well is *unsound*.
+`@infection-ignore-all` is matched through php-parser's `getComments()`, which
+returns line comments as well as docblocks, so adding that annotation in a `//`
+comment changes which mutants exist. A comment-stripped digest would not notice
+and would bank a stale verdict.
+
+So: **whitespace-only normalisation is safe and is what gets built** if this is
+done; comment stripping would need Infection's full annotation vocabulary
+verified first, and conditioning the strip on "the file mentions `@infection`
+anywhere" encodes a guess about another tool's future. Not worth it for an
+unmeasured gain — and the gain *is* unmeasured, since the split between
+formatting churn and comment churn in this repo is unknown.
+
+### Declined, with reasons
+
+| idea | why not |
+|---|---|
+| timeouts count toward the score — `(killed + timeout) / …` | mule refuses a timed-out mutant as proof. Worth recording that a serious tool does the opposite: it is exactly why mule always passes `--with-timeouts` and asserts the kind per mutant rather than trusting a score |
+| refuse a dirty worktree unless `--allow-dirty` | mule needs no such flag. A content-addressed identity handles a dirty tree correctly by construction — the digests *are* the working tree |
+| `--max-mutants`, `--mutants-per-line` sampling | incompatible with a 100% MSI bar; a sampled run cannot bank a verdict |
+| retry survivors and timeouts to detect flakiness | doubles engine cost, and determinism is P2 — the user's rule, not something mule can buy |
+| outcome journal and `--resume` | mule's answer is simpler and already required: whole-ledger replace, corrupt reads as empty, so an interrupted run leaves the previous ledger intact and the next run is merely cold |
+| `test_reach` taxonomy (`mocked-only`, `transitive`, `direct`, …) for uncovered code | mule refuses missing coverage outright, so it needs no vocabulary for degrees of it. The `direct` vs `transitive` distinction is the narrowing architecture the brief rules out |
+| kill matrix / test-redundancy reporting | a different product |

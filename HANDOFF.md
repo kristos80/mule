@@ -154,8 +154,17 @@ ID(F) = HASH(
     ("coexecuted", sorted (G, digest(G)) for G ∈ ⋃ owns(T), T ∈ owners(F), G ≠ F),
     ("support",    supportDigest),
     ("toolchain",  toolchainDigest),
+    ("config",     digest(rendered mule.infection.json) + digest(coverage-relevant phpunit config)),
 )
 ```
+
+**The `config` term was missing until 2026-11-27 and its absence was a real
+hole.** The toolchain term carries package versions only, so changing
+`mutators` in `mule.json` — enabling `@identical`, say — would have changed which
+mutants exist while every identity stayed put, and every stale verdict would have
+been reused. The rendered configurations decide what the engine does, so they
+belong in the key. Found by comparing against `fallow`, whose result-cache key
+includes "scope, runner selection, and targets".
 
 Paths project-relative (P3: a key must hit in CI too). Both lists sorted, because
 `executionOrder="random"` changes arrival order on purpose.
