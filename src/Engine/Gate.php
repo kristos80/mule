@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Engine;
 
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Verdict;
 use Kristos80\Mule\Failure;
@@ -55,7 +56,7 @@ final readonly class Gate {
 	 * @param Outcome $outcome
 	 * @param array<string, non-empty-string> $keys The files re-proven, and what each one keys to now.
 	 * @param non-empty-string $toolchain
-	 * @param array<string, list<string>> $tests What each test file was seen to run.
+	 * @param array<string, Footprint> $tests What each test file was seen to run.
 	 * @param list<string> $uncovered Files the report does not cover to the floor.
 	 * @return Snapshot
 	 */

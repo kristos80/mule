@@ -6,6 +6,7 @@ namespace Kristos80\Mule\Tests\Unit\Engine;
 use Kristos80\Mule\Engine\Gate;
 use Kristos80\Mule\Engine\Outcome;
 use Kristos80\Mule\Failure;
+use Kristos80\Mule\Cache\Footprint;
 use PHPUnit\Framework\TestCase;
 
 final class GateTest extends TestCase {
@@ -169,11 +170,11 @@ final class GateTest extends TestCase {
 			$this->outcome(),
 			["src/A.php" => "key-a"],
 			"chain",
-			["tests/ATest.php" => ["src/A.php"]],
+			$tests = ["tests/ATest.php" => new Footprint("sig", ["src/A.php"])],
 		);
 
 		self::assertSame("chain", $snapshot->toolchain);
-		self::assertSame(["tests/ATest.php" => ["src/A.php"]], $snapshot->tests);
+		self::assertSame($tests, $snapshot->tests);
 	}
 
 	/**

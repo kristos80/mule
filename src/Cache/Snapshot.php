@@ -38,7 +38,11 @@ final readonly class Snapshot {
 	 * on, are derivable from this alone: a test covers `F` when `F` is among what
 	 * it executed.
 	 *
-	 * @var array<string, list<string>>
+	 * **Each record carries the bytes it was measured at**, because a test that
+	 * covers nothing has its digest in no file's key and would otherwise be a file
+	 * mule has heard of and recorded nothing checkable about (`Footprint`).
+	 *
+	 * @var array<string, Footprint>
 	 */
 	public array $tests;
 
@@ -51,7 +55,7 @@ final readonly class Snapshot {
 	 *
 	 * @param array<string, Verdict> $verdicts
 	 * @param list<string> $unproven
-	 * @param array<string, list<string>> $tests
+	 * @param array<string, Footprint> $tests
 	 * @param non-empty-string $toolchain The environment every verdict here was proven under.
 	 */
 	public function __construct(
@@ -82,8 +86,8 @@ final readonly class Snapshot {
 	public function coveredBy(string $file): array {
 		$covering = [];
 
-		foreach($this->tests as $test => $touches) {
-			if(in_array($file, $touches, TRUE)) {
+		foreach($this->tests as $test => $footprint) {
+			if($footprint->covers($file)) {
 				$covering[] = $test;
 			}
 		}
@@ -109,7 +113,7 @@ final readonly class Snapshot {
 		$deps = [];
 
 		foreach($this->coveredBy($file) as $test) {
-			foreach($this->tests[$test] as $touched) {
+			foreach($this->tests[$test]->touches as $touched) {
 				$deps[] = $touched;
 			}
 		}
@@ -134,8 +138,8 @@ final readonly class Snapshot {
 	public function known(): array {
 		$known = [...array_keys($this->verdicts), ...$this->unproven, ...array_keys($this->tests)];
 
-		foreach($this->tests as $touches) {
-			foreach($touches as $touched) {
+		foreach($this->tests as $footprint) {
+			foreach($footprint->touches as $touched) {
 				$known[] = $touched;
 			}
 		}
@@ -144,6 +148,29 @@ final readonly class Snapshot {
 		sort($unique);
 
 		return $unique;
+	}
+
+	/**
+	 * The test files whose recorded bytes are not the bytes on disk.
+	 *
+	 * **The half of the cheap question that keys cannot answer.** A test file's
+	 * digest reaches a key only through the files it covers, so a test that covers
+	 * nothing has its bytes in no key — and editing it to start covering something
+	 * moves nothing. Asking the record directly is what notices.
+	 *
+	 * @param array<string, non-empty-string> $digests
+	 * @return list<string>
+	 */
+	public function unmeasured(array $digests): array {
+		$unmeasured = [];
+
+		foreach($this->tests as $test => $footprint) {
+			if(isset($digests[$test]) && !$footprint->describes($digests, $test)) {
+				$unmeasured[] = $test;
+			}
+		}
+
+		return $unmeasured;
 	}
 
 	/**

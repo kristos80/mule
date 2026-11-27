@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Runner;
 
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Cache\Key;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Standing;
@@ -62,7 +63,7 @@ final readonly class Run {
 		$live = $this->live($stored, $digests);
 		$partial = !$whole && $standing->usable && $live !== [];
 
-		if($partial && $standing->outstanding === []) {
+		if($partial && $standing->outstanding === [] && $standing->unmeasured === []) {
 			return Finding::settled($stored, $standing);
 		}
 
@@ -155,14 +156,14 @@ final readonly class Run {
 	 *
 	 * @param Snapshot $stored
 	 * @param array<string, non-empty-string> $digests
-	 * @return array<string, list<string>>
+	 * @return array<string, Footprint>
 	 */
 	private function live(Snapshot $stored, array $digests): array {
 		$live = [];
 
-		foreach($stored->tests as $test => $touches) {
+		foreach($stored->tests as $test => $footprint) {
 			if(isset($digests[$test])) {
-				$live[$test] = $touches;
+				$live[$test] = $footprint;
 			}
 		}
 

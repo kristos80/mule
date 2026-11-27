@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Runner;
 
 use Closure;
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Coverage\Capture;
@@ -26,6 +27,7 @@ use Kristos80\Mule\Tests\Support\StubClasses;
 use Kristos80\Mule\Tests\Support\StubLines;
 use PHPUnit\Framework\TestCase;
 use SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData;
+use function basename;
 use function count;
 use function json_encode;
 use function str_ends_with;
@@ -89,7 +91,13 @@ final class RunTest extends TestCase {
 	 *
 	 * @var list<string>
 	 */
-	private array $silent = [];
+	private array $silent = ["Ccc"];
+
+	/**
+	 * The one line each test class runs on its own, besides the shared `Hub.php`.
+	 * `CccTest` has none: it executes no instrumented source at all (M16).
+	 */
+	private const array OWN = ["Aaa" => ["A.php" => 3], "Bbb" => ["B.php" => 4], "Ccc" => []];
 
 	/**
 	 * Whether `AaaTest` has also started covering `B.php` — attribution changing
@@ -142,11 +150,30 @@ final class RunTest extends TestCase {
 	 */
 	private function capturing(array $command): void {
 		$last = $command[count($command) - 1];
-		$only = str_ends_with($last, "Test.php") ? [$last === "tests/Unit/AaaTest.php" ? "Aaa" : "Bbb"] : ["Aaa", "Bbb"];
-		$covering = array_values(array_diff($only, $this->silent));
+		$only = str_ends_with($last, "Test.php") ? [substr(basename($last), 0, 3)] : $this->classes();
+		// **The JUnit log lists every class PHPUnit ran**, whether or not it
+		// executed any instrumented source — attribution is the other file. A fake
+		// that dropped the silent ones would make mule look like it had lost a
+		// timing it never had any business losing.
+		$this->filesystem->payloads[self::PAYLOAD] = $this->payload(array_values(array_diff($only, $this->silent)));
+		$this->filesystem->files[self::JUNIT] = $this->junit($only);
+	}
 
-		$this->filesystem->payloads[self::PAYLOAD] = $this->payload($covering);
-		$this->filesystem->files[self::JUNIT] = $this->junit($covering);
+	/**
+	 * The test classes the tree has, which is however many test files are in it.
+	 *
+	 * @return list<string>
+	 */
+	private function classes(): array {
+		$classes = [];
+
+		foreach(["Aaa", "Bbb", "Ccc"] as $class) {
+			if($this->filesystem->exists("/p/tests/Unit/{$class}Test.php")) {
+				$classes[] = $class;
+			}
+		}
+
+		return $classes;
 	}
 
 	/**
@@ -224,8 +251,11 @@ final class RunTest extends TestCase {
 		foreach($classes as $index => $class) {
 			$ids[$index] = "{$class}Test::testOne";
 			$results["{$class}Test::testOne"] = ["size" => "unknown", "status" => "success", "time" => 0.5];
-			$lines[$class === "Aaa" ? "A.php" : "B.php"][$class === "Aaa" ? 3 : 4][$index] = 1;
 			$lines["Hub.php"][5][$index] = 1;
+
+			foreach(self::OWN[$class] as $file => $line) {
+				$lines[$file][$line][$index] = 1;
+			}
 
 			if($class === "Aaa" && $this->shared) {
 				$lines["B.php"][4][$index] = 1;
@@ -275,6 +305,7 @@ final class RunTest extends TestCase {
 				new StubClasses([
 					"AaaTest" => "/p/tests/Unit/AaaTest.php",
 					"BbbTest" => "/p/tests/Unit/BbbTest.php",
+					"CccTest" => "/p/tests/Unit/CccTest.php",
 				]),
 				$commands,
 				new Shards($this->filesystem, "/p/.mule/cache"),
@@ -296,6 +327,23 @@ final class RunTest extends TestCase {
 			new Gate(),
 			$toolchain,
 		);
+	}
+
+	/**
+	 * A test record as its touch lists alone, so a whole-map comparison reads as
+	 * what each test runs rather than as object identity.
+	 *
+	 * @param array<string, Footprint> $tests
+	 * @return array<string, list<string>>
+	 */
+	private function touches(array $tests): array {
+		$touches = [];
+
+		foreach($tests as $test => $footprint) {
+			$touches[$test] = $footprint->touches;
+		}
+
+		return $touches;
 	}
 
 	/**
@@ -326,7 +374,7 @@ final class RunTest extends TestCase {
 				"tests/Unit/AaaTest.php" => ["src/A.php", "src/Hub.php"],
 				"tests/Unit/BbbTest.php" => ["src/B.php", "src/Hub.php"],
 			],
-			($this->mule())()->store->tests,
+			$this->touches(($this->mule())()->store->tests),
 		);
 	}
 
@@ -633,7 +681,10 @@ final class RunTest extends TestCase {
 
 		$finding = $mule();
 
-		self::assertSame(["tests/Unit/BbbTest.php" => ["src/Hub.php"]], array_slice($finding->store->tests, 1));
+		self::assertSame(
+			["tests/Unit/BbbTest.php" => ["src/Hub.php"]],
+			array_slice($this->touches($finding->store->tests), 1),
+		);
 		self::assertFalse($finding->measured);
 	}
 
@@ -717,7 +768,7 @@ final class RunTest extends TestCase {
 		self::assertTrue($finding->standing->usable);
 		self::assertSame("the store describes this tree", $finding->standing->because);
 		self::assertArrayHasKey("tests/Unit/AaaTest.php", $finding->store->tests);
-		self::assertSame([], $finding->store->tests["tests/Unit/AaaTest.php"]);
+		self::assertSame([], $finding->store->tests["tests/Unit/AaaTest.php"]->touches);
 	}
 
 	/**
@@ -767,7 +818,7 @@ final class RunTest extends TestCase {
 		self::assertCount(1, $this->commands());
 		self::assertSame([], $finding->examined);
 		self::assertTrue($finding->holds());
-		self::assertSame([], $finding->store->tests["tests/Unit/CccTest.php"]);
+		self::assertSame([], $finding->store->tests["tests/Unit/CccTest.php"]->touches);
 	}
 
 	public function testAndTheRunAfterThatIsCheapAgain(): void {
@@ -798,5 +849,31 @@ final class RunTest extends TestCase {
 
 		self::assertNotContains("tests/Unit/AaaTest.php", $this->commands()[0]);
 		self::assertContains("--filter=src/C.php", $this->commands()[1]);
+	}
+
+	/**
+	 * **A test that covered nothing and now covers something.** Its digest belongs
+	 * to no source file's key, because it touched nothing — so recomputing every
+	 * key from the store finds nothing moved, and the cheap question answers
+	 * "nothing is owed" while the coverage picture has changed underneath it.
+	 *
+	 * Not a false verdict: adding a covering test cannot un-kill a mutant. But it
+	 * is mule claiming the store describes this tree when it does not, and that
+	 * claim is the only thing the fast path has to sell.
+	 *
+	 * @return void
+	 */
+	public function testATestThatStartsCoveringSomethingIsNoticed(): void {
+		($this->mule())();
+		$this->filesystem->files["/p/tests/Unit/CccTest.php"] = "<?php // ccc, asserts about a fixture";
+		($this->mule())();
+		$this->silent = [];
+		$this->filesystem->files["/p/tests/Unit/CccTest.php"] = "<?php // ccc, now running Hub";
+		$this->processes->started = [];
+
+		$finding = ($this->mule())();
+
+		self::assertTrue($finding->measured);
+		self::assertSame(["src/Hub.php"], $finding->store->tests["tests/Unit/CccTest.php"]->touches);
 	}
 }

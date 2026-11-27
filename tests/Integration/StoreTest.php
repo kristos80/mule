@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Integration;
 
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Cache\StoreFormat;
@@ -25,7 +26,7 @@ final class StoreTest extends TestCase {
 	/**
 	 * @param array<string, int<0, max>> $proven
 	 * @param list<string> $unproven
-	 * @param array<string, list<string>> $tests
+	 * @param array<string, Footprint> $tests
 	 * @return Snapshot
 	 */
 	private function snapshot(
@@ -34,6 +35,7 @@ final class StoreTest extends TestCase {
 		string $toolchain = "chain",
 		array $tests = [],
 	): Snapshot {
+		/** @var array<string, Footprint> $tests */
 		/** @var non-empty-string $toolchain */
 		$verdicts = [];
 

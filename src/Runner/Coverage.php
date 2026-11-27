@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Runner;
 
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Coverage\Capture;
 use Kristos80\Mule\Coverage\Merge;
@@ -70,8 +71,12 @@ final readonly class Coverage {
 
 		$capture = $this->capture();
 		$timings = Timings::from($this->filesystem->read($this->junit()));
-		$tests = array_fill_keys($known, []);
+		$tests = [];
 		$claimed = [];
+
+		foreach($known as $test) {
+			$tests[$test] = new Footprint($this->signature($test), []);
+		}
 
 		foreach(new Split($capture)->byTestClass() as $class => $shard) {
 			$test = $this->fileOf($class);
@@ -85,7 +90,7 @@ final readonly class Coverage {
 
 			$this->shards->write($test, Shard::of($class, $shard, $this->digestsFor($test, $touches)));
 
-			$tests[$test] = $touches;
+			$tests[$test] = new Footprint($this->signature($test), $touches);
 		}
 
 		$this->shards->writeTimings($timings);
@@ -96,7 +101,7 @@ final readonly class Coverage {
 	/**
 	 * The dirty test files re-measured, everything else taken off disk.
 	 *
-	 * @param array<string, list<string>> $recorded What the store says each test file runs.
+	 * @param array<string, Footprint> $recorded What the store says each test file runs.
 	 * @param array<string, non-empty-string> $digests Every file on disk mule cares about, and its digest.
 	 * @return Measured
 	 */
@@ -116,7 +121,7 @@ final readonly class Coverage {
 				// coverage from a test that no longer provides any.
 				$this->shards->forget($test);
 
-				$tests[$test] = [];
+				$tests[$test] = new Footprint($this->signature($test), []);
 
 				continue;
 			}
@@ -130,7 +135,7 @@ final readonly class Coverage {
 
 			$this->shards->write($test, Shard::of($classes[0], $shard, $this->digestsFor($test, $touches)));
 
-			$tests[$test] = $touches;
+			$tests[$test] = new Footprint($this->signature($test), $touches);
 		}
 
 		return new Measured($this->merged(array_keys($recorded)), $this->shards->readTimings(), $tests);
@@ -168,7 +173,7 @@ final readonly class Coverage {
 	 * it touched is stale, because it touched nothing, and the file it now covers
 	 * would stay looking unreached on every run from here on.
 	 *
-	 * @param array<string, list<string>> $recorded
+	 * @param array<string, Footprint> $recorded
 	 * @param array<string, non-empty-string> $digests
 	 * @return list<string>
 	 */
@@ -283,6 +288,14 @@ final readonly class Coverage {
 	}
 
 	/**
+	 * @param string $test
+	 * @return non-empty-string
+	 */
+	private function signature(string $test): string {
+		return $this->filesystem->digest($this->project->absolute($test));
+	}
+
+	/**
 	 * The digests a shard is reusable against: its own test file, and every
 	 * source file it recorded coverage for.
 	 *
@@ -291,7 +304,7 @@ final readonly class Coverage {
 	 * @return array<string, non-empty-string>
 	 */
 	private function digestsFor(string $test, array $touches): array {
-		$digests = [$test => $this->filesystem->digest($this->project->absolute($test))];
+		$digests = [$test => $this->signature($test)];
 
 		foreach($touches as $touched) {
 			$digests[$touched] = $this->filesystem->digest($this->project->absolute($touched));

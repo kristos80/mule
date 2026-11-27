@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Unit\Runner;
 
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Coverage\Capture;
 use Kristos80\Mule\Project;
@@ -69,7 +70,12 @@ final class CoverageTest extends TestCase {
 			? [$last === "tests/Unit/AaaTest.php" ? "Aaa" : "Bbb"]
 			: ["Aaa", "Bbb"];
 
-		$this->willCapture(array_values(array_diff($only, $this->silent)));
+		// **The JUnit log lists every class PHPUnit ran**, whether or not it
+		// executed any instrumented source — attribution is the other file. A fake
+		// that dropped the silent ones would make mule look like it had lost a
+		// timing it never had any business losing.
+		$this->filesystem->payloads[self::PAYLOAD] = $this->payload(array_values(array_diff($only, $this->silent)));
+		$this->filesystem->files[self::JUNIT] = $this->junit($only);
 
 		return ["status" => 0, "output" => ""];
 	}
@@ -142,23 +148,20 @@ final class CoverageTest extends TestCase {
 	}
 
 	/**
-	 * @param list<string> $classes
-	 * @return void
-	 */
-	private function willCapture(array $classes = ["Aaa", "Bbb"]): void {
-		$this->filesystem->payloads[self::PAYLOAD] = $this->payload($classes);
-		$this->filesystem->files[self::JUNIT] = $this->junit($classes);
-	}
-
-	/**
 	 * What the store would hold after a cold run.
 	 *
-	 * @return array<string, list<string>>
+	 * @return array<string, Footprint>
 	 */
 	private function recorded(): array {
 		return [
-			"tests/Unit/AaaTest.php" => ["src/A.php", "src/Hub.php"],
-			"tests/Unit/BbbTest.php" => ["src/B.php", "src/Hub.php"],
+			"tests/Unit/AaaTest.php" => new Footprint(
+				$this->filesystem->digest("/p/tests/Unit/AaaTest.php"),
+				["src/A.php", "src/Hub.php"],
+			),
+			"tests/Unit/BbbTest.php" => new Footprint(
+				$this->filesystem->digest("/p/tests/Unit/BbbTest.php"),
+				["src/B.php", "src/Hub.php"],
+			),
 		];
 	}
 
@@ -211,6 +214,23 @@ final class CoverageTest extends TestCase {
 	}
 
 	/**
+	 * A test record as its touch lists alone, so a whole-map comparison reads as
+	 * what each test runs rather than as object identity.
+	 *
+	 * @param array<string, Footprint> $tests
+	 * @return array<string, list<string>>
+	 */
+	private function touches(array $tests): array {
+		$touches = [];
+
+		foreach($tests as $test => $footprint) {
+			$touches[$test] = $footprint->touches;
+		}
+
+		return $touches;
+	}
+
+	/**
 	 * @return list<list<string>>
 	 */
 	private function commands(): array {
@@ -251,7 +271,10 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testItRecordsWhatEachTestRan(): void {
-		self::assertSame($this->recorded(), $this->coverage()->whole($this->known())->tests);
+		self::assertSame(
+			$this->touches($this->recorded()),
+			$this->touches($this->coverage()->whole($this->known())->tests),
+		);
 	}
 
 	/**
@@ -269,7 +292,7 @@ final class CoverageTest extends TestCase {
 				"tests/Unit/AaaTest.php" => ["src/A.php", "src/Hub.php"],
 				"tests/Unit/BbbTest.php" => [],
 			],
-			$this->coverage()->whole($this->known())->tests,
+			$this->touches($this->coverage()->whole($this->known())->tests),
 		);
 	}
 
@@ -286,7 +309,7 @@ final class CoverageTest extends TestCase {
 				"tests/Unit/AaaTest.php" => ["src/A.php"],
 				"tests/Unit/BbbTest.php" => ["src/B.php"],
 			],
-			$this->coverage(settings: ["exclude" => ["src/Hub.php"]])->whole($this->known())->tests,
+			$this->touches($this->coverage(settings: ["exclude" => ["src/Hub.php"]])->whole($this->known())->tests),
 		);
 	}
 
@@ -467,7 +490,7 @@ final class CoverageTest extends TestCase {
 
 		$measured = $this->coverage()->refresh($this->recorded(), $this->digests("/p/src/A.php"));
 
-		self::assertSame(["src/B.php", "src/Hub.php"], $measured->tests["tests/Unit/BbbTest.php"]);
+		self::assertSame(["src/B.php", "src/Hub.php"], $measured->tests["tests/Unit/BbbTest.php"]->touches);
 	}
 
 	/**
@@ -502,8 +525,8 @@ final class CoverageTest extends TestCase {
 
 		$measured = $this->coverage()->refresh($this->recorded(), $this->digests("/p/src/Hub.php"));
 
-		self::assertSame([], $measured->tests["tests/Unit/AaaTest.php"]);
-		self::assertSame(["src/B.php", "src/Hub.php"], $measured->tests["tests/Unit/BbbTest.php"]);
+		self::assertSame([], $measured->tests["tests/Unit/AaaTest.php"]->touches);
+		self::assertSame(["src/B.php", "src/Hub.php"], $measured->tests["tests/Unit/BbbTest.php"]->touches);
 		self::assertCount(2, $this->commands());
 	}
 

@@ -23,11 +23,13 @@ final readonly class Standing {
 	/**
 	 * @param bool $usable Whether the store describes the tree as it is now.
 	 * @param list<string> $outstanding What still needs the engine.
+	 * @param list<string> $unmeasured Test files whose coverage has to be captured again.
 	 * @param string $because Why, in a form a person can read.
 	 */
 	private function __construct(
 		public bool $usable,
 		public array $outstanding,
+		public array $unmeasured,
 		public string $because,
 	) {}
 
@@ -43,6 +45,7 @@ final readonly class Standing {
 			return new self(
 				FALSE,
 				[],
+				[],
 				"the verification environment has changed, so nothing the store holds was proven under it",
 			);
 		}
@@ -53,14 +56,20 @@ final readonly class Standing {
 			return new self(
 				FALSE,
 				[],
+				[],
 				count($appeared) . " file(s) the store has never heard of have appeared, starting with "
 				. $appeared[0] . "; what they cover cannot be worked out from digests",
 			);
 		}
 
+		// **Two facts, not one.** What is owed is about verdicts; what is unmeasured
+		// is about coverage, and a test that covers nothing has its bytes in no
+		// verdict's key at all — so asking only the first question would answer
+		// "nothing is owed" while the coverage picture had changed underneath it.
 		return new self(
 			TRUE,
 			self::outstanding($stored, $digests, $gated, $toolchain),
+			$stored->unmeasured($digests),
 			"the store describes this tree",
 		);
 	}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Runner;
 
 use Closure;
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Coverage\Capture;
 use Kristos80\Mule\Coverage\Report;
@@ -91,7 +92,7 @@ final class EngineTest extends TestCase {
 				'<?xml version="1.0"?><testsuites><testsuite name="AaaTest"'
 				. ' file="/p/tests/Unit/AaaTest.php" time="1.5"/></testsuites>',
 			),
-			["tests/Unit/AaaTest.php" => ["src/A.php"]],
+			["tests/Unit/AaaTest.php" => new Footprint("sig", ["src/A.php"])],
 		);
 	}
 

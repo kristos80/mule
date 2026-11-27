@@ -586,7 +586,22 @@ that it is tracked; mule must not move it.
 
 - `verdicts`: `path => { key, mutants, killed, escaped, timeouts, errors }`
 - `coverage`: `path => { executable, executed, unreached[] }`
-- `tests`: `path => { sig, touches[] }` — what each test file was seen to execute
+- `tests`: `path => { sig, touches[] }` — what each test file was seen to execute,
+  and the bytes it was measured at. **The signature is load-bearing rather than
+  informational**, and an implementation that recorded only `touches` was measured
+  to be wrong: a test file's digest otherwise reaches the store only through the
+  keys of the files it covers, so a test that covers *nothing* has its bytes
+  recorded nowhere, and editing it to start covering something moves no key at
+  all. A run in that state answers "nothing is owed" while the coverage picture
+  has changed underneath it, and goes on answering that until some unrelated edit
+  happens to trigger a measurement. It is not a false verdict — adding a covering
+  test cannot un-kill a mutant — but it is the fast path claiming something it has
+  not checked, and the fast path has nothing else to sell.
+
+  It also has to be in the **committed** store rather than beside the shards. The
+  cheap question is answered on a fresh checkout with no cache at all; a signature
+  kept machine-local could not be compared there, so the fast path would either
+  miss the change or stop being fast.
 - `timings`: `{ key, capturedAt, tests: path => seconds }` — the reference capture
   (§5), keyed separately so a changed test body marks it stale
 
@@ -1112,7 +1127,7 @@ something to engineer around.
   unimplemented rather than optional.
 - **`"signature": "code"` is deferred**, not designed. §3 states the conditions it
   would have to meet; nothing has been built or measured against them.
-- **Four lifecycle defects were found at the boundaries between the components,
+- **Five lifecycle defects were found at the boundaries between the components,
   not in any one of them**, and the pattern is worth recording because it will
   recur: each was a case where coverage attribution *moved* rather than merely
   changed. A test that stops covering anything left its shard on disk for the
@@ -1121,8 +1136,12 @@ something to engineer around.
   test that covers nothing was absent from the store, so it read as having
   appeared on every run from then on; and a file that *acquired* a covering test
   was not re-keyed by the run that noticed, because the owed list was computed
-  from the store's picture rather than from the fresh one. The fix for the last
-  one generalises: **what is owed is decided after measuring, never before.**
+  from the store's picture rather than from the fresh one; and a test that covered
+  nothing and starts covering something was invisible to the cheap question
+  entirely, because its bytes were in no key — which §4's `tests.sig` had
+  specified and an implementation carrying only `touches` had dropped. The fix for
+  the fourth generalises: **what is owed is decided after measuring, never
+  before.**
   `Standing` answers only the cheap question — may this run skip measuring
   altogether — and the owed list is a comparison of fresh keys against banked
   verdicts. One consequence is an improvement: a file that has appeared now makes

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Cache\Key;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Standing;
@@ -18,10 +19,26 @@ final class StandingTest extends TestCase {
 	 *
 	 * @var array<string, list<string>>
 	 */
-	private const array TESTS = [
+	private const array TOUCHES = [
 		"tests/ATest.php" => ["src/A.php", "src/Hub.php"],
 		"tests/BTest.php" => ["src/B.php", "src/Hub.php"],
 	];
+
+	/**
+	 * The same thing with each test's own bytes recorded beside what it ran, which
+	 * is what the store actually holds.
+	 *
+	 * @return array<string, Footprint>
+	 */
+	private function tests(): array {
+		$tests = [];
+
+		foreach(self::TOUCHES as $test => $touches) {
+			$tests[$test] = new Footprint($this->digests()[$test], $touches);
+		}
+
+		return $tests;
+	}
 
 	/**
 	 * The source files mule is answerable for, as the tree on disk has them.
@@ -51,7 +68,7 @@ final class StandingTest extends TestCase {
 	 */
 	private function stored(array $unproven = [], string $toolchain = "chain"): Snapshot {
 		/** @var non-empty-string $toolchain */
-		$blank = new Snapshot([], [], self::TESTS, $toolchain);
+		$blank = new Snapshot([], [], $this->tests(), $toolchain);
 		$digests = $this->digests();
 		$verdicts = [];
 
@@ -71,7 +88,7 @@ final class StandingTest extends TestCase {
 			$verdicts[$path] = new Verdict(Key::of($path, $digests[$path], $deps, $tests, $toolchain), $mutants);
 		}
 
-		return new Snapshot($verdicts, $unproven, self::TESTS, $toolchain);
+		return new Snapshot($verdicts, $unproven, $this->tests(), $toolchain);
 	}
 
 	public function testAStoreThatDescribesTheTreeHasNothingOutstanding(): void {
@@ -214,7 +231,7 @@ final class StandingTest extends TestCase {
 	 * @return void
 	 */
 	public function testAGatedFileWithNoVerdictAtAllIsOutstanding(): void {
-		$stored = new Snapshot([], [], self::TESTS, "chain");
+		$stored = new Snapshot([], [], $this->tests(), "chain");
 
 		self::assertSame(
 			["src/A.php", "src/B.php", "src/Hub.php"],

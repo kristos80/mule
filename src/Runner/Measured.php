@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Runner;
 
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Coverage\Capture;
 use Kristos80\Mule\Coverage\Timings;
 
@@ -21,7 +22,7 @@ final readonly class Measured {
 	/**
 	 * @param Capture $capture The merged attribution.
 	 * @param Timings $timings Per test class, from one reference capture.
-	 * @param array<string, list<string>> $tests Test file to the project-relative source files it ran.
+	 * @param array<string, Footprint> $tests Test file to what it ran, and the bytes it ran at.
 	 */
 	public function __construct(
 		public Capture $capture,

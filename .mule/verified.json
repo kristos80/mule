@@ -1,357 +1,460 @@
 {
     "toolchain": "9e363adac7c0c683050c39f139cfc71922ec7caac6406a6063522f90f4523f67",
     "verdicts": {
+        "src/Cache/Footprint.php": {
+            "key": "e70dc338420e6258e40540599470896c59107c76cd624b5428a7574db1f2d6f0",
+            "mutants": 7
+        },
         "src/Cache/Key.php": {
-            "key": "2bc310034302ad4b5e18598681539312115c022e7e35d8f31ffdacaf96174c6a",
+            "key": "f3d3e022de122956cc9d960d2539267ae1d32f0435517596a7f5b929e897d237",
             "mutants": 5
         },
         "src/Cache/Snapshot.php": {
-            "key": "aebb3c8a73d017a563e821fa0e9c96435e29d62bdbbdd540046d1b2f57ce757d",
-            "mutants": 54
+            "key": "d38da674c1dff6241ac13d66b6805b0625c56a18ee84a06b8293cc61fb1c9717",
+            "mutants": 61
         },
         "src/Cache/Standing.php": {
-            "key": "41032481f1c368fa18fcc169c9b2669129e35bda79f6cc409b91336a91ec259d",
+            "key": "00b6413dada697deda8266589cecd22ffcd11d18933aab1331959c34dcabd3ca",
             "mutants": 49
         },
         "src/Cache/Store.php": {
-            "key": "6501e0771d39dc74ba33e043c9995281624c26b56e0ebd7222e0a7565ad850a0",
+            "key": "ccf59e7315aa1bcd9ed0111688195c21eadb1b11d6259d97137ac11c616e1a5f",
             "mutants": 9
         },
         "src/Cache/StoreFormat.php": {
-            "key": "6a29de4e9d145a62fa4b91c8960e384fa2c6428d4bbbdd7575fd44128f13f747",
-            "mutants": 92
+            "key": "c6392793f19a83e14dd56a4f2c5562e2358bd7464a65d0890042267c62b86262",
+            "mutants": 101
         },
         "src/Cache/Toolchain.php": {
-            "key": "52a7cafee0f86383d398bb2957d85cdab44c62ee3ab4747b254cc66147b2e31f",
+            "key": "8590862f05f67ef8568b07c1ee016ba6274d52865f799846c55342ae06509714",
             "mutants": 4
         },
         "src/Cache/Verdict.php": {
-            "key": "97025c652c794101c3bc65568db90f01f1c344396e032006aad760e07bf7ffcc",
+            "key": "0709351ae6d8b84e063973c594ddc9db197bebac2b5a31d005537bcaa314dd3f",
             "mutants": 2
         },
         "src/Config/Configuration.php": {
-            "key": "251dada049669249ce76cfc142588938cbb3c3a9e2ec40d909e938de4afe2d46",
+            "key": "5d89e3661e7fa49d1f9a7e00935dbf594bf4dc086f73b909263a21d75938ef44",
             "mutants": 127
         },
         "src/Console/Application.php": {
-            "key": "d7cbcba806db045799d08a8e78e447ec90d07ccd3f048bcf7196a5ef9c9bcd81",
+            "key": "70821c0b63102ec6d4cced37cf5ac74863c1501c4b860835ce7dea9a9af0618c",
             "mutants": 30
         },
         "src/Console/Composition.php": {
-            "key": "033ea26e65c46d1372e992c7d6d774d33fa2b9e203122faf59cd0f1389cb4e27",
+            "key": "8693545bb1d565bbfb1ff73f854853875ed61e7a5a8539e5f68c450e83607cd0",
             "mutants": 27
         },
         "src/Console/Summary.php": {
-            "key": "7cbdca9a9d564cfb52264444aa62d217790dde682e24a42779f21b564ea15ace",
-            "mutants": 71
+            "key": "42db3036e5c94fed04ce3323fac58a3ab2ceb53c86acf68f93142c4f54ea1c85",
+            "mutants": 79
         },
         "src/Coverage/Capture.php": {
-            "key": "3e5710da253800bbcc0d6c4bc94569cc693283129d43545298d49121c0ee2e1e",
+            "key": "62c8aadd3e5b27df3a9c812b0a5b049a6856f44d739253a850d879342ef81527",
             "mutants": 45
         },
         "src/Coverage/Merge.php": {
-            "key": "1a108d03d047ec74b4c2d2d1a3b6c2938feb817e645bcf2fdffc96071834aa0c",
+            "key": "e0382fe53924e5e81042a76ccc4e8f9e91399fd6e494fd6371af45d5ac93c012",
             "mutants": 11
         },
         "src/Coverage/Report.php": {
-            "key": "765707d63e1d6e7fc69d51f7b015cd0ff0b2a2b09fd2f2f7df16f03816eb5db3",
+            "key": "b10fdb13984a54b9d682abbcfabdf729a15effc7c4ad0090f43f43516ba2104d",
             "mutants": 27
         },
         "src/Coverage/Shard.php": {
-            "key": "0404a56f6af660ad420c28b793358ce9cc92e75ac60c15d2ec5efd8e089f68d7",
+            "key": "1802d8c9ee302e945ebc9c2b8c9cf67d0612e9891909495266d0d1be27a9ec95",
             "mutants": 33
         },
         "src/Coverage/ShardFormat.php": {
-            "key": "557d1b54cae4b7ac6344fe414933f9e21cd82ee6018839caa27ff6fd0be5c921",
+            "key": "32a7a38512b78c9fa11831c7253d6024b9817b7a04635d4ae38a51ad70d6fc92",
             "mutants": 74
         },
         "src/Coverage/Soundness.php": {
-            "key": "580d872efd760c8bf48d9a79bdacb30afb4a26ab9873ca3a91244b8936adb555",
+            "key": "9b5758eab65b7a440a2be760c2b93a239112fe16616386d11cb39bd304bd983e",
             "mutants": 38
         },
         "src/Coverage/Split.php": {
-            "key": "def3fd1853797ac76cbcf1ece8f32ce8453eef32000b26c699049f9b56d84410",
+            "key": "cf77f868995cdf6258e6afd34e7a84b12aa6d72cde26c290987d089a188846fa",
             "mutants": 21
         },
         "src/Coverage/TestResults.php": {
-            "key": "52539035b3546b023236af9b914a0d41869140cd5621cb6cb3a2e6a622469200",
+            "key": "f550029957196b58a56e1a568c48709240663cf24563f656ae53572c5fac131d",
             "mutants": 20
         },
         "src/Coverage/Timings.php": {
-            "key": "d352e0ebcb04a5c1af0bc5d6693218773610576f6f405b3becf2326f748488fa",
+            "key": "35a34a38ab797e955fb2c035ff58c806651e62bfca9b0c5c85af65092803f4de",
             "mutants": 43
         },
         "src/Engine/Declaration.php": {
-            "key": "590e5f6de270f1c3e360eba39cf0ec06fe745e27ff3102105ce33ae4726dd242",
+            "key": "9c716b9862a24bf43d68242c55ae7b5872f801a2849856097ed5c0a957a00c27",
             "mutants": 22
         },
         "src/Engine/Gate.php": {
-            "key": "0ca427c1e2b894b87ac719e49c43baef1b7faaf5de214b536a63d6c55134d64f",
+            "key": "de224c98aac53dc28f5d71f646a203798c9268b8c7f8ff63c6c7c585c784f52c",
             "mutants": 29
         },
         "src/Engine/Outcome.php": {
-            "key": "a7dcdcea02c750263fcec47db7bcfd3f534627c97b182a9101755b85ab58d8da",
+            "key": "21bf97feb6c41e181fdfcbb1b3b5eb15e3a103beacb81022d1390f4fb8dad5ac",
             "mutants": 56
         },
         "src/Project.php": {
-            "key": "c7f2ddb7c411a9e8bfdbb6f44a28a2803be37dcae84baf80d30375fa0847b6b2",
+            "key": "11face4f6524fb6f06c12bc9da980cf79e3ec66b82da3c94fc0a41d9691d594c",
             "mutants": 5
         },
         "src/Runner/Commands.php": {
-            "key": "b836ad19dad90bdf9f34a248276212d1d7c00dd87424a6ab0aac8569b3ba7206",
+            "key": "c01e2806562aaeffb11542801c16591f3dafc5f92ff4d2d5e33fa491228af72c",
             "mutants": 20
         },
         "src/Runner/Coverage.php": {
-            "key": "8f27f21de4bf2e10fc7932c434ef7611bf689d9e56c1ac56642a51f1e1988c8a",
-            "mutants": 82
+            "key": "8b185f89e6b54170d68e95aca52df3e1bf9f157e2616d699bb21fc8b8610e114",
+            "mutants": 83
         },
         "src/Runner/Engine.php": {
-            "key": "3ed5a2c7b47643de90a9fbc18508e993decfccf7be5c438577d93762f95d3ffe",
+            "key": "2da74ddc1d755f205406c4491b9daad28c3ba77e41c6a7e71ba0149199f9e98e",
             "mutants": 15
         },
         "src/Runner/Finding.php": {
-            "key": "b8b4f985c717ab95ef1477ef9ef50ba55c7765a502cc4204bd1f807972b7ec52",
+            "key": "7ac74729d1b8c6791497be5631ecc0fecef6e752b16d8eea02297b566f1b0572",
             "mutants": 18
         },
         "src/Runner/Run.php": {
-            "key": "5befd6944918492dfd42a9a64d053e161b4c514225f687b13d8c3d533dd23d3c",
-            "mutants": 36
+            "key": "dbd45ad3c4247756602cc83386123fcd2958e754ac285b435ce08c02b5ba89b0",
+            "mutants": 38
         },
         "src/Runner/Shards.php": {
-            "key": "72148c5f27af4185ffc9f5d7fcbe90ca8f0002e4355fca93053f9fb212c33e2c",
+            "key": "1ad5cb25ab88492def25173acb5af934bf913414cdf75f9e8b0851345377ecc2",
             "mutants": 25
         },
         "src/Runner/Universe.php": {
-            "key": "4de19ef6476e616e5a90ed5a88715eeabaeed5c2ec6c585d0196d3e83050189f",
+            "key": "56d73578d77f8e5360220a305f77dcf168a000d44d7523123f6b42330fb853f0",
             "mutants": 28
         }
     },
     "unproven": [],
     "tests": {
-        "tests/Unit/Cache/KeyTest.php": [
-            "src/Cache/Key.php",
-            "src/Cache/Toolchain.php"
-        ],
-        "tests/Unit/Cache/SnapshotTest.php": [
-            "src/Cache/Snapshot.php",
-            "src/Cache/Verdict.php"
-        ],
-        "tests/Unit/Cache/StandingTest.php": [
-            "src/Cache/Key.php",
-            "src/Cache/Snapshot.php",
-            "src/Cache/Standing.php",
-            "src/Cache/Toolchain.php",
-            "src/Cache/Verdict.php"
-        ],
-        "tests/Unit/Cache/StoreFormatTest.php": [
-            "src/Cache/Snapshot.php",
-            "src/Cache/StoreFormat.php",
-            "src/Cache/Verdict.php"
-        ],
-        "tests/Unit/Cache/StoreTest.php": [
-            "src/Cache/Snapshot.php",
-            "src/Cache/Store.php",
-            "src/Cache/StoreFormat.php",
-            "src/Cache/Verdict.php"
-        ],
-        "tests/Unit/Cache/ToolchainTest.php": [
-            "src/Cache/Toolchain.php"
-        ],
-        "tests/Unit/Cache/VerdictTest.php": [
-            "src/Cache/Verdict.php"
-        ],
-        "tests/Unit/Config/ConfigurationTest.php": [
-            "src/Config/Configuration.php"
-        ],
-        "tests/Unit/Console/ApplicationTest.php": [
-            "src/Cache/Key.php",
-            "src/Cache/Snapshot.php",
-            "src/Cache/Standing.php",
-            "src/Cache/Store.php",
-            "src/Cache/StoreFormat.php",
-            "src/Cache/Toolchain.php",
-            "src/Cache/Verdict.php",
-            "src/Config/Configuration.php",
-            "src/Console/Application.php",
-            "src/Console/Composition.php",
-            "src/Console/Summary.php",
-            "src/Coverage/Capture.php",
-            "src/Coverage/Report.php",
-            "src/Coverage/Shard.php",
-            "src/Coverage/Soundness.php",
-            "src/Coverage/Split.php",
-            "src/Coverage/TestResults.php",
-            "src/Coverage/Timings.php",
-            "src/Engine/Declaration.php",
-            "src/Engine/Gate.php",
-            "src/Engine/Outcome.php",
-            "src/Project.php",
-            "src/Runner/Commands.php",
-            "src/Runner/Coverage.php",
-            "src/Runner/Engine.php",
-            "src/Runner/Finding.php",
-            "src/Runner/Run.php",
-            "src/Runner/Shards.php",
-            "src/Runner/Universe.php"
-        ],
-        "tests/Unit/Console/CompositionTest.php": [
-            "src/Cache/Store.php",
-            "src/Cache/Toolchain.php",
-            "src/Config/Configuration.php",
-            "src/Console/Composition.php",
-            "src/Coverage/Report.php",
-            "src/Coverage/Soundness.php",
-            "src/Engine/Declaration.php",
-            "src/Project.php",
-            "src/Runner/Commands.php",
-            "src/Runner/Coverage.php",
-            "src/Runner/Engine.php",
-            "src/Runner/Run.php",
-            "src/Runner/Shards.php",
-            "src/Runner/Universe.php"
-        ],
-        "tests/Unit/Console/SummaryTest.php": [
-            "src/Cache/Key.php",
-            "src/Cache/Snapshot.php",
-            "src/Cache/Standing.php",
-            "src/Cache/Toolchain.php",
-            "src/Cache/Verdict.php",
-            "src/Console/Summary.php",
-            "src/Runner/Finding.php"
-        ],
-        "tests/Unit/Coverage/CaptureTest.php": [
-            "src/Coverage/Capture.php",
-            "src/Coverage/TestResults.php"
-        ],
-        "tests/Unit/Coverage/MergeTest.php": [
-            "src/Coverage/Capture.php",
-            "src/Coverage/Merge.php",
-            "src/Coverage/Split.php",
-            "src/Coverage/TestResults.php"
-        ],
-        "tests/Unit/Coverage/ReportTest.php": [
-            "src/Coverage/Capture.php",
-            "src/Coverage/Report.php",
-            "src/Coverage/TestResults.php",
-            "src/Coverage/Timings.php"
-        ],
-        "tests/Unit/Coverage/ShardFormatTest.php": [
-            "src/Coverage/ShardFormat.php",
-            "src/Coverage/TestResults.php"
-        ],
-        "tests/Unit/Coverage/ShardTest.php": [
-            "src/Coverage/Capture.php",
-            "src/Coverage/Shard.php",
-            "src/Coverage/ShardFormat.php",
-            "src/Coverage/TestResults.php"
-        ],
-        "tests/Unit/Coverage/SoundnessTest.php": [
-            "src/Config/Configuration.php",
-            "src/Coverage/Capture.php",
-            "src/Coverage/Soundness.php",
-            "src/Coverage/TestResults.php",
-            "src/Project.php"
-        ],
-        "tests/Unit/Coverage/SplitTest.php": [
-            "src/Coverage/Capture.php",
-            "src/Coverage/Split.php",
-            "src/Coverage/TestResults.php"
-        ],
-        "tests/Unit/Coverage/TestResultsTest.php": [
-            "src/Coverage/TestResults.php"
-        ],
-        "tests/Unit/Coverage/TimingsTest.php": [
-            "src/Coverage/Timings.php"
-        ],
-        "tests/Unit/Engine/DeclarationTest.php": [
-            "src/Config/Configuration.php",
-            "src/Engine/Declaration.php"
-        ],
-        "tests/Unit/Engine/GateTest.php": [
-            "src/Cache/Snapshot.php",
-            "src/Cache/Verdict.php",
-            "src/Engine/Gate.php",
-            "src/Engine/Outcome.php"
-        ],
-        "tests/Unit/Engine/OutcomeTest.php": [
-            "src/Engine/Outcome.php"
-        ],
-        "tests/Unit/ProjectTest.php": [
-            "src/Project.php"
-        ],
-        "tests/Unit/Runner/CommandsTest.php": [
-            "src/Config/Configuration.php",
-            "src/Runner/Commands.php"
-        ],
-        "tests/Unit/Runner/CoverageTest.php": [
-            "src/Config/Configuration.php",
-            "src/Coverage/Capture.php",
-            "src/Coverage/Merge.php",
-            "src/Coverage/Shard.php",
-            "src/Coverage/ShardFormat.php",
-            "src/Coverage/Split.php",
-            "src/Coverage/TestResults.php",
-            "src/Coverage/Timings.php",
-            "src/Project.php",
-            "src/Runner/Commands.php",
-            "src/Runner/Coverage.php",
-            "src/Runner/Shards.php"
-        ],
-        "tests/Unit/Runner/EngineTest.php": [
-            "src/Config/Configuration.php",
-            "src/Coverage/Capture.php",
-            "src/Coverage/Report.php",
-            "src/Coverage/TestResults.php",
-            "src/Coverage/Timings.php",
-            "src/Engine/Declaration.php",
-            "src/Engine/Outcome.php",
-            "src/Project.php",
-            "src/Runner/Commands.php",
-            "src/Runner/Engine.php"
-        ],
-        "tests/Unit/Runner/RunTest.php": [
-            "src/Cache/Key.php",
-            "src/Cache/Snapshot.php",
-            "src/Cache/Standing.php",
-            "src/Cache/Store.php",
-            "src/Cache/StoreFormat.php",
-            "src/Cache/Toolchain.php",
-            "src/Cache/Verdict.php",
-            "src/Config/Configuration.php",
-            "src/Coverage/Capture.php",
-            "src/Coverage/Merge.php",
-            "src/Coverage/Report.php",
-            "src/Coverage/Shard.php",
-            "src/Coverage/ShardFormat.php",
-            "src/Coverage/Soundness.php",
-            "src/Coverage/Split.php",
-            "src/Coverage/TestResults.php",
-            "src/Coverage/Timings.php",
-            "src/Engine/Declaration.php",
-            "src/Engine/Gate.php",
-            "src/Engine/Outcome.php",
-            "src/Project.php",
-            "src/Runner/Commands.php",
-            "src/Runner/Coverage.php",
-            "src/Runner/Engine.php",
-            "src/Runner/Finding.php",
-            "src/Runner/Run.php",
-            "src/Runner/Shards.php",
-            "src/Runner/Universe.php"
-        ],
-        "tests/Unit/Runner/ShardsTest.php": [
-            "src/Coverage/Capture.php",
-            "src/Coverage/Shard.php",
-            "src/Coverage/ShardFormat.php",
-            "src/Coverage/TestResults.php",
-            "src/Coverage/Timings.php",
-            "src/Runner/Shards.php"
-        ],
-        "tests/Unit/Runner/UniverseTest.php": [
-            "src/Cache/Toolchain.php",
-            "src/Config/Configuration.php",
-            "src/Project.php",
-            "src/Runner/Universe.php"
-        ]
+        "tests/Unit/Cache/KeyTest.php": {
+            "sig": "a089b6c9c896902d432677e905ebd5f46fc17757d73919b49cf25be76b6b9706",
+            "touches": [
+                "src/Cache/Key.php",
+                "src/Cache/Toolchain.php"
+            ]
+        },
+        "tests/Unit/Cache/SnapshotTest.php": {
+            "sig": "e1e52a899b07e968c48f7087aee5aebd195fa27feeb3d63cd484aeb57de009c5",
+            "touches": [
+                "src/Cache/Footprint.php",
+                "src/Cache/Snapshot.php",
+                "src/Cache/Verdict.php"
+            ]
+        },
+        "tests/Unit/Cache/StandingTest.php": {
+            "sig": "f80fef39b651d440e64d575b17e96ae53558e3ed57bff8e813d70b7f8b3a13c6",
+            "touches": [
+                "src/Cache/Footprint.php",
+                "src/Cache/Key.php",
+                "src/Cache/Snapshot.php",
+                "src/Cache/Standing.php",
+                "src/Cache/Toolchain.php",
+                "src/Cache/Verdict.php"
+            ]
+        },
+        "tests/Unit/Cache/StoreFormatTest.php": {
+            "sig": "7f9bf5847d18241a8fde9cb4e0ed484b1a24f902a1b6fabb30b8ca6bd33097de",
+            "touches": [
+                "src/Cache/Footprint.php",
+                "src/Cache/Snapshot.php",
+                "src/Cache/StoreFormat.php",
+                "src/Cache/Verdict.php"
+            ]
+        },
+        "tests/Unit/Cache/StoreTest.php": {
+            "sig": "31520e498c65a5d0285d04ee08894ede1b3b8ecc9dd2fc88f379102ab80a3fd8",
+            "touches": [
+                "src/Cache/Snapshot.php",
+                "src/Cache/Store.php",
+                "src/Cache/StoreFormat.php",
+                "src/Cache/Verdict.php"
+            ]
+        },
+        "tests/Unit/Cache/ToolchainTest.php": {
+            "sig": "b358678a4a3cb48742ea7116a3f0b74bd211eb7c0b639069b9df04140c7db8ef",
+            "touches": [
+                "src/Cache/Toolchain.php"
+            ]
+        },
+        "tests/Unit/Cache/VerdictTest.php": {
+            "sig": "5af2281c32b06e8ed6ea19562633f8da6abff9d5b1a70fce394c1ce2f953884e",
+            "touches": [
+                "src/Cache/Verdict.php"
+            ]
+        },
+        "tests/Unit/Config/ConfigurationTest.php": {
+            "sig": "0f4c5e9c369721a5c36ed287ebdd8f413898dfdcc7299f22619f045eed08d887",
+            "touches": [
+                "src/Config/Configuration.php"
+            ]
+        },
+        "tests/Unit/Console/ApplicationTest.php": {
+            "sig": "e368313ea8696a57f01d961c2f7c87d8373ca09ec00de36fdab0838fb60521f3",
+            "touches": [
+                "src/Cache/Footprint.php",
+                "src/Cache/Key.php",
+                "src/Cache/Snapshot.php",
+                "src/Cache/Standing.php",
+                "src/Cache/Store.php",
+                "src/Cache/StoreFormat.php",
+                "src/Cache/Toolchain.php",
+                "src/Cache/Verdict.php",
+                "src/Config/Configuration.php",
+                "src/Console/Application.php",
+                "src/Console/Composition.php",
+                "src/Console/Summary.php",
+                "src/Coverage/Capture.php",
+                "src/Coverage/Report.php",
+                "src/Coverage/Shard.php",
+                "src/Coverage/Soundness.php",
+                "src/Coverage/Split.php",
+                "src/Coverage/TestResults.php",
+                "src/Coverage/Timings.php",
+                "src/Engine/Declaration.php",
+                "src/Engine/Gate.php",
+                "src/Engine/Outcome.php",
+                "src/Project.php",
+                "src/Runner/Commands.php",
+                "src/Runner/Coverage.php",
+                "src/Runner/Engine.php",
+                "src/Runner/Finding.php",
+                "src/Runner/Run.php",
+                "src/Runner/Shards.php",
+                "src/Runner/Universe.php"
+            ]
+        },
+        "tests/Unit/Console/CompositionTest.php": {
+            "sig": "0b5ad4f1e7c17432c49408725181dbda57326fd3151c5028f3ae7fdfae68a79e",
+            "touches": [
+                "src/Cache/Store.php",
+                "src/Cache/Toolchain.php",
+                "src/Config/Configuration.php",
+                "src/Console/Composition.php",
+                "src/Coverage/Report.php",
+                "src/Coverage/Soundness.php",
+                "src/Engine/Declaration.php",
+                "src/Project.php",
+                "src/Runner/Commands.php",
+                "src/Runner/Coverage.php",
+                "src/Runner/Engine.php",
+                "src/Runner/Run.php",
+                "src/Runner/Shards.php",
+                "src/Runner/Universe.php"
+            ]
+        },
+        "tests/Unit/Console/SummaryTest.php": {
+            "sig": "51ad5236d11013457f2da5456e058bb715f6648975382d84277ee9e32e24c555",
+            "touches": [
+                "src/Cache/Footprint.php",
+                "src/Cache/Key.php",
+                "src/Cache/Snapshot.php",
+                "src/Cache/Standing.php",
+                "src/Cache/Toolchain.php",
+                "src/Cache/Verdict.php",
+                "src/Console/Summary.php",
+                "src/Runner/Finding.php"
+            ]
+        },
+        "tests/Unit/Coverage/CaptureTest.php": {
+            "sig": "f3d91658f56bbbe890d106c9360a4511517cc63ee031644d4cbb0398c11ed046",
+            "touches": [
+                "src/Coverage/Capture.php",
+                "src/Coverage/TestResults.php"
+            ]
+        },
+        "tests/Unit/Coverage/MergeTest.php": {
+            "sig": "726712cfc87e0b7bf74dd537ee7b2cfe62ade829126cf51ee1502f466b2b66e1",
+            "touches": [
+                "src/Coverage/Capture.php",
+                "src/Coverage/Merge.php",
+                "src/Coverage/Split.php",
+                "src/Coverage/TestResults.php"
+            ]
+        },
+        "tests/Unit/Coverage/ReportTest.php": {
+            "sig": "e55ade9ba4b76b0ecc9c70a60d0f45791360c143e82c61582f6b9022c1599c5a",
+            "touches": [
+                "src/Coverage/Capture.php",
+                "src/Coverage/Report.php",
+                "src/Coverage/TestResults.php",
+                "src/Coverage/Timings.php"
+            ]
+        },
+        "tests/Unit/Coverage/ShardFormatTest.php": {
+            "sig": "60274091180c6022b93e13ded6d2d1ce723c6050f36f3eb6bc1f4826b62c156d",
+            "touches": [
+                "src/Coverage/ShardFormat.php",
+                "src/Coverage/TestResults.php"
+            ]
+        },
+        "tests/Unit/Coverage/ShardTest.php": {
+            "sig": "a2c2879ec152ac8d2ab3a5af7585f0b070db168f1136326e8a55904c0fbd665f",
+            "touches": [
+                "src/Coverage/Capture.php",
+                "src/Coverage/Shard.php",
+                "src/Coverage/ShardFormat.php",
+                "src/Coverage/TestResults.php"
+            ]
+        },
+        "tests/Unit/Coverage/SoundnessTest.php": {
+            "sig": "c88e68bf8fc5e0342ffb5f9403d2f493f3542888e2accf33277374b806e4354b",
+            "touches": [
+                "src/Config/Configuration.php",
+                "src/Coverage/Capture.php",
+                "src/Coverage/Soundness.php",
+                "src/Coverage/TestResults.php",
+                "src/Project.php"
+            ]
+        },
+        "tests/Unit/Coverage/SplitTest.php": {
+            "sig": "d671f9865102da44f5b1a21fe5fdd44c6240e46266f2af70b6f93189bc5b66c8",
+            "touches": [
+                "src/Coverage/Capture.php",
+                "src/Coverage/Split.php",
+                "src/Coverage/TestResults.php"
+            ]
+        },
+        "tests/Unit/Coverage/TestResultsTest.php": {
+            "sig": "0890282f592712d646348ebf16d9e4d7195e375a0964947e6e3a59bdf35cecc4",
+            "touches": [
+                "src/Coverage/TestResults.php"
+            ]
+        },
+        "tests/Unit/Coverage/TimingsTest.php": {
+            "sig": "8dffdab3c216fe93390de5cc1d91a0e6b7d56b77c3f9a6adca355e7d84797a4a",
+            "touches": [
+                "src/Coverage/Timings.php"
+            ]
+        },
+        "tests/Unit/Engine/DeclarationTest.php": {
+            "sig": "a0f8cf45579481f4e0fb90e35f4b216c18c7c4c1701c5c750def3b6890a6f167",
+            "touches": [
+                "src/Config/Configuration.php",
+                "src/Engine/Declaration.php"
+            ]
+        },
+        "tests/Unit/Engine/GateTest.php": {
+            "sig": "3f8e25875d5cd8a22267044f41c1c728140908f2aeb04fd94e85609b3096fe29",
+            "touches": [
+                "src/Cache/Footprint.php",
+                "src/Cache/Snapshot.php",
+                "src/Cache/Verdict.php",
+                "src/Engine/Gate.php",
+                "src/Engine/Outcome.php"
+            ]
+        },
+        "tests/Unit/Engine/OutcomeTest.php": {
+            "sig": "590a0f7af6e8bb550f448ef833c7ba2a247152bfb7a69bb522fb88e316908c56",
+            "touches": [
+                "src/Engine/Outcome.php"
+            ]
+        },
+        "tests/Unit/ProjectTest.php": {
+            "sig": "2aa67644eb1915aeb7ab2a8d3168823ebf5a5ad05ed4defa44b24779f1d33543",
+            "touches": [
+                "src/Project.php"
+            ]
+        },
+        "tests/Unit/Runner/CommandsTest.php": {
+            "sig": "cde93499b86b430d0ac8b3cd66d21a9aade52c3035cedbe597470613fd048eab",
+            "touches": [
+                "src/Config/Configuration.php",
+                "src/Runner/Commands.php"
+            ]
+        },
+        "tests/Unit/Runner/CoverageTest.php": {
+            "sig": "8cfee347939050ca757a50a7f6afe056a1c54fac511b8b0a8cb69ad0369c46e9",
+            "touches": [
+                "src/Cache/Footprint.php",
+                "src/Config/Configuration.php",
+                "src/Coverage/Capture.php",
+                "src/Coverage/Merge.php",
+                "src/Coverage/Shard.php",
+                "src/Coverage/ShardFormat.php",
+                "src/Coverage/Split.php",
+                "src/Coverage/TestResults.php",
+                "src/Coverage/Timings.php",
+                "src/Project.php",
+                "src/Runner/Commands.php",
+                "src/Runner/Coverage.php",
+                "src/Runner/Shards.php"
+            ]
+        },
+        "tests/Unit/Runner/EngineTest.php": {
+            "sig": "05ca0c8d51eacefa62bdf47779fcb4592be473e96d100412ea9905c3e64f5458",
+            "touches": [
+                "src/Cache/Footprint.php",
+                "src/Config/Configuration.php",
+                "src/Coverage/Capture.php",
+                "src/Coverage/Report.php",
+                "src/Coverage/TestResults.php",
+                "src/Coverage/Timings.php",
+                "src/Engine/Declaration.php",
+                "src/Engine/Outcome.php",
+                "src/Project.php",
+                "src/Runner/Commands.php",
+                "src/Runner/Engine.php"
+            ]
+        },
+        "tests/Unit/Runner/RunTest.php": {
+            "sig": "ff673ba196a9712f6de065230eda4407195da16033d5bb966180583355ea509e",
+            "touches": [
+                "src/Cache/Footprint.php",
+                "src/Cache/Key.php",
+                "src/Cache/Snapshot.php",
+                "src/Cache/Standing.php",
+                "src/Cache/Store.php",
+                "src/Cache/StoreFormat.php",
+                "src/Cache/Toolchain.php",
+                "src/Cache/Verdict.php",
+                "src/Config/Configuration.php",
+                "src/Coverage/Capture.php",
+                "src/Coverage/Merge.php",
+                "src/Coverage/Report.php",
+                "src/Coverage/Shard.php",
+                "src/Coverage/ShardFormat.php",
+                "src/Coverage/Soundness.php",
+                "src/Coverage/Split.php",
+                "src/Coverage/TestResults.php",
+                "src/Coverage/Timings.php",
+                "src/Engine/Declaration.php",
+                "src/Engine/Gate.php",
+                "src/Engine/Outcome.php",
+                "src/Project.php",
+                "src/Runner/Commands.php",
+                "src/Runner/Coverage.php",
+                "src/Runner/Engine.php",
+                "src/Runner/Finding.php",
+                "src/Runner/Run.php",
+                "src/Runner/Shards.php",
+                "src/Runner/Universe.php"
+            ]
+        },
+        "tests/Unit/Runner/ShardsTest.php": {
+            "sig": "1c193f45c664e4671b12c98e99f8a48cced621f0061685c8d3c3233305469b67",
+            "touches": [
+                "src/Coverage/Capture.php",
+                "src/Coverage/Shard.php",
+                "src/Coverage/ShardFormat.php",
+                "src/Coverage/TestResults.php",
+                "src/Coverage/Timings.php",
+                "src/Runner/Shards.php"
+            ]
+        },
+        "tests/Unit/Runner/UniverseTest.php": {
+            "sig": "6b030b47f37b4dc40e7ae004cd592a2c9ba2b876b1469f019c87d938aa2b5e25",
+            "touches": [
+                "src/Cache/Toolchain.php",
+                "src/Config/Configuration.php",
+                "src/Project.php",
+                "src/Runner/Universe.php"
+            ]
+        }
     }
 }

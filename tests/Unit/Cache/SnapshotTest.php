@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Verdict;
 use PHPUnit\Framework\TestCase;
@@ -12,7 +13,7 @@ final class SnapshotTest extends TestCase {
 	/**
 	 * @param array<string, int<0, max>> $proven Path to mutant count; the key is derived from the path.
 	 * @param list<string> $unproven
-	 * @param array<string, list<string>> $tests
+	 * @param array<string, Footprint> $tests
 	 * @return Snapshot
 	 */
 	private function snapshot(
@@ -44,8 +45,8 @@ final class SnapshotTest extends TestCase {
 			["src/U.php"],
 			"chain",
 			[
-				"tests/ZzzTest.php" => ["src/Zzz.php", "src/Hub.php"],
-				"tests/AaaTest.php" => ["src/Hub.php", "src/Aaa.php"],
+				"tests/ZzzTest.php" => new Footprint("sig", ["src/Zzz.php", "src/Hub.php"]),
+				"tests/AaaTest.php" => new Footprint("sig", ["src/Hub.php", "src/Aaa.php"]),
 			],
 		);
 	}
@@ -227,8 +228,8 @@ final class SnapshotTest extends TestCase {
 	 * @return void
 	 */
 	public function testTheTestRecordIsTheNewerRunsWhole(): void {
-		$merged = $this->snapshot([], [], "chain", ["tests/ATest.php" => ["src/A.php"]])
-			->with($this->snapshot([], [], "chain", ["tests/BTest.php" => ["src/B.php"]]));
+		$merged = $this->snapshot([], [], "chain", ["tests/ATest.php" => new Footprint("sig", ["src/A.php"])])
+			->with($this->snapshot([], [], "chain", ["tests/BTest.php" => new Footprint("sig", ["src/B.php"])]));
 
 		self::assertSame(["tests/BTest.php"], array_keys($merged->tests));
 	}
@@ -244,5 +245,40 @@ final class SnapshotTest extends TestCase {
 			->with($this->snapshot([], ["src/A.php", "src/M.php"]));
 
 		self::assertSame(["src/A.php", "src/M.php", "src/Z.php"], $merged->unproven);
+	}
+
+	/**
+	 * **The half of the cheap question that keys cannot answer.** A test file's
+	 * digest reaches a key only through the files it covers, so a test that covers
+	 * nothing has its bytes in no key — and editing it to start covering something
+	 * moves nothing. Asking the record directly is what notices, and it has to name
+	 * every one of them.
+	 *
+	 * @return void
+	 */
+	public function testNamesEveryTestWhoseBytesHaveMoved(): void {
+		$snapshot = $this->snapshot([], [], "chain", [
+			"tests/ATest.php" => new Footprint("was", ["src/A.php"]),
+			"tests/BTest.php" => new Footprint("was", []),
+			"tests/CTest.php" => new Footprint("still", []),
+		]);
+
+		self::assertSame(["tests/ATest.php", "tests/BTest.php"], $snapshot->unmeasured([
+			"tests/ATest.php" => "now",
+			"tests/BTest.php" => "now",
+			"tests/CTest.php" => "still",
+		]));
+	}
+
+	/**
+	 * A test file the tree no longer has is not unmeasured, it is gone — and
+	 * `Runner\Run` drops it before anything is asked about it.
+	 *
+	 * @return void
+	 */
+	public function testATestTheTreeNoLongerHasIsNotUnmeasured(): void {
+		$snapshot = $this->snapshot([], [], "chain", ["tests/ATest.php" => new Footprint("was", [])]);
+
+		self::assertSame([], $snapshot->unmeasured([]));
 	}
 }

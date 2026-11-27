@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\StoreFormat;
 use Kristos80\Mule\Cache\Verdict;
@@ -18,7 +19,7 @@ final class StoreFormatTest extends TestCase {
 		return new Snapshot(
 			["src/A.php" => new Verdict("key-a", 4), "src/B.php" => new Verdict("key-b", 0)],
 			["src/C.php"],
-			["tests/ATest.php" => ["src/A.php", "src/B.php"], "tests/BTest.php" => ["src/B.php"]],
+			["tests/ATest.php" => new Footprint("sig", ["src/A.php", "src/B.php"]), "tests/BTest.php" => new Footprint("sig", ["src/B.php"])],
 			"chain",
 		);
 	}
@@ -32,7 +33,10 @@ final class StoreFormatTest extends TestCase {
 			"toolchain" => "chain",
 			"verdicts" => ["src/A.php" => ["key" => "key-a", "mutants" => 4]],
 			"unproven" => ["src/C.php"],
-			"tests" => ["tests/ATest.php" => ["src/A.php"], "tests/BTest.php" => ["src/B.php"]],
+			"tests" => [
+				"tests/ATest.php" => ["sig" => "sig-a", "touches" => ["src/A.php"]],
+				"tests/BTest.php" => ["sig" => "sig-b", "touches" => ["src/B.php"]],
+			],
 			...$overrides,
 		];
 	}
@@ -170,11 +174,34 @@ final class StoreFormatTest extends TestCase {
 		StoreFormat::read($this->stored(["tests" => [42 => ["src/A.php"]]]));
 	}
 
-	public function testRefusesARecordOfWhatATestRunsThatIsNotAnArray(): void {
+	public function testRefusesARecordThatIsNotAnObject(): void {
+		$this->expectException(Failure::class);
+		$this->expectExceptionMessage('The store\'s record for "tests/ATest.php" must be an object.');
+
+		StoreFormat::read($this->stored(["tests" => ["tests/ATest.php" => "src/A.php"]]));
+	}
+
+	/**
+	 * **The signature is what makes a test that covers nothing checkable.** Its
+	 * digest is in no file's key, so a record without one is a test mule has heard
+	 * of and can say nothing about.
+	 *
+	 * @return void
+	 */
+	public function testRefusesARecordWithNoSignature(): void {
+		$this->expectException(Failure::class);
+		$this->expectExceptionMessage('The store\'s record for "tests/ATest.php" carries no signature.');
+
+		StoreFormat::read($this->stored(["tests" => ["tests/ATest.php" => ["touches" => []]]]));
+	}
+
+	public function testRefusesARecordWhoseTouchListIsNotOne(): void {
 		$this->expectException(Failure::class);
 		$this->expectExceptionMessage('A store\'s record of what "tests/ATest.php" runs must be an array, string given.');
 
-		StoreFormat::read($this->stored(["tests" => ["tests/ATest.php" => "src/A.php"]]));
+		StoreFormat::read($this->stored([
+			"tests" => ["tests/ATest.php" => ["sig" => "s", "touches" => "src/A.php"]],
+		]));
 	}
 
 	/**
@@ -188,15 +215,20 @@ final class StoreFormatTest extends TestCase {
 		$this->expectException(Failure::class);
 		$this->expectExceptionMessage('A store\'s record of what "tests/ATest.php" runs includes something that is not a file path.');
 
-		StoreFormat::read($this->stored(["tests" => ["tests/ATest.php" => [42]]]));
+		StoreFormat::read($this->stored(["tests" => ["tests/ATest.php" => ["sig" => "s", "touches" => [42]]]]));
 	}
 
 	public function testCarriesTheTestMapThroughTheRoundTrip(): void {
 		$written = StoreFormat::write($this->snapshot());
 
+		$read = StoreFormat::read(json_decode($written, TRUE, 512, JSON_THROW_ON_ERROR));
+
 		self::assertSame(
-			["tests/ATest.php" => ["src/A.php", "src/B.php"], "tests/BTest.php" => ["src/B.php"]],
-			StoreFormat::read(json_decode($written, TRUE, 512, JSON_THROW_ON_ERROR))->tests,
+			[
+				"tests/ATest.php" => ["sig" => "sig", "touches" => ["src/A.php", "src/B.php"]],
+				"tests/BTest.php" => ["sig" => "sig", "touches" => ["src/B.php"]],
+			],
+			array_map(static fn (Footprint $f): array => $f->toArray(), $read->tests),
 		);
 	}
 

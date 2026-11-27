@@ -61,8 +61,29 @@ final readonly class Summary {
 		}
 
 		return [
+			...$this->remeasured($finding),
 			count($finding->standing->outstanding) . " file(s) were owed; " . count($finding->examined)
 			. " were handed to the engine.",
+		];
+	}
+
+	/**
+	 * **Said out loud, because otherwise the run looks like work for nothing.** A
+	 * changed test file has to be captured again before anything can be keyed
+	 * against it, and that can be the only reason a run measured anything — in
+	 * which case nothing was owed and nothing reached the engine.
+	 *
+	 * @param Finding $finding
+	 * @return list<string>
+	 */
+	private function remeasured(Finding $finding): array {
+		if($finding->standing->unmeasured === []) {
+			return [];
+		}
+
+		return [
+			count($finding->standing->unmeasured)
+			. " test file(s) had changed since they were measured, so their coverage was captured again.",
 		];
 	}
 

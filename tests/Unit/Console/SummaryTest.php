@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Unit\Console;
 
+use Kristos80\Mule\Cache\Footprint;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Standing;
 use Kristos80\Mule\Cache\Verdict;
@@ -23,7 +24,7 @@ final class SummaryTest extends TestCase {
 		return new Snapshot(
 			["src/A.php" => new Verdict("key-a", 4)],
 			$unproven,
-			["tests/Unit/AaaTest.php" => ["src/A.php"]],
+			["tests/Unit/AaaTest.php" => new Footprint("t", ["src/A.php"])],
 			"chain",
 		);
 	}
@@ -62,7 +63,7 @@ final class SummaryTest extends TestCase {
 			"1 file(s) were owed; 1 were handed to the engine.",
 			$this->text(Finding::proven(
 				$store,
-				$this->standing(new Snapshot([], ["src/A.php"], ["tests/Unit/AaaTest.php" => []], "chain")),
+				$this->standing(new Snapshot([], ["src/A.php"], ["tests/Unit/AaaTest.php" => new Footprint("t", [])], "chain")),
 				["src/A.php" => "key-a"],
 				[],
 			)),
@@ -223,6 +224,40 @@ final class SummaryTest extends TestCase {
 		self::assertStringNotContainsString(
 			"Not banked",
 			$this->text(Finding::settled($store, $this->standing($store))),
+		);
+	}
+
+	/**
+	 * **Said out loud, because otherwise the run looks like work for nothing.** A
+	 * changed test file has to be captured again before anything can be keyed
+	 * against it, and that can be the only reason a run measured anything — in
+	 * which case nothing was owed and nothing reached the engine.
+	 *
+	 * @return void
+	 */
+	public function testARunThatOnlyReMeasuredSaysSo(): void {
+		$store = new Snapshot(
+			["src/A.php" => new Verdict("key-a", 4)],
+			[],
+			["tests/Unit/AaaTest.php" => new Footprint("the bytes it had then", ["src/A.php"])],
+			"chain",
+		);
+
+		$text = $this->text(Finding::proven($store, $this->standing($store), [], []));
+
+		self::assertStringContainsString(
+			"1 test file(s) had changed since they were measured, so their coverage was captured"
+			. " again.\n1 file(s) were owed; 0 were handed to the engine.",
+			$text,
+		);
+	}
+
+	public function testARunThatReMeasuredNothingSaysNothingAboutIt(): void {
+		$store = $this->store();
+
+		self::assertStringNotContainsString(
+			"had changed since they were measured",
+			$this->text(Finding::proven($store, $this->standing($store), [], [])),
 		);
 	}
 }

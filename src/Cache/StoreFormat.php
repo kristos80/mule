@@ -41,7 +41,7 @@ final readonly class StoreFormat {
 			"toolchain" => $snapshot->toolchain,
 			"verdicts" => $verdicts,
 			"unproven" => $snapshot->unproven,
-			"tests" => $snapshot->tests,
+			"tests" => self::written($snapshot),
 		], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
 	}
 
@@ -126,11 +126,26 @@ final readonly class StoreFormat {
 	}
 
 	/**
-	 * **What each test was seen to execute**, which is what lets a run decide it
-	 * has nothing to do without generating a coverage report.
+	 * @param Snapshot $snapshot
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function written(Snapshot $snapshot): array {
+		$tests = [];
+
+		foreach($snapshot->tests as $test => $footprint) {
+			$tests[$test] = $footprint->toArray();
+		}
+
+		return $tests;
+	}
+
+	/**
+	 * **What each test was seen to execute, and the bytes it was measured at**,
+	 * which together are what let a run decide it has nothing to do without
+	 * generating a coverage report.
 	 *
 	 * @param mixed $value
-	 * @return array<string, list<string>>
+	 * @return array<string, Footprint>
 	 */
 	private static function tests(mixed $value): array {
 		if(!is_array($value)) {
@@ -139,15 +154,34 @@ final readonly class StoreFormat {
 
 		$tests = [];
 
-		foreach($value as $test => $touches) {
+		foreach($value as $test => $record) {
 			if(!is_string($test) || $test === "") {
 				throw new Failure("A store's test map is keyed by something that is not a test file.");
 			}
 
-			$tests[$test] = self::paths($touches, "record of what \"{$test}\" runs");
+			$tests[$test] = self::footprint($record, $test);
 		}
 
 		return $tests;
+	}
+
+	/**
+	 * @param mixed $record
+	 * @param string $test
+	 * @return Footprint
+	 */
+	private static function footprint(mixed $record, string $test): Footprint {
+		if(!is_array($record)) {
+			throw new Failure("The store's record for \"{$test}\" must be an object.");
+		}
+
+		$signature = $record["sig"] ?? NULL;
+
+		if(!is_string($signature) || $signature === "") {
+			throw new Failure("The store's record for \"{$test}\" carries no signature.");
+		}
+
+		return new Footprint($signature, self::paths($record["touches"] ?? NULL, "record of what \"{$test}\" runs"));
 	}
 
 	/**
