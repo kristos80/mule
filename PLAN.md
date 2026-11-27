@@ -152,7 +152,7 @@ final readonly class Verdict {                      // anemic
 	public function __construct(
 		public string $file,
 		public string $id,
-		public int $mutants,                        // > 0 always; see §4
+		public int $mutants,                        // >= 0; zero is a distinct, reported state — §4
 	) {}
 }
 
@@ -312,13 +312,33 @@ Carried from v5 unchanged, because each was a real defect once.
 - A gated source with `executed < executable` is a refusal. Mechanic 7 means
   Infection generates no mutants for uncovered code and the file simply vanishes
   from its log, so a missing-coverage check that ran afterwards would pass.
-- Zero executable statements is distinguished from zero mutants and is not a
-  refusal — a file of pure declarations has nothing to prove.
+- **It does not need the enumerated gated set, and here is why.** Mechanics 12–14
+  say the report already enumerates every included file, that PHPUnit refuses
+  coverage outright rather than writing a partial report, and that absence means
+  excluded-or-zero-executable-statements — not "uncovered". So checking every
+  returned record is sufficient.
+- **The one real hole is exclude drift**, and it gets its own guard. A file listed
+  in the project's `<source><exclude>` but not in `mule.json`'s `exclude` is
+  gated by mule, absent from the report, and silently unverified. So mule reads
+  the project's `phpunit.xml` and refuses when the two lists disagree, naming the
+  files. hermes-2 has no drift today — both name the same three — and nothing
+  prevents it from acquiring one.
 
-**Mutation gate**, per owed file:
-- The file produced **at least one mutant**. A file that silently produced none
-  does not lower MSI; it disappears. Aggregate MSI never substitutes for a
-  per-file assertion.
+**Mutation gate**, per owed file. Three outcomes, not two:
+- **Mutants produced and all killed by a test** → banked.
+- **Mutants produced, any other kind** → refusal (below).
+- **No mutants produced** → `mutants = 0`, banked, **and named in the report on
+  every run**. A file whose executable statements are all unmutatable is a real
+  thing; a file that should have mutants and produced none is a silent green, and
+  the only honest treatment that is not a hand-maintained list is to keep saying
+  so out loud. Aggregate MSI never substitutes for the per-file assertion.
+
+  **Open, needs measurement before step 7 is written:** Infection's log appears
+  to omit a file that generated no mutants, which makes "generated none" and
+  "never mutated" indistinguishable from the log alone — the same ambiguity
+  mechanic 7 created. Check whether `--noop`, `--dry-run` or the summary logger
+  enumerates zero-mutant files. **If they do not, this case must fail closed
+  rather than bank**, and the plan above changes accordingly.
 - Every mutant was **killed by a test**. `escaped`, `timeouted`, `errored`,
   `syntaxErrors`, `ignored`, `notCovered` and `killedByStaticAnalysis` are each
   a refusal naming the file and the kind. A static-analysis kill marks a mutation
@@ -360,6 +380,45 @@ Plus:
   measured, and **the ratio between them decides whether v6 is worth having.**
   If the engine turns out cheap relative to capture, say so and stop.
 
+## 5a. The first performance experiment, after the baseline works
+
+**The principle to hold on to: mule should pay for discovery when the evidence
+may have changed, not because the program was invoked.** The unconditional
+coverage pass (`HANDOFF.md` §6) obeys correctness and violates that principle,
+and it costs ~30.6 s of every warm run on hermes-2. v6 as planned therefore has
+no sub-second unchanged run, which was the most attractive property of the
+original idea. This is the main open concern, not a footnote.
+
+The way out does not need shards, a dependency graph or v5's orchestration — one
+project-level fingerprint:
+
+```
+DiscoveryId = H( every gated source digest
+               + every test file digest
+               + supportDigest
+               + toolchainDigest
+               + the rendered PHPUnit and Infection configurations )
+```
+
+If `DiscoveryId` equals the one stored beside the last **successful** capture,
+the ownership relation and every verdict can be reused with no PHPUnit process
+at all. Soundness rests on P2 (deterministic tests): with every input identical,
+re-running can only reproduce the same attribution. Measured support for that
+assumption — coverage attribution was byte-identical across two full hermes-2
+runs under `executionOrder="random"`.
+
+What it costs, stated plainly so the trade is visible: the ownership relation
+becomes persisted state, which brings back a snapshot format, its validation,
+and the invalidation rule that it must be discarded whenever `DiscoveryId`
+misses or a capture failed halfway. That is exactly the kind of machinery this
+rewrite removed, so it is worth doing **only** against a measured baseline, and
+only if the engine's cost turns out small enough that the 30 s capture dominates.
+
+**Order: baseline first (steps 1–11), then the §5 timings, then this.** Reducing
+a 30-second warm run is worth far more than any hashing micro-optimisation, so it
+is the first thing to attempt — and the measurement in §5 decides whether it is
+worth attempting at all.
+
 ## 6. Deliberately not built
 
 Challenged with "what guarantee or measured gain is lost without it?" — in each
@@ -367,7 +426,7 @@ case, none.
 
 | | why not |
 |---|---|
-| persistent ownership index | subsumed by the unconditional coverage pass (`HANDOFF.md` §6) |
+| persistent ownership index | subsumed by the unconditional coverage pass (`HANDOFF.md` §6). **Revisit as §5a**, where a single project-level `DiscoveryId` buys back the cheap unchanged run without shards |
 | coverage payload split / merge / shards | PHPUnit emits Infection's report directly (mechanic 2) |
 | reference timings artefact | `--log-junit` comes out of the same run |
 | Composer autoloader class resolution | `--list-tests-xml` answers it (mechanic 1) |

@@ -68,7 +68,23 @@ without re-measuring; several were wrong when assumed.
     phpunit (`Unable to locate a phpunit executable`).
 11. **`--ignore-msi-with-no-mutations` must never be passed.** A zero-mutant run
     exits 1 under `--min-msi=100` and exits 0 once that flag is added.
-12. **`herd coverage` swallows `-d`.** Its ini is
+12. **With `<source><include>` configured, the report enumerates every included
+    file even if no test ever loaded it.** php-code-coverage statically analyses
+    the include list. Verified on the fixture: `Orphan.php` is loaded by no test,
+    has one executable statement, and appears with `executable=1 executed=0`.
+13. **Without a source filter, PHPUnit refuses coverage entirely** rather than
+    producing a partial report: *"No filter is configured, code coverage will not
+    be processed"*, and no `coverage.jsonl` is written at all. There is therefore
+    no silently-incomplete-report failure mode.
+14. **A file absent from the report is either excluded by the filter or has zero
+    executable statements.** Measured on hermes-2: 613 `.php` under `src/`, 3
+    excluded by `<source><exclude>`, 404 in the report, **206 absent** — 147
+    interfaces, 29 enums, 1 abstract class, 29 bodyless exception classes.
+    Absence is *not* evidence of uncovered executable code.
+15. **`<source>` carries attributes** (`<source restrictNotices="true" …>` in
+    hermes-2), so anything matching the element must not assume a bare tag. A
+    pattern that missed it made the report look incomplete when it was not.
+16. **`herd coverage` swallows `-d`.** Its ini is
     `~/Library/Application Support/Herd/config/php/84/debug/debug.ini`, and its
     `xdebug.mode` is `debug,develop` — not `coverage`.
 
