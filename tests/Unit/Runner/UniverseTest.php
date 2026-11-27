@@ -176,4 +176,27 @@ final class UniverseTest extends TestCase {
 	public function testADirectoryThatIsNotThereYet(): void {
 		self::assertSame([], $this->universe(["source" => "app"])->sources());
 	}
+
+	/**
+	 * **A single file counts as its own root.** `support` is the natural place for
+	 * one — a base test case, a trait, a framework bootstrap — and an entry that
+	 * was silently ignored for not being a directory is the worst of both: the
+	 * consumer wrote it down and nothing watches it.
+	 *
+	 * @return void
+	 */
+	public function testASupportEntryCanBeASingleFile(): void {
+		$this->filesystem->files["/p/tests/Bootstrap.php"] = "<?php // bootstrap";
+		$before = $this->universe(["support" => ["tests/Bootstrap.php"]])->support();
+		$this->filesystem->files["/p/tests/Bootstrap.php"] = "<?php // bootstrap, differently";
+
+		self::assertNotSame($before, $this->universe(["support" => ["tests/Bootstrap.php"]])->support());
+	}
+
+	public function testASupportEntryThatIsNeitherFileNorDirectory(): void {
+		self::assertSame(
+			$this->universe(["support" => []])->support(),
+			$this->universe(["support" => ["tests/Nothing.php"]])->support(),
+		);
+	}
 }

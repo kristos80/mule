@@ -891,9 +891,19 @@ renumbering, which it has already done three times. G2, G4 and G8 exist because 
 document each slipped past an earlier draft of this list — which is the argument
 for the differential fixture below rather than for a longer list.
 
-**G1 — Zero mutants.** For every file mule asked the engine to re-prove, the JSON
-log must contain at least one mutant. A file producing none, and not known to be
-mutant-free, fails. Infection's aggregate cannot catch this: MSI averages over
+**G1 — Zero mutants.** For every file mule asked the engine to re-prove **that has
+executable lines**, the JSON log must contain at least one mutant. A file producing
+none fails, and the message names every offender at once rather than the first.
+
+**The line count is the parser's, not the report's**, which is what keeps the guard
+honest in both directions. An interface, or an enum of nothing but cases, has no
+executable lines and so nothing a mutator could change: it banks with `mutants: 0`,
+which is a claim rather than an absence. A file whose *coverage* went stale still
+has its lines on disk, so it still fails. Measured on the application: **187 of its
+613 source files are interfaces or enums**, and requiring each to be named in
+`exclude` would have been bureaucracy rather than a decision anybody made — while
+an earlier version that stopped at the first offender would have turned populating
+`exclude` into one run per file. Infection's aggregate cannot catch this: MSI averages over
 mutants that were generated, so a file producing none does not lower it —
 measured, a stale file sat beside a healthy one and the run reported
 `Mutation Code Coverage: 100%`, MSI 75 %, exit 0, with the stale file absent from

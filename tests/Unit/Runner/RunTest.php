@@ -651,7 +651,9 @@ final class RunTest extends TestCase {
 	public function testAFileTheEngineFiledNothingAgainst(): void {
 		$this->onlyFiling = ["src/A.php"];
 
-		$this->expectExceptionMessage('The engine filed no mutants against "src/B.php"');
+		$this->expectExceptionMessageMatches(
+			'/no mutants against 2 file\(s\).*\n  src\/B\.php\n  src\/Hub\.php$/s',
+		);
 
 		($this->mule())();
 	}

@@ -70,13 +70,12 @@ final readonly class Gate {
 		array $reach,
 	): Snapshot {
 		$this->assertNothingUnverified($outcome);
+		$this->assertEverythingExamined($outcome, $keys, $reach);
 
 		$verdicts = [];
 		$unproven = [];
 
 		foreach($keys as $path => $key) {
-			$this->assertMeasured($reach, $path);
-
 			$lapse = $this->lapse($outcome, $path, $reach[$path]);
 
 			if($lapse === NULL) {
@@ -115,23 +114,12 @@ final readonly class Gate {
 	/**
 	 * Why a file is not proven, or `NULL` if it is.
 	 *
-	 * **A file the suite does not reach to the floor skips G1.** The engine files
-	 * `uncovered` mutants for most of them, which would make the file unproven
-	 * anyway — but an uncovered line whose statements are unmutable produces no
-	 * mutant at all, so a file can reach MSI 100 % with part of it never run
-	 * (`Coverage\Soundness`). The reason it is unproven is already known, and a
-	 * zero-mutant message would name the wrong cause.
-	 *
 	 * @param Outcome $outcome
 	 * @param string $path
 	 * @param Reach $reach
 	 * @return Lapse|null
 	 */
 	private function lapse(Outcome $outcome, string $path, Reach $reach): ?Lapse {
-		if($reach->meets) {
-			$this->assertExamined($outcome, $path);
-		}
-
 		if($reach->meets && $outcome->mutants($path) === $outcome->count($path, "killed")) {
 			return NULL;
 		}
@@ -179,20 +167,48 @@ final readonly class Gate {
 	 * so no mutants are generated, the file vanishes from the report, and the run
 	 * exits 0 having proven nothing about it.
 	 *
-	 * A file that genuinely has nothing to mutate belongs in `exclude`, where
-	 * saying so is a decision somebody made rather than a silence mule guessed at.
+	 * **A file with no executable lines is not that, and the parser says so.** An
+	 * interface, or an enum of nothing but cases, has nothing a mutator could
+	 * change — so it banks with `mutants: 0`, which `Verdict` has always described
+	 * as a claim rather than an absence. The guard keeps its teeth exactly where
+	 * they matter: the line count comes from the file on disk, not from the
+	 * coverage report, so a file whose *coverage* went stale still has executable
+	 * lines and still fails. Measured on a 613-file application: 187 of its files
+	 * are interfaces or enums, and naming every one of them in `exclude` would be
+	 * bureaucracy rather than a decision anybody made.
+	 *
+	 * **A file below the coverage floor is not that either.** The engine files
+	 * `uncovered` mutants for most of them, but an uncovered line whose statements
+	 * are unmutable produces none — so the honest answer is "the suite reaches 9 of
+	 * 20 lines", which `Coverage\Soundness` already supplies, and a zero-mutant
+	 * message would name the wrong cause.
+	 *
+	 * **Every offender at once.** One run should hand over the whole list: a guard
+	 * that stops at the first turns populating `exclude` into one run per file.
 	 *
 	 * @param Outcome $outcome
-	 * @param string $path
+	 * @param array<string, non-empty-string> $keys
+	 * @param array<string, Reach> $reach
 	 * @return void
 	 */
-	private function assertExamined(Outcome $outcome, string $path): void {
-		if($outcome->mutants($path) === 0) {
+	private function assertEverythingExamined(Outcome $outcome, array $keys, array $reach): void {
+		$silent = [];
+
+		foreach(array_keys($keys) as $path) {
+			$this->assertMeasured($reach, $path);
+
+			if($reach[$path]->executable > 0 && $reach[$path]->meets && $outcome->mutants($path) === 0) {
+				$silent[] = $path;
+			}
+		}
+
+		if($silent !== []) {
 			throw new Failure(
-				"The engine filed no mutants against \"{$path}\", which it was asked to re-prove."
-				. " Either its coverage is stale — a file whose covered lines have moved generates"
-				. " nothing and disappears from the report — or it has nothing to mutate, in which"
-				. " case name it in \"exclude\". Nothing was written.",
+				"The engine filed no mutants against " . count($silent) . " file(s) it was asked to"
+				. " re-prove, each of which has lines it could have mutated. Either their coverage"
+				. " is stale — a file whose covered lines have moved generates nothing and"
+				. " disappears from the report — or they have nothing to mutate, in which case name"
+				. " them in \"exclude\". Nothing was written.\n  " . implode("\n  ", $silent),
 			);
 		}
 	}

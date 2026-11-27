@@ -429,9 +429,14 @@ change another file's verdict?*
 A test double or a fixture is the easy case: it is not under `source` at all, so
 `support` is the only place for it.
 
-**A file mule asks about and the engine files no mutants against fails the run
-(G1)**, with a message naming `exclude`. That is not pedantry: a file whose
-coverage has gone stale produces no mutants either, disappears from the report,
-and a run without this guard exits 0 having proven nothing about it. The first
-`mule` on a real project usually ends with two or three interfaces to name here,
-and after that it stays quiet.
+**You do not need to list your interfaces.** A file with no executable lines has
+nothing a mutator could change, and mule asks the parser rather than guessing — so
+interfaces, and enums of nothing but cases, are proven with `mutants: 0` and need
+no entry. On a 613-file application that is 187 files you do not have to think
+about.
+
+**A file that *does* have executable lines and no mutants fails the run (G1)**,
+with every offender named at once. That is not pedantry: a file whose coverage has
+gone stale produces no mutants either, disappears from the report, and a run
+without this guard exits 0 having proven nothing about it. One run hands you the
+whole list to paste in here.

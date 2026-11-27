@@ -166,6 +166,11 @@ final readonly class Universe {
 	 * the same answer as an empty one, and a less confusing one than a crash from
 	 * inside a digest loop.
 	 *
+	 * **A single file counts as its own root.** `support` is the natural place for
+	 * one — a base test case, a trait — and an entry that was silently ignored for
+	 * not being a directory is the worst of both: the consumer wrote it down and
+	 * nothing watches it.
+	 *
 	 * @param string $root Project-relative.
 	 * @return list<string>
 	 */
@@ -173,7 +178,7 @@ final readonly class Universe {
 		$absolute = $this->project->absolute($root);
 
 		if(!$this->filesystem->isDirectory($absolute)) {
-			return [];
+			return $this->filesystem->exists($absolute) ? [$root] : [];
 		}
 
 		$paths = [];

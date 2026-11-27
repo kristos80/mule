@@ -184,10 +184,11 @@ final class GateTest extends TestCase {
 	public function testRefusesToBankAFileTheEngineFiledNothingAgainst(): void {
 		$this->expectException(Failure::class);
 		$this->expectExceptionMessage(
-			'The engine filed no mutants against "src/Missing.php", which it was asked to re-prove.'
-			. " Either its coverage is stale — a file whose covered lines have moved generates"
-			. " nothing and disappears from the report — or it has nothing to mutate, in which"
-			. ' case name it in "exclude". Nothing was written.',
+			"The engine filed no mutants against 1 file(s) it was asked to re-prove, each of which"
+			. " has lines it could have mutated. Either their coverage is stale — a file whose"
+			. " covered lines have moved generates nothing and disappears from the report — or they"
+			. ' have nothing to mutate, in which case name them in "exclude". Nothing was written.'
+			. "\n  src/Missing.php",
 		);
 
 		new Gate()->proven(
@@ -352,5 +353,89 @@ final class GateTest extends TestCase {
 		);
 
 		new Gate()->proven($this->outcome(), ["src/A.php" => "key-a"], "chain", [], []);
+	}
+
+	/**
+	 * **Every offender at once.** One run should hand over the whole list: a guard
+	 * that stopped at the first turned populating `exclude` into one run per file,
+	 * and on a 613-file application that is a morning.
+	 *
+	 * @return void
+	 */
+	public function testItNamesEveryFileTheEngineFiledNothingAgainst(): void {
+		$this->expectExceptionMessageMatches(
+			'/no mutants against 2 file\(s\).*\n  src\/Missing\.php\n  src\/AlsoMissing\.php$/s',
+		);
+
+		new Gate()->proven(
+			$this->outcome(),
+			["src/Missing.php" => "key-m", "src/AlsoMissing.php" => "key-a"],
+			"chain",
+			[],
+			$this->reached(["src/Missing.php", "src/AlsoMissing.php"]),
+		);
+	}
+
+	/**
+	 * **A file with no executable lines is not a G1 failure, and the parser says
+	 * so.** An interface, or an enum of nothing but cases, has nothing a mutator
+	 * could change — so it banks with `mutants: 0`, which is a claim rather than an
+	 * absence. Measured on a 613-file application: 187 of its files are interfaces
+	 * or enums, and naming every one in `exclude` would be bureaucracy rather than
+	 * a decision anybody made.
+	 *
+	 * @return void
+	 */
+	public function testAFileWithNothingToMutateIsProvenRatherThanRefused(): void {
+		$snapshot = new Gate()->proven(
+			$this->outcome(),
+			["src/Thing.php" => "key-t"],
+			"chain",
+			[],
+			["src/Thing.php" => new Reach(0, 0, TRUE)],
+		);
+
+		self::assertSame(["src/Thing.php"], array_keys($snapshot->verdicts));
+		self::assertSame(0, $snapshot->verdicts["src/Thing.php"]->mutants);
+	}
+
+	/**
+	 * **The guard keeps its teeth where they matter.** The line count comes from
+	 * the file on disk, not from the coverage report — so a file whose coverage
+	 * went stale still has executable lines and still fails.
+	 *
+	 * @return void
+	 */
+	public function testAFileWithLinesAndNoMutantsStillFails(): void {
+		$this->expectExceptionMessage("no mutants against 1 file(s)");
+
+		new Gate()->proven(
+			$this->outcome(),
+			["src/Stale.php" => "key-s"],
+			"chain",
+			[],
+			["src/Stale.php" => new Reach(20, 20, TRUE)],
+		);
+	}
+
+	/**
+	 * And a file below the floor is reported as the coverage gap it is, rather than
+	 * as a zero-mutant fault that would name the wrong cause.
+	 *
+	 * @return void
+	 */
+	public function testAFileBelowTheFloorIsAGapRatherThanAFault(): void {
+		$snapshot = new Gate()->proven(
+			$this->outcome(),
+			["src/Bare.php" => "key-b"],
+			"chain",
+			[],
+			["src/Bare.php" => new Reach(20, 0, FALSE)],
+		);
+
+		self::assertSame(
+			"the suite reaches 0 of 20 line(s)",
+			$snapshot->unproven["src/Bare.php"]->because(),
+		);
 	}
 }
