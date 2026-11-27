@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Footprint;
+use Kristos80\Mule\Cache\Lapse;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Cache\StoreFormat;
@@ -29,6 +30,23 @@ final class StoreTest extends TestCase {
 	}
 
 	/**
+	 * A reason the store would carry for a file nothing proved. The tests that
+	 * care about the reason build their own; these only care that it travels.
+	 *
+	 * @param list<string> $paths
+	 * @return array<string, Lapse>
+	 */
+	private function lapses(array $paths): array {
+		$lapses = [];
+
+		foreach($paths as $path) {
+			$lapses[$path] = new Lapse(4, 3, 1, 0, 10, 10);
+		}
+
+		return $lapses;
+	}
+
+	/**
 	 * @param array<string, int<0, max>> $proven
 	 * @param list<string> $unproven
 	 * @param array<string, Footprint> $tests
@@ -48,7 +66,7 @@ final class StoreTest extends TestCase {
 			$verdicts[$path] = new Verdict("key-of-{$path}", $mutants);
 		}
 
-		return new Snapshot($verdicts, $unproven, $tests, $toolchain);
+		return new Snapshot($verdicts, $this->lapses($unproven), $tests, $toolchain);
 	}
 
 	/**
@@ -69,7 +87,7 @@ final class StoreTest extends TestCase {
 		$read = $this->store()->read("chain");
 
 		self::assertSame([], $read->verdicts);
-		self::assertSame([], $read->unproven);
+		self::assertSame([], array_keys($read->unproven));
 		self::assertSame("chain", $read->toolchain);
 	}
 
@@ -79,7 +97,7 @@ final class StoreTest extends TestCase {
 		$read = $this->store()->read("chain");
 
 		self::assertTrue($read->vouchesFor("src/A.php", "key-of-src/A.php"));
-		self::assertSame(["src/B.php"], $read->unproven);
+		self::assertSame(["src/B.php"], array_keys($read->unproven));
 	}
 
 	/**

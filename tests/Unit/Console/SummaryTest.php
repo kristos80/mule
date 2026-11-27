@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Console;
 
 use Kristos80\Mule\Cache\Footprint;
+use Kristos80\Mule\Cache\Lapse;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Standing;
 use Kristos80\Mule\Cache\Verdict;
@@ -23,7 +24,7 @@ final class SummaryTest extends TestCase {
 	private function store(array $unproven = []): Snapshot {
 		return new Snapshot(
 			["src/A.php" => new Verdict("key-a", 4)],
-			$unproven,
+			$this->lapses($unproven),
 			["tests/Unit/AaaTest.php" => new Footprint("t", ["src/A.php"])],
 			"chain",
 		);
@@ -47,6 +48,22 @@ final class SummaryTest extends TestCase {
 		return implode("\n", new Summary()->lines($finding, $excluded));
 	}
 
+	/**
+	 * A reason the store would carry for a file nothing proved.
+	 *
+	 * @param list<string> $paths
+	 * @return array<string, Lapse>
+	 */
+	private function lapses(array $paths): array {
+		$lapses = [];
+
+		foreach($paths as $path) {
+			$lapses[$path] = new Lapse(4, 3, 1, 0, 10, 10);
+		}
+
+		return $lapses;
+	}
+
 	public function testNothingOwedSaysSoAndSaysWhy(): void {
 		$store = $this->store();
 
@@ -63,7 +80,7 @@ final class SummaryTest extends TestCase {
 			"1 file(s) were owed; 1 were handed to the engine.",
 			$this->text(Finding::proven(
 				$store,
-				$this->standing(new Snapshot([], ["src/A.php"], ["tests/Unit/AaaTest.php" => new Footprint("t", [])], "chain")),
+				$this->standing(new Snapshot([], $this->lapses(["src/A.php"]), ["tests/Unit/AaaTest.php" => new Footprint("t", [])], "chain")),
 				["src/A.php" => "key-a"],
 				[],
 			)),
@@ -125,7 +142,7 @@ final class SummaryTest extends TestCase {
 			. "  excluded    1 file(s), not gated at all\n"
 			. "\n"
 			. "Not proven, and was not before this run either:\n"
-			. "  src/B.php\n"
+			. "  src/B.php — 1 of 4 mutant(s) escaped\n"
 			. "\n"
 			. "Not banked, edited while the engine ran:\n"
 			. "  src/Z.php\n"
@@ -170,9 +187,12 @@ final class SummaryTest extends TestCase {
 			[],
 		));
 
-		self::assertStringContainsString("Not proven, found by this run:\n  src/B.php\n", $text);
 		self::assertStringContainsString(
-			"Not proven, and was not before this run either:\n  src/C.php\n",
+			"Not proven, found by this run:\n  src/B.php — 1 of 4 mutant(s) escaped\n",
+			$text,
+		);
+		self::assertStringContainsString(
+			"Not proven, and was not before this run either:\n  src/C.php — 1 of 4 mutant(s) escaped\n",
 			$text,
 		);
 		self::assertStringContainsString("NOT PROVEN: 2 file(s) have mutants nothing killed.", $text);
@@ -197,7 +217,7 @@ final class SummaryTest extends TestCase {
 		$store = $this->store(["src/B.php"]);
 
 		self::assertStringContainsString(
-			"Not proven, and was not before this run either:\n  src/B.php",
+			"Not proven, and was not before this run either:\n  src/B.php — 1 of 4 mutant(s) escaped",
 			$this->text(Finding::settled($store, $this->standing($store))),
 		);
 	}
@@ -238,7 +258,7 @@ final class SummaryTest extends TestCase {
 	public function testARunThatOnlyReMeasuredSaysSo(): void {
 		$store = new Snapshot(
 			["src/A.php" => new Verdict("key-a", 4)],
-			[],
+			$this->lapses([]),
 			["tests/Unit/AaaTest.php" => new Footprint("the bytes it had then", ["src/A.php"])],
 			"chain",
 		);

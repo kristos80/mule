@@ -19,9 +19,14 @@ final readonly class Snapshot {
 	public array $verdicts;
 
 	/**
-	 * Files it examined and could *not* prove.
+	 * Files it examined and could *not* prove, and why for each.
 	 *
-	 * @var list<string>
+	 * **The reason is recorded, not just the name.** "src/B.php is not proven"
+	 * could mean three mutants of forty-seven escaped, or the suite reaching half
+	 * the file, or both — and the difference decides whether somebody writes an
+	 * assertion or writes a test (`Lapse`).
+	 *
+	 * @var array<string, Lapse>
 	 */
 	public array $unproven;
 
@@ -54,7 +59,7 @@ final readonly class Snapshot {
 	 * right and no second sort to disagree with.
 	 *
 	 * @param array<string, Verdict> $verdicts
-	 * @param list<string> $unproven
+	 * @param array<string, Lapse> $unproven
 	 * @param array<string, Footprint> $tests
 	 * @param non-empty-string $toolchain The environment every verdict here was proven under.
 	 */
@@ -65,15 +70,11 @@ final readonly class Snapshot {
 		public string $toolchain,
 	) {
 		ksort($verdicts);
+		ksort($unproven);
 		ksort($tests);
 
-		// `sort()` reindexes, so wrapping this in `array_values()` would be an
-		// operation with no result behind it — and the gate said so.
-		$unique = array_unique($unproven);
-		sort($unique);
-
 		$this->verdicts = $verdicts;
-		$this->unproven = $unique;
+		$this->unproven = $unproven;
 		$this->tests = $tests;
 	}
 
@@ -136,7 +137,11 @@ final readonly class Snapshot {
 	 * @return list<string>
 	 */
 	public function known(): array {
-		$known = [...array_keys($this->verdicts), ...$this->unproven, ...array_keys($this->tests)];
+		$known = [
+			...array_keys($this->verdicts),
+			...array_keys($this->unproven),
+			...array_keys($this->tests),
+		];
 
 		foreach($this->tests as $footprint) {
 			foreach($footprint->touches as $touched) {
@@ -202,7 +207,7 @@ final readonly class Snapshot {
 
 		$verdicts = $this->verdicts;
 
-		foreach($newer->unproven as $path) {
+		foreach(array_keys($newer->unproven) as $path) {
 			unset($verdicts[$path]);
 		}
 
@@ -270,14 +275,14 @@ final readonly class Snapshot {
 	 *
 	 * @param self $newer
 	 * @param array<string, Verdict> $verdicts
-	 * @return list<string>
+	 * @return array<string, Lapse>
 	 */
 	private function mergedUnproven(self $newer, array $verdicts): array {
 		$unproven = [];
 
-		foreach([...$this->unproven, ...$newer->unproven] as $path) {
+		foreach([...$this->unproven, ...$newer->unproven] as $path => $lapse) {
 			if(!isset($verdicts[$path])) {
-				$unproven[] = $path;
+				$unproven[$path] = $lapse;
 			}
 		}
 

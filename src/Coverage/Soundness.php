@@ -7,9 +7,7 @@ use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\External\LinesInterface;
 use Kristos80\Mule\Failure;
 use Kristos80\Mule\Project;
-use function count;
 use function implode;
-use function intdiv;
 
 /**
  * Whether a merged report describes the files as they are on disk, and how much
@@ -40,16 +38,20 @@ final readonly class Soundness {
 	) {}
 
 	/**
-	 * The gated files the report does not cover to the floor, asserting G3 on the
-	 * way through.
+	 * How much of each gated file the report says the suite runs, asserting G3 on
+	 * the way through.
+	 *
+	 * **Figures rather than names.** Which files fall short is derivable from them,
+	 * and the figures are what the store records as the reason — "the suite reaches
+	 * 18 of 20 lines" is something somebody acts on where a bare name is a list.
 	 *
 	 * @param Capture $merged
 	 * @param list<string> $gated Project-relative source files mule is answerable for.
-	 * @return list<string>
+	 * @return array<string, Reach>
 	 */
-	public function uncovered(Capture $merged, array $gated): array {
+	public function reach(Capture $merged, array $gated): array {
 		$recorded = $merged->coverage->lineCoverage();
-		$uncovered = [];
+		$reach = [];
 
 		foreach($gated as $path) {
 			$executable = $this->lines->executableIn($this->project->absolute($path));
@@ -57,12 +59,10 @@ final readonly class Soundness {
 
 			$this->assertLinesValid($path, $lines, $executable);
 
-			if($this->shortfall($lines, $executable)) {
-				$uncovered[] = $path;
-			}
+			$reach[$path] = Reach::of($executable, $this->executed($lines), $this->configuration->minCoverage);
 		}
 
-		return $uncovered;
+		return $reach;
 	}
 
 	/**
@@ -92,21 +92,12 @@ final readonly class Soundness {
 	}
 
 	/**
-	 * Whether the lines actually run fall short of the floor.
-	 *
-	 * **A file with nothing executable in it passes.** An interface or an enum of
-	 * constants has no lines to reach, and 0 of 0 is not a gap — it is G1's
-	 * business, which says so in a message naming `exclude`.
+	 * How many of a file's lines the report says something ran.
 	 *
 	 * @param array<int, mixed> $lines
-	 * @param list<int> $executable
-	 * @return bool
+	 * @return int<0, max>
 	 */
-	private function shortfall(array $lines, array $executable): bool {
-		if($executable === []) {
-			return FALSE;
-		}
-
+	private function executed(array $lines): int {
 		$executed = 0;
 
 		foreach($lines as $tests) {
@@ -115,7 +106,7 @@ final readonly class Soundness {
 			}
 		}
 
-		return intdiv($executed * 100, count($executable)) < $this->configuration->minCoverage;
+		return $executed;
 	}
 
 	/**

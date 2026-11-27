@@ -87,13 +87,13 @@ final readonly class Run {
 		// A shard describing a version of a file that is gone makes every mutant
 		// the engine then runs a mutant of the wrong lines, and that is cheaper to
 		// refuse than to explain afterwards.
-		$uncovered = $this->soundness->uncovered($measured->capture, array_keys($owed));
+		$reach = $this->soundness->reach($measured->capture, array_keys($owed));
 		$outcome = $this->engine->over($measured, $whole ? [] : array_keys($owed));
 		$banked = $this->unmoved($owed, $measured);
 
 		return Finding::proven(
 			$this->store->bank(
-				$this->gate->proven($outcome, $banked, $this->toolchain, $measured->tests, $uncovered),
+				$this->gate->proven($outcome, $banked, $this->toolchain, $measured->tests, $reach),
 			),
 			$standing,
 			$banked,

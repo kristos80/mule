@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Footprint;
+use Kristos80\Mule\Cache\Lapse;
 use Kristos80\Mule\Cache\Key;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Standing;
@@ -48,6 +49,22 @@ final class StandingTest extends TestCase {
 	private const array GATED = ["src/A.php", "src/B.php", "src/Hub.php"];
 
 	/**
+	 * A reason the store would carry for a file nothing proved.
+	 *
+	 * @param list<string> $paths
+	 * @return array<string, Lapse>
+	 */
+	private function lapses(array $paths): array {
+		$lapses = [];
+
+		foreach($paths as $path) {
+			$lapses[$path] = new Lapse(4, 3, 1, 0, 10, 10);
+		}
+
+		return $lapses;
+	}
+
+	/**
 	 * @return array<string, non-empty-string>
 	 */
 	private function digests(): array {
@@ -88,7 +105,7 @@ final class StandingTest extends TestCase {
 			$verdicts[$path] = new Verdict(Key::of($path, $digests[$path], $deps, $tests, $toolchain), $mutants);
 		}
 
-		return new Snapshot($verdicts, $unproven, $this->tests(), $toolchain);
+		return new Snapshot($verdicts, $this->lapses($unproven), $this->tests(), $toolchain);
 	}
 
 	public function testAStoreThatDescribesTheTreeHasNothingOutstanding(): void {

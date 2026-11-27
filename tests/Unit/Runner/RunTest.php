@@ -496,7 +496,7 @@ final class RunTest extends TestCase {
 
 		self::assertSame(["src/B.php", "src/Hub.php"], $finding->standing->outstanding);
 		self::assertSame(["src/A.php", "src/Hub.php"], array_keys($finding->store->verdicts));
-		self::assertSame(["src/B.php"], $finding->store->unproven);
+		self::assertSame(["src/B.php"], array_keys($finding->store->unproven));
 	}
 
 	/**
@@ -573,7 +573,7 @@ final class RunTest extends TestCase {
 		$finding = ($this->mule())();
 
 		self::assertFalse($finding->holds());
-		self::assertSame(["src/B.php", "src/Hub.php"], $finding->store->unproven);
+		self::assertSame(["src/B.php", "src/Hub.php"], array_keys($finding->store->unproven));
 		self::assertSame(["src/B.php", "src/Hub.php"], $finding->escaped());
 		self::assertSame(["src/A.php"], $finding->proved());
 	}
@@ -660,7 +660,7 @@ final class RunTest extends TestCase {
 		$finding = ($this->mule(settings: ["exclude" => ["src/B.php"]]))();
 
 		self::assertSame(["src/A.php", "src/Hub.php"], array_keys($finding->store->verdicts));
-		self::assertSame([], $finding->store->unproven);
+		self::assertSame([], array_keys($finding->store->unproven));
 	}
 
 	/**
@@ -706,7 +706,7 @@ final class RunTest extends TestCase {
 		$finding = ($this->mule())();
 
 		self::assertFalse($finding->holds());
-		self::assertSame(["src/A.php", "src/B.php"], $finding->store->unproven);
+		self::assertSame(["src/A.php", "src/B.php"], array_keys($finding->store->unproven));
 		self::assertSame(["src/Hub.php"], array_keys($finding->store->verdicts));
 	}
 

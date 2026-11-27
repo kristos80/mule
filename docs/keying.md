@@ -584,8 +584,16 @@ that it is tracked; mule must not move it.
 .mule/verified.json
 ```
 
-- `verdicts`: `path => { key, mutants, killed, escaped, timeouts, errors }`
-- `coverage`: `path => { executable, executed, unreached[] }`
+- `verdicts`: `path => { key, mutants }` — the files proven, and what each one
+  rests on. **`killed`, `escaped`, `timeouts` and `errors` have no column here and
+  cannot have one**: a verdict exists only when every mutant was killed by a test
+  (G8), so `killed` is `mutants` and the other three are zero by construction. A
+  column that is always zero reads as a measurement somebody took.
+- `unproven`: `path => { mutants, killed, escaped, uncovered, executable, executed }`
+  — the files examined and *not* proven, and why for each. This is where the
+  per-mutant detail belongs, because this is where it varies. A name on its own is
+  a list; `3 of 47 mutant(s) escaped; the suite reaches 18 of 20 line(s)` is
+  something somebody acts on, and the two halves call for different work.
 - `tests`: `path => { sig, touches[] }` — what each test file was seen to execute,
   and the bytes it was measured at. **The signature is load-bearing rather than
   informational**, and an implementation that recorded only `touches` was measured
@@ -602,8 +610,21 @@ that it is tracked; mule must not move it.
   cheap question is answered on a fresh checkout with no cache at all; a signature
   kept machine-local could not be compared there, so the fast path would either
   miss the change or stop being fast.
-- `timings`: `{ key, capturedAt, tests: path => seconds }` — the reference capture
-  (§5), keyed separately so a changed test body marks it stale
+**Two sections this page specified are deliberately not built**, and the reasons
+are worth keeping because they are reasons not to build them rather than work left
+over:
+
+- **`coverage`: `path => { executable, executed, unreached[] }` for every file.**
+  The figures are recomputed from the rendered report on every run that measures
+  anything, and the only consumer that would read them from the store is `doctor`
+  — which takes its own capture. They are recorded for the files that *fall short*,
+  where they are the reason, and nowhere else.
+- **`timings`: `{ key, capturedAt, tests: path => seconds }` in the committed
+  store.** Traced through: on a fresh checkout there is no shard cache, so a run
+  captures the whole suite and gets fresh timings; on a warm machine the local
+  artifact is read. The committed copy would never be the one consulted. The
+  reference capture stays machine-local, and a cache without it is refused with a
+  message naming `mule --whole`.
 
 Shards are **JSON, one file per test class**, under `.mule/cache/`. Not a
 `require`d PHP file: a cache entry that is executed is a cache entry that can run
@@ -1146,10 +1167,10 @@ something to engineer around.
   altogether — and the owed list is a comparison of fresh keys against banked
   verdicts. One consequence is an improvement: a file that has appeared now makes
   the *capture* whole but the mutation run filtered to what actually moved.
-- **`doctor` is not built.** §8's tier detection, the invalidation distribution and
-  the four-state report are specified and unimplemented. What `mule` prints today
-  is three of the four states — proven, not proven, excluded — because the other
-  two are narrowing-only and so cannot occur.
+- **`doctor` is not built.** §8's tier detection and the invalidation distribution
+  are specified and unimplemented. What `mule` prints today is three of the four
+  states — proven, not proven with the reason for each, excluded — because the
+  other two are narrowing-only and so cannot occur.
 - **The saving has not been re-measured end to end through the command.** The
   figures in §2 and §5 were taken by hand from the same mechanics the pipeline now
   uses, and mule's own run reproduces Infection's verdict exactly — but a cold-vs-warm

@@ -32,8 +32,8 @@ final readonly class Summary {
 			...$this->what($finding),
 			"",
 			...$this->counts($finding, $excluded),
-			...$this->listed("Not proven, found by this run", $finding->escaped()),
-			...$this->listed("Not proven, and was not before this run either", $this->inherited($finding)),
+			...$this->lapsed("Not proven, found by this run", $finding, $finding->escaped()),
+			...$this->lapsed("Not proven, and was not before this run either", $finding, $this->inherited($finding)),
 			...$this->listed("Not banked, edited while the engine ran", $finding->abandoned),
 			"",
 			$finding->holds()
@@ -115,7 +115,26 @@ final readonly class Summary {
 	private function inherited(Finding $finding): array {
 		// Not reindexed: the keys reach nothing but a `foreach`, and the gate
 		// proved an `array_values` here to be an operation with no result behind it.
-		return array_diff($finding->store->unproven, $finding->escaped());
+		return array_diff(array_keys($finding->store->unproven), $finding->escaped());
+	}
+
+	/**
+	 * The unproven files with the reason beside each, which is what the store
+	 * records and what somebody acts on.
+	 *
+	 * @param string $heading
+	 * @param Finding $finding
+	 * @param array<string> $paths Keys are not read, only the names.
+	 * @return list<string>
+	 */
+	private function lapsed(string $heading, Finding $finding, array $paths): array {
+		$named = [];
+
+		foreach($paths as $path) {
+			$named[] = "{$path} — " . $finding->store->unproven[$path]->because();
+		}
+
+		return $this->listed($heading, $named);
 	}
 
 	/**

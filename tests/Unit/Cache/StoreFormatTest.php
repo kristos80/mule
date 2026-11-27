@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Footprint;
+use Kristos80\Mule\Cache\Lapse;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\StoreFormat;
 use Kristos80\Mule\Cache\Verdict;
@@ -18,7 +19,7 @@ final class StoreFormatTest extends TestCase {
 	private function snapshot(): Snapshot {
 		return new Snapshot(
 			["src/A.php" => new Verdict("key-a", 4), "src/B.php" => new Verdict("key-b", 0)],
-			["src/C.php"],
+			$this->lapses(["src/C.php"]),
 			["tests/ATest.php" => new Footprint("sig", ["src/A.php", "src/B.php"]), "tests/BTest.php" => new Footprint("sig", ["src/B.php"])],
 			"chain",
 		);
@@ -32,13 +33,36 @@ final class StoreFormatTest extends TestCase {
 		return [
 			"toolchain" => "chain",
 			"verdicts" => ["src/A.php" => ["key" => "key-a", "mutants" => 4]],
-			"unproven" => ["src/C.php"],
+			"unproven" => ["src/C.php" => [
+				"mutants" => 4,
+				"killed" => 3,
+				"escaped" => 1,
+				"uncovered" => 0,
+				"executable" => 10,
+				"executed" => 10,
+			]],
 			"tests" => [
 				"tests/ATest.php" => ["sig" => "sig-a", "touches" => ["src/A.php"]],
 				"tests/BTest.php" => ["sig" => "sig-b", "touches" => ["src/B.php"]],
 			],
 			...$overrides,
 		];
+	}
+
+	/**
+	 * A reason the store would carry for a file nothing proved.
+	 *
+	 * @param list<string> $paths
+	 * @return array<string, Lapse>
+	 */
+	private function lapses(array $paths): array {
+		$lapses = [];
+
+		foreach($paths as $path) {
+			$lapses[$path] = new Lapse(4, 3, 1, 0, 10, 10);
+		}
+
+		return $lapses;
 	}
 
 	public function testSurvivesTheRoundTrip(): void {
@@ -153,11 +177,29 @@ final class StoreFormatTest extends TestCase {
 		StoreFormat::read($this->stored(["unproven" => "src/C.php"]));
 	}
 
-	public function testRefusesAnUnprovenEntryThatIsNotAPath(): void {
+	public function testRefusesAnUnprovenEntryThatIsNotKeyedByAFile(): void {
 		$this->expectException(Failure::class);
-		$this->expectExceptionMessage("A store's unproven list includes something that is not a file path.");
+		$this->expectExceptionMessage("A store's unproven list is keyed by something that is not a file.");
 
-		StoreFormat::read($this->stored(["unproven" => [42]]));
+		StoreFormat::read($this->stored(["unproven" => [["mutants" => 0]]]));
+	}
+
+	/**
+	 * **The reason is the point of the section.** A name on its own is a list, so
+	 * a record missing a count is a record that cannot say why — and reading past
+	 * it would put a `0` where a measurement should be.
+	 *
+	 * @return void
+	 */
+	public function testRefusesAnUnprovenRecordMissingACount(): void {
+		$this->expectException(Failure::class);
+		$this->expectExceptionMessage(
+			'The store\'s record of why "src/C.php" is unproven gives no "escaped".',
+		);
+
+		StoreFormat::read($this->stored([
+			"unproven" => ["src/C.php" => ["mutants" => 1, "killed" => 0]],
+		]));
 	}
 
 	public function testRefusesATestMapThatIsNotAnArray(): void {
@@ -257,10 +299,40 @@ final class StoreFormatTest extends TestCase {
 				"src/Z.php" => ["key" => "z", "mutants" => 1],
 				"src/A.php" => ["key" => "a", "mutants" => 1],
 			],
-			"unproven" => ["src/Z.php", "src/A.php"],
+			"unproven" => [
+				"src/Z.php" => ["mutants" => 1, "killed" => 0, "escaped" => 1, "uncovered" => 0,
+					"executable" => 1, "executed" => 1],
+				"src/A.php" => ["mutants" => 1, "killed" => 0, "escaped" => 1, "uncovered" => 0,
+					"executable" => 1, "executed" => 1],
+			],
 		]));
 
 		self::assertSame(["src/A.php", "src/Z.php"], array_keys($read->verdicts));
-		self::assertSame(["src/A.php", "src/Z.php"], $read->unproven);
+		self::assertSame(["src/A.php", "src/Z.php"], array_keys($read->unproven));
+	}
+
+	/**
+	 * Every reason, not just the first: a store read down to one unproven file is
+	 * a project with one thing wrong with it.
+	 *
+	 * @return void
+	 */
+	public function testCarriesEveryReasonThroughTheRoundTrip(): void {
+		$snapshot = new Snapshot(
+			[],
+			[
+				"src/A.php" => new Lapse(47, 44, 3, 0, 20, 20),
+				"src/B.php" => new Lapse(0, 0, 0, 0, 20, 9),
+			],
+			[],
+			"chain",
+		);
+
+		$read = StoreFormat::read(
+			json_decode(StoreFormat::write($snapshot), TRUE, 512, JSON_THROW_ON_ERROR),
+		);
+
+		self::assertSame("3 of 47 mutant(s) escaped", $read->unproven["src/A.php"]->because());
+		self::assertSame("the suite reaches 9 of 20 line(s)", $read->unproven["src/B.php"]->because());
 	}
 }

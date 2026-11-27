@@ -5,6 +5,7 @@ namespace Kristos80\Mule\Tests\Unit\Coverage;
 
 use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Coverage\Capture;
+use Kristos80\Mule\Coverage\Reach;
 use Kristos80\Mule\Coverage\Soundness;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
@@ -50,14 +51,36 @@ final class SoundnessTest extends TestCase {
 		);
 	}
 
-	public function testAFullyCoveredFileIsNotReported(): void {
-		self::assertSame(
-			[],
-			$this->soundness(["/p/src/A.php" => [3, 4]])->uncovered(
-				$this->capture(["A.php" => [3 => [0 => 1], 4 => [0 => 1]]]),
-				["src/A.php"],
-			),
+	/**
+	 * @param array<string, list<int>> $executable
+	 * @param int $floor
+	 * @param Capture|null $capture
+	 * @param list<string> $gated
+	 * @return array<string, Reach>
+	 */
+	private function reach(
+		array $executable = ["/p/src/A.php" => [3, 4, 5]],
+		int $floor = 100,
+		?Capture $capture = NULL,
+		array $gated = ["src/A.php"],
+	): array {
+		return $this->soundness($executable, $floor)->reach($capture ?? $this->capture(), $gated);
+	}
+
+	public function testItCountsWhatTheSuiteRunsAndWhatItCould(): void {
+		$reach = $this->reach();
+
+		self::assertSame(3, $reach["src/A.php"]->executable);
+		self::assertSame(2, $reach["src/A.php"]->executed);
+	}
+
+	public function testAFullyCoveredFileMeetsTheFloor(): void {
+		$reach = $this->reach(
+			["/p/src/A.php" => [3, 4]],
+			capture: $this->capture(["A.php" => [3 => [0 => 1], 4 => [0 => 1]]]),
 		);
+
+		self::assertTrue($reach["src/A.php"]->meets);
 	}
 
 	/**
@@ -69,24 +92,24 @@ final class SoundnessTest extends TestCase {
 	 * @return void
 	 */
 	public function testALineNobodyRanIsAFinding(): void {
-		self::assertSame(["src/A.php"], $this->soundness()->uncovered($this->capture(), ["src/A.php"]));
+		self::assertFalse($this->reach()["src/A.php"]->meets);
 	}
 
-	public function testEveryFileShortOfTheFloorIsNamed(): void {
-		self::assertSame(
-			["src/A.php", "src/B.php"],
-			$this->soundness(["/p/src/A.php" => [3, 4, 5], "/p/src/B.php" => [1]])->uncovered(
-				$this->capture(),
-				["src/A.php", "src/B.php"],
-			),
+	public function testEveryFileAskedAboutIsAnswered(): void {
+		$reach = $this->reach(
+			["/p/src/A.php" => [3, 4, 5], "/p/src/B.php" => [1]],
+			gated: ["src/A.php", "src/B.php"],
 		);
+
+		self::assertFalse($reach["src/A.php"]->meets);
+		self::assertFalse($reach["src/B.php"]->meets);
 	}
 
 	public function testAFileTheReportHasNeverHeardOfIsAFinding(): void {
-		self::assertSame(
-			["src/B.php"],
-			$this->soundness(["/p/src/B.php" => [1, 2]])->uncovered($this->capture(), ["src/B.php"]),
-		);
+		$reach = $this->reach(["/p/src/B.php" => [1, 2]], gated: ["src/B.php"]);
+
+		self::assertFalse($reach["src/B.php"]->meets);
+		self::assertSame(0, $reach["src/B.php"]->executed);
 	}
 
 	/**
@@ -96,14 +119,11 @@ final class SoundnessTest extends TestCase {
 	 * @return void
 	 */
 	public function testAFileWithNothingExecutableInItPasses(): void {
-		self::assertSame(
-			[],
-			$this->soundness(["/p/src/Thing.php" => []])->uncovered($this->capture(), ["src/Thing.php"]),
-		);
+		self::assertTrue($this->reach(["/p/src/Thing.php" => []], gated: ["src/Thing.php"])["src/Thing.php"]->meets);
 	}
 
 	public function testTheFloorIsThePersonsChoice(): void {
-		self::assertSame([], $this->soundness(floor: 66)->uncovered($this->capture(), ["src/A.php"]));
+		self::assertTrue($this->reach(floor: 66)["src/A.php"]->meets);
 	}
 
 	/**
@@ -113,18 +133,15 @@ final class SoundnessTest extends TestCase {
 	 * @return void
 	 */
 	public function testTheFloorIsNotRoundedInTheProjectsFavour(): void {
-		self::assertSame(["src/A.php"], $this->soundness(floor: 67)->uncovered($this->capture(), ["src/A.php"]));
+		self::assertFalse($this->reach(floor: 67)["src/A.php"]->meets);
 	}
 
 	public function testAFloorOfNothingAsksForNothing(): void {
-		self::assertSame(
-			[],
-			$this->soundness(["/p/src/A.php" => [1, 2, 3, 4, 5]], 0)->uncovered($this->capture(), ["src/A.php"]),
-		);
+		self::assertTrue($this->reach(["/p/src/A.php" => [1, 2, 3, 4, 5]], 0)["src/A.php"]->meets);
 	}
 
 	public function testOnlyTheFilesAskedAboutAreAnswered(): void {
-		self::assertSame([], $this->soundness()->uncovered($this->capture(), []));
+		self::assertSame([], $this->reach(gated: []));
 	}
 
 	/**
@@ -140,16 +157,16 @@ final class SoundnessTest extends TestCase {
 			"The coverage for \"src/A.php\" names line(s) 5, which that file does not have",
 		);
 
-		$this->soundness(["/p/src/A.php" => [3, 4]])->uncovered(
-			$this->capture(["A.php" => [3 => [0 => 1], 4 => [0 => 1], 5 => [0 => 1]]]),
-			["src/A.php"],
+		$this->reach(
+			["/p/src/A.php" => [3, 4]],
+			capture: $this->capture(["A.php" => [3 => [0 => 1], 4 => [0 => 1], 5 => [0 => 1]]]),
 		);
 	}
 
 	public function testItSaysWhatToDoAboutAStaleShard(): void {
 		$this->expectExceptionMessage("Run mule --whole. Nothing was written.");
 
-		$this->soundness([])->uncovered($this->capture(), ["src/A.php"]);
+		$this->reach([]);
 	}
 
 	/**
@@ -161,7 +178,7 @@ final class SoundnessTest extends TestCase {
 	public function testAnInvalidLineCountsEvenWhenNobodyRanIt(): void {
 		$this->expectExceptionMessage("names line(s) 5");
 
-		$this->soundness(["/p/src/A.php" => [3, 4]])->uncovered($this->capture(), ["src/A.php"]);
+		$this->reach(["/p/src/A.php" => [3, 4]]);
 	}
 
 	/**
@@ -172,12 +189,12 @@ final class SoundnessTest extends TestCase {
 	 * @return void
 	 */
 	public function testAPathOutsideTheSourceRootIsLookedUpAsItIs(): void {
-		self::assertSame(
-			[],
-			$this->soundness(["/p/tests/Helper.php" => [1]])->uncovered(
-				$this->capture(["tests/Helper.php" => [1 => [0 => 1]]]),
-				["tests/Helper.php"],
-			),
+		self::assertTrue(
+			$this->reach(
+				["/p/tests/Helper.php" => [1]],
+				capture: $this->capture(["tests/Helper.php" => [1 => [0 => 1]]]),
+				gated: ["tests/Helper.php"],
+			)["tests/Helper.php"]->meets,
 		);
 	}
 }

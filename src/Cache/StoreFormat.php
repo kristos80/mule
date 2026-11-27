@@ -40,7 +40,7 @@ final readonly class StoreFormat {
 		return json_encode([
 			"toolchain" => $snapshot->toolchain,
 			"verdicts" => $verdicts,
-			"unproven" => $snapshot->unproven,
+			"unproven" => self::lapses($snapshot),
 			"tests" => self::written($snapshot),
 		], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
 	}
@@ -68,7 +68,7 @@ final readonly class StoreFormat {
 
 		return new Snapshot(
 			self::verdicts($decoded["verdicts"]),
-			self::paths($decoded["unproven"], "unproven list"),
+			self::unproven($decoded["unproven"]),
 			self::tests($decoded["tests"]),
 			$toolchain,
 		);
@@ -123,6 +123,68 @@ final readonly class StoreFormat {
 		}
 
 		return new Verdict($key, $mutants);
+	}
+
+	/**
+	 * @param Snapshot $snapshot
+	 * @return array<string, array<string, int>>
+	 */
+	private static function lapses(Snapshot $snapshot): array {
+		$lapses = [];
+
+		foreach($snapshot->unproven as $path => $lapse) {
+			$lapses[$path] = $lapse->toArray();
+		}
+
+		return $lapses;
+	}
+
+	/**
+	 * **What was wrong with each file, not just which ones.** A name on its own is
+	 * a list; a name with a reason is something somebody can act on (§4).
+	 *
+	 * @param mixed $value
+	 * @return array<string, Lapse>
+	 */
+	private static function unproven(mixed $value): array {
+		if(!is_array($value)) {
+			throw new Failure("A store's unproven list must be an array, " . get_debug_type($value) . " given.");
+		}
+
+		$unproven = [];
+
+		foreach($value as $path => $lapse) {
+			if(!is_string($path) || $path === "") {
+				throw new Failure("A store's unproven list is keyed by something that is not a file.");
+			}
+
+			$unproven[$path] = new Lapse(
+				self::tally($lapse, "mutants", $path),
+				self::tally($lapse, "killed", $path),
+				self::tally($lapse, "escaped", $path),
+				self::tally($lapse, "uncovered", $path),
+				self::tally($lapse, "executable", $path),
+				self::tally($lapse, "executed", $path),
+			);
+		}
+
+		return $unproven;
+	}
+
+	/**
+	 * @param mixed $lapse
+	 * @param string $name
+	 * @param string $path
+	 * @return int<0, max>
+	 */
+	private static function tally(mixed $lapse, string $name, string $path): int {
+		$count = is_array($lapse) ? ($lapse[$name] ?? NULL) : NULL;
+
+		if(!is_int($count) || $count < 0) {
+			throw new Failure("The store's record of why \"{$path}\" is unproven gives no \"{$name}\".");
+		}
+
+		return $count;
 	}
 
 	/**

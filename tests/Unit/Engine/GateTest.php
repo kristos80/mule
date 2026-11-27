@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace Kristos80\Mule\Tests\Unit\Engine;
 
+use Kristos80\Mule\Coverage\Reach;
 use Kristos80\Mule\Engine\Gate;
 use Kristos80\Mule\Engine\Outcome;
 use Kristos80\Mule\Failure;
@@ -10,6 +11,28 @@ use Kristos80\Mule\Cache\Footprint;
 use PHPUnit\Framework\TestCase;
 
 final class GateTest extends TestCase {
+
+	/**
+	 * @param array<string, int> $stats
+	 * @param array<string, list<string>> $sections Kind to the files mutants were filed against.
+	 * @return Outcome
+	 */
+	/**
+	 * Every gated file fully reached, so a test that cares about mutants says
+	 * nothing about lines.
+	 *
+	 * @param list<string> $paths
+	 * @return array<string, Reach>
+	 */
+	private function reached(array $paths): array {
+		$reach = [];
+
+		foreach($paths as $path) {
+			$reach[$path] = new Reach(10, 10, TRUE);
+		}
+
+		return $reach;
+	}
 
 	/**
 	 * @param array<string, int> $stats
@@ -37,7 +60,13 @@ final class GateTest extends TestCase {
 	}
 
 	public function testBanksAFileWhoseEveryMutantWasKilledByATest(): void {
-		$snapshot = new Gate()->proven($this->outcome(), ["src/A.php" => "key-a"], "chain", []);
+		$snapshot = new Gate()->proven(
+			$this->outcome(),
+			["src/A.php" => "key-a"],
+			"chain",
+			[],
+			$this->reached(["src/A.php"]),
+		);
 
 		self::assertSame(["src/A.php"], array_keys($snapshot->verdicts));
 		self::assertSame("key-a", $snapshot->verdicts["src/A.php"]->key);
@@ -61,19 +90,26 @@ final class GateTest extends TestCase {
 			["src/A.php" => "key-a", "src/B.php" => "key-b"],
 			"chain",
 			[],
+			$this->reached(["src/A.php", "src/B.php"]),
 		);
 
 		self::assertSame(["src/A.php"], array_keys($snapshot->verdicts));
-		self::assertSame(["src/B.php"], $snapshot->unproven);
+		self::assertSame(["src/B.php"], array_keys($snapshot->unproven));
 	}
 
 	public function testDoesNotBankAFileWithASurvivor(): void {
 		$outcome = $this->outcome(sections: ["killed" => ["/p/src/A.php"], "escaped" => ["/p/src/A.php"]]);
 
-		$snapshot = new Gate()->proven($outcome, ["src/A.php" => "key-a"], "chain", []);
+		$snapshot = new Gate()->proven(
+			$outcome,
+			["src/A.php" => "key-a"],
+			"chain",
+			[],
+			$this->reached(["src/A.php"]),
+		);
 
 		self::assertSame([], $snapshot->verdicts);
-		self::assertSame(["src/A.php"], $snapshot->unproven);
+		self::assertSame(["src/A.php"], array_keys($snapshot->unproven));
 	}
 
 	/**
@@ -93,7 +129,13 @@ final class GateTest extends TestCase {
 			"killedByStaticAnalysisCount",
 		] as $statistic) {
 			try {
-				new Gate()->proven($this->outcome([$statistic => 1]), ["src/A.php" => "key-a"], "chain", []);
+				new Gate()->proven(
+					$this->outcome([$statistic => 1]),
+					["src/A.php" => "key-a"],
+					"chain",
+					[],
+					$this->reached(["src/A.php"]),
+				);
 			} catch(Failure $failure) {
 				$caught[$statistic] = $failure->getMessage();
 			}
@@ -128,6 +170,7 @@ final class GateTest extends TestCase {
 			["src/A.php" => "key-a"],
 			"chain",
 			[],
+			$this->reached(["src/A.php"]),
 		);
 	}
 
@@ -147,7 +190,13 @@ final class GateTest extends TestCase {
 			. ' case name it in "exclude". Nothing was written.',
 		);
 
-		new Gate()->proven($this->outcome(), ["src/Missing.php" => "key-m"], "chain", []);
+		new Gate()->proven(
+			$this->outcome(),
+			["src/Missing.php" => "key-m"],
+			"chain",
+			[],
+			$this->reached(["src/Missing.php"]),
+		);
 	}
 
 	/**
@@ -159,10 +208,16 @@ final class GateTest extends TestCase {
 	public function testAFileDetectedOnlyByAnErrorIsNotProven(): void {
 		$outcome = $this->outcome(sections: ["errored" => ["/p/src/A.php"]]);
 
-		$snapshot = new Gate()->proven($outcome, ["src/A.php" => "key-a"], "chain", []);
+		$snapshot = new Gate()->proven(
+			$outcome,
+			["src/A.php" => "key-a"],
+			"chain",
+			[],
+			$this->reached(["src/A.php"]),
+		);
 
 		self::assertSame([], $snapshot->verdicts);
-		self::assertSame(["src/A.php"], $snapshot->unproven);
+		self::assertSame(["src/A.php"], array_keys($snapshot->unproven));
 	}
 
 	public function testCarriesTheToolchainAndTheTestRecordThrough(): void {
@@ -171,6 +226,7 @@ final class GateTest extends TestCase {
 			["src/A.php" => "key-a"],
 			"chain",
 			$tests = ["tests/ATest.php" => new Footprint("sig", ["src/A.php"])],
+			$this->reached(["src/A.php"]),
 		);
 
 		self::assertSame("chain", $snapshot->toolchain);
@@ -194,13 +250,24 @@ final class GateTest extends TestCase {
 			["src/A.php" => "key-a", "src/Bare.php" => "key-b"],
 			"chain",
 			[],
-			["src/Bare.php"],
+			[...$this->reached(["src/A.php"]), "src/Bare.php" => new Reach(20, 9, FALSE)],
 		);
 
 		self::assertSame(["src/A.php"], array_keys($snapshot->verdicts));
-		self::assertSame(["src/Bare.php"], $snapshot->unproven);
+		self::assertSame(["src/Bare.php"], array_keys($snapshot->unproven));
+		self::assertSame(
+			"the suite reaches 9 of 20 line(s)",
+			$snapshot->unproven["src/Bare.php"]->because(),
+		);
 	}
 
+	/**
+	 * **Only the files this run was asked about.** A caller may know of a gap in a
+	 * file this run never examined, and recording that as a finding of *this* run
+	 * would put a verdict's worth of weight on something nobody measured.
+	 *
+	 * @return void
+	 */
 	/**
 	 * **Only the files this run was asked about.** A caller may know of a gap in a
 	 * file this run never examined, and recording that as a finding of *this* run
@@ -214,11 +281,11 @@ final class GateTest extends TestCase {
 			["src/A.php" => "key-a"],
 			"chain",
 			[],
-			["src/Elsewhere.php"],
+			[...$this->reached(["src/A.php"]), "src/Elsewhere.php" => new Reach(20, 0, FALSE)],
 		);
 
 		self::assertSame(["src/A.php"], array_keys($snapshot->verdicts));
-		self::assertSame([], $snapshot->unproven);
+		self::assertSame([], array_keys($snapshot->unproven));
 	}
 
 	public function testEveryFileTheSuiteDoesNotReachIsNamed(): void {
@@ -227,9 +294,63 @@ final class GateTest extends TestCase {
 			["src/A.php" => "key-a", "src/Bare.php" => "key-b", "src/Barer.php" => "key-c"],
 			"chain",
 			[],
-			["src/Bare.php", "src/Barer.php"],
+			[
+				...$this->reached(["src/A.php"]),
+				"src/Bare.php" => new Reach(2, 1, FALSE),
+				"src/Barer.php" => new Reach(2, 0, FALSE),
+			],
 		);
 
-		self::assertSame(["src/Bare.php", "src/Barer.php"], $snapshot->unproven);
+		self::assertSame(["src/Bare.php", "src/Barer.php"], array_keys($snapshot->unproven));
+	}
+
+	/**
+	 * **The reason is recorded, not just the name.** A file with three escapes of
+	 * forty-seven and a file the suite reaches half of are both "not proven", and
+	 * the difference decides whether somebody writes an assertion or writes a test.
+	 *
+	 * @return void
+	 */
+	public function testItRecordsWhyAFileIsNotProven(): void {
+		$outcome = $this->outcome(sections: [
+			"killed" => ["/p/src/A.php", "/p/src/A.php"],
+			"escaped" => ["/p/src/A.php"],
+			"uncovered" => ["/p/src/A.php"],
+		]);
+
+		$lapse = new Gate()->proven(
+			$outcome,
+			["src/A.php" => "key-a"],
+			"chain",
+			[],
+			$this->reached(["src/A.php"]),
+		)->unproven["src/A.php"];
+
+		self::assertSame(4, $lapse->mutants);
+		self::assertSame(2, $lapse->killed);
+		self::assertSame(1, $lapse->escaped);
+		self::assertSame(1, $lapse->uncovered);
+		self::assertSame(
+			"1 of 4 mutant(s) escaped and 1 were on lines nothing runs",
+			$lapse->because(),
+		);
+	}
+
+	/**
+	 * **A file asked about and not measured is a caller bug rather than a
+	 * verdict.** The same discipline as G1 from the other side: a run decides what
+	 * to key and what to measure in one pass, so the two lists are the same list —
+	 * and defaulting the figures would record a file as fully reached because
+	 * nobody said otherwise.
+	 *
+	 * @return void
+	 */
+	public function testAFileAskedAboutAndNotMeasured(): void {
+		$this->expectExceptionMessage(
+			'mule asked the engine about "src/A.php" without recording how much of it the suite'
+			. ' runs, so there is nothing to check the coverage floor against. Nothing was written.',
+		);
+
+		new Gate()->proven($this->outcome(), ["src/A.php" => "key-a"], "chain", [], []);
 	}
 }

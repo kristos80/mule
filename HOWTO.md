@@ -209,7 +209,39 @@ the dependency edges then come from:
 
 ---
 
-## 5. What `doctor` tells you
+## 5. What a run tells you
+
+```
+34 file(s) were owed; 34 were handed to the engine.
+
+  proven      33 file(s), 1195 mutant(s) killed
+  not proven  1 file(s)
+  excluded    17 file(s), not gated at all
+
+Not proven, found by this run:
+  src/Cache/Lapse.php — 1 of 26 mutant(s) escaped; the suite reaches 17 of 18 line(s)
+
+NOT PROVEN: 1 file(s) have mutants nothing killed.
+```
+
+**The reason is on the line, because the two halves call for different work.**
+Mutants escaping means a test runs the code and would not notice it changing —
+you write an assertion. The suite reaching fewer lines than the file has means
+nothing runs that part at all — you write a test. A file can need both, and then
+it says both.
+
+**Found by this run, as against inherited**, is the other distinction worth
+having: "you have just broken this" is something you act on now, and "this has
+been broken since before you started" is a backlog. One list for both makes the
+first invisible inside the second.
+
+The counts add up to your source tree on purpose. A file missing from the output
+is indistinguishable from a file nobody thought about, which is how a mutable file
+stops being gated without anybody choosing that.
+
+---
+
+## 5a. What `doctor` tells you
 
 ```
 vendor/bin/mule doctor

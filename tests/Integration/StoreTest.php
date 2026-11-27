@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Integration;
 
 use Kristos80\Mule\Cache\Footprint;
+use Kristos80\Mule\Cache\Lapse;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Store;
 use Kristos80\Mule\Cache\StoreFormat;
@@ -22,6 +23,23 @@ use PHPUnit\Framework\TestCase;
 final class StoreTest extends TestCase {
 
 	use TemporaryTree;
+
+	/**
+	 * A reason the store would carry for a file nothing proved. The tests that
+	 * care about the reason build their own; these only care that it travels.
+	 *
+	 * @param list<string> $paths
+	 * @return array<string, Lapse>
+	 */
+	private function lapses(array $paths): array {
+		$lapses = [];
+
+		foreach($paths as $path) {
+			$lapses[$path] = new Lapse(4, 3, 1, 0, 10, 10);
+		}
+
+		return $lapses;
+	}
 
 	/**
 	 * @param array<string, int<0, max>> $proven
@@ -43,7 +61,7 @@ final class StoreTest extends TestCase {
 			$verdicts[$path] = new Verdict("key-of-{$path}", $mutants);
 		}
 
-		return new Snapshot($verdicts, $unproven, $tests, $toolchain);
+		return new Snapshot($verdicts, $this->lapses($unproven), $tests, $toolchain);
 	}
 
 	/**

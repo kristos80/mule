@@ -160,7 +160,7 @@ final readonly class Standing {
 	private static function stillUnproven(Snapshot $stored, array $wanted): array {
 		$unproven = [];
 
-		foreach($stored->unproven as $path) {
+		foreach(array_keys($stored->unproven) as $path) {
 			if(isset($wanted[$path])) {
 				$unproven[] = $path;
 			}
@@ -201,7 +201,7 @@ final readonly class Standing {
 		$unclassified = [];
 
 		foreach($gated as $path) {
-			if(!isset($stored->verdicts[$path]) && !in_array($path, $stored->unproven, TRUE)) {
+			if(!isset($stored->verdicts[$path]) && !isset($stored->unproven[$path])) {
 				$unclassified[] = $path;
 			}
 		}

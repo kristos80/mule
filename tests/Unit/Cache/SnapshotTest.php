@@ -4,11 +4,29 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Tests\Unit\Cache;
 
 use Kristos80\Mule\Cache\Footprint;
+use Kristos80\Mule\Cache\Lapse;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Verdict;
 use PHPUnit\Framework\TestCase;
 
 final class SnapshotTest extends TestCase {
+
+	/**
+	 * A reason the store would carry for a file nothing proved. The tests that
+	 * care about the reason build their own; these only care that it travels.
+	 *
+	 * @param list<string> $paths
+	 * @return array<string, Lapse>
+	 */
+	private function lapses(array $paths): array {
+		$lapses = [];
+
+		foreach($paths as $path) {
+			$lapses[$path] = new Lapse(4, 3, 1, 0, 10, 10);
+		}
+
+		return $lapses;
+	}
 
 	/**
 	 * @param array<string, int<0, max>> $proven Path to mutant count; the key is derived from the path.
@@ -29,7 +47,7 @@ final class SnapshotTest extends TestCase {
 			$verdicts[$path] = new Verdict("key-of-{$path}", $mutants);
 		}
 
-		return new Snapshot($verdicts, $unproven, $tests, $toolchain);
+		return new Snapshot($verdicts, $this->lapses($unproven), $tests, $toolchain);
 	}
 
 	/**
@@ -160,7 +178,7 @@ final class SnapshotTest extends TestCase {
 	public function testALaterRunProvingAFileTakesItOutOfUnproven(): void {
 		$merged = $this->snapshot([], ["src/A.php"])->with($this->snapshot(["src/A.php" => 4]));
 
-		self::assertSame([], $merged->unproven);
+		self::assertSame([], array_keys($merged->unproven));
 		self::assertTrue($merged->vouchesFor("src/A.php", "key-of-src/A.php"));
 	}
 
@@ -174,7 +192,7 @@ final class SnapshotTest extends TestCase {
 		$merged = $this->snapshot(["src/A.php" => 4])->with($this->snapshot([], ["src/A.php"]));
 
 		self::assertSame([], $merged->verdicts);
-		self::assertSame(["src/A.php"], $merged->unproven);
+		self::assertSame(["src/A.php"], array_keys($merged->unproven));
 	}
 
 	/**
@@ -189,7 +207,7 @@ final class SnapshotTest extends TestCase {
 			->with($this->snapshot(["src/B.php" => 3], [], "a different gate"));
 
 		self::assertSame(["src/B.php"], array_keys($merged->verdicts));
-		self::assertSame([], $merged->unproven);
+		self::assertSame([], array_keys($merged->unproven));
 		self::assertSame("a different gate", $merged->toolchain);
 	}
 
@@ -207,11 +225,27 @@ final class SnapshotTest extends TestCase {
 
 		self::assertSame(array_keys($forwards->verdicts), array_keys($backwards->verdicts));
 		self::assertSame(["src/A.php", "src/Z.php"], array_keys($forwards->verdicts));
-		self::assertSame($forwards->unproven, $backwards->unproven);
+		self::assertSame(array_keys($forwards->unproven), array_keys($backwards->unproven));
 	}
 
-	public function testTheUnprovenListCarriesNoRepeats(): void {
-		self::assertSame(["src/A.php"], $this->snapshot([], ["src/A.php", "src/A.php"])->unproven);
+	/**
+	 * **The reason travels with the name.** A name on its own is a list; a name
+	 * with a reason is something somebody can act on, and the store is the only
+	 * place the reason survives the run that found it.
+	 *
+	 * @return void
+	 */
+	public function testTheReasonAFileIsUnprovenIsKeptWithIt(): void {
+		$snapshot = new Snapshot([], ["src/A.php" => new Lapse(47, 44, 3, 0, 20, 20)], [], "chain");
+
+		self::assertSame("3 of 47 mutant(s) escaped", $snapshot->unproven["src/A.php"]->because());
+	}
+
+	public function testTheUnprovenMapIsSorted(): void {
+		self::assertSame(
+			["src/A.php", "src/Z.php"],
+			array_keys($this->snapshot([], ["src/Z.php", "src/A.php"])->unproven),
+		);
 	}
 
 	/**
@@ -244,7 +278,7 @@ final class SnapshotTest extends TestCase {
 		$merged = $this->snapshot([], ["src/Z.php", "src/A.php"])
 			->with($this->snapshot([], ["src/A.php", "src/M.php"]));
 
-		self::assertSame(["src/A.php", "src/M.php", "src/Z.php"], $merged->unproven);
+		self::assertSame(["src/A.php", "src/M.php", "src/Z.php"], array_keys($merged->unproven));
 	}
 
 	/**

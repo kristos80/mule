@@ -146,11 +146,12 @@ GitHub honours for that reason.
 ```
 bin/mule          the only file that names a concrete port
 src/
-  Cache/          Key, Toolchain, Verdict, Snapshot, Standing, Store, StoreFormat
+  Cache/          Key, Toolchain, Verdict, Lapse, Footprint, Snapshot, Standing,
+                  Store, StoreFormat
   Config/         Configuration — mule.json, and the whole vocabulary a consumer has
   Console/        Application, Composition, Assembly, Summary
-  Coverage/       Capture, Split, Shard, Merge, Timings, Report, Attribution,
-                  TestResults, Soundness — the shard pipeline (M2–M4, M19) and G3
+  Coverage/       Capture, Split, Shard, Merge, Timings, Report, TestResults,
+                  Soundness, Reach — the shard pipeline (M2–M4, M19) and G3
   Engine/         Declaration, Outcome, Gate — what mule asks Infection and what
                   it refuses to accept back (G1, G2, G5, G8)
   External/       the ports and their wrappers; the only code not unit tested
