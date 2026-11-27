@@ -3,6 +3,11 @@
 Everything needed to resume without re-deriving anything. Read `CLAUDE.md` first
 for the rules, then this.
 
+**Nothing about this project is kept in a local or per-session memory store.**
+This repository is the only record. Anything learned that is worth keeping goes
+into `CLAUDE.md` (rules) or this file (facts, measurements, decisions) in the
+same commit that learns it.
+
 ---
 
 ## 1. Where things are
