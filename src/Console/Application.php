@@ -28,10 +28,13 @@ final readonly class Application {
 
 		  mule              prove whatever is owed, and nothing else
 		  mule --whole      re-prove everything, ignoring the store's verdicts
+		  mule doctor       measure whether a verdict cache will pay for itself
+		                    here. One coverage capture; writes no store and runs
+		                    no mutants
 		  mule --help       this
 
 		Exit codes: 0 everything gated is proven · 1 something is not · 2 mule could
-		not answer.
+		not answer. `doctor` exits 0 unless it could not answer.
 
 		mule reads mule.json if there is one, and needs none. It writes
 		.mule/verified.json, which is meant to be committed, and .mule/cache, which
@@ -41,11 +44,13 @@ final readonly class Application {
 	/**
 	 * @param Composition $composition
 	 * @param Summary $summary
+	 * @param Prognosis $prognosis
 	 * @param OutputInterface $output
 	 */
 	public function __construct(
 		private Composition $composition,
 		private Summary $summary,
+		private Prognosis $prognosis,
 		private OutputInterface $output,
 	) {}
 
@@ -63,10 +68,14 @@ final readonly class Application {
 		// Not reindexed: the keys reach neither the check nor the message, and the
 		// gate proved an `array_values` here to be an operation with no result
 		// behind it.
-		$unknown = array_diff($arguments, ["--whole"]);
+		$unknown = array_diff($arguments, ["--whole", "doctor"]);
 
 		if($unknown !== []) {
 			return $this->failed("mule does not know " . implode(" ", $unknown) . ". Try --help.");
+		}
+
+		if(in_array("doctor", $arguments, TRUE)) {
+			return $this->examined();
 		}
 
 		return $this->proved(in_array("--whole", $arguments, TRUE));
@@ -89,6 +98,27 @@ final readonly class Application {
 		}
 
 		return $finding->holds() ? 0 : 1;
+	}
+
+	/**
+	 * **`doctor` has no verdict to give, so it has no failing exit code.** It
+	 * answers a question about the shape of a test suite, and a suite whose shape
+	 * is unhelpful is not a broken build — it is a reason not to install this.
+	 *
+	 * @return int
+	 */
+	private function examined(): int {
+		try {
+			$diagnosis = ($this->composition->assembled()->examination)();
+		} catch(Failure $failure) {
+			return $this->failed($failure->getMessage());
+		}
+
+		foreach($this->prognosis->lines($diagnosis) as $line) {
+			$this->output->line($line);
+		}
+
+		return 0;
 	}
 
 	/**

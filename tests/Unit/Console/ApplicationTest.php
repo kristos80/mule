@@ -5,6 +5,7 @@ namespace Kristos80\Mule\Tests\Unit\Console;
 
 use Kristos80\Mule\Console\Application;
 use Kristos80\Mule\Console\Composition;
+use Kristos80\Mule\Console\Prognosis;
 use Kristos80\Mule\Console\Summary;
 use Kristos80\Mule\Coverage\Capture;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
@@ -68,6 +69,7 @@ final class ApplicationTest extends TestCase {
 				new StubEnvironment(),
 			),
 			new Summary(),
+			new Prognosis(),
 			$this->output,
 		)($arguments);
 	}
@@ -289,5 +291,45 @@ final class ApplicationTest extends TestCase {
 ',
 			$this->filesystem->read("/p/mule.infection.json"),
 		);
+	}
+
+	/**
+	 * **`doctor` has no verdict to give, so it has no failing exit code.** It
+	 * answers a question about the shape of a test suite, and a suite whose shape
+	 * is unhelpful is not a broken build — it is a reason not to install this.
+	 *
+	 * @return void
+	 */
+	public function testDoctorAnswersAndExitsZero(): void {
+		self::assertSame(0, $this->mule(["doctor"]));
+		self::assertStringContainsString("1 gated file(s), 0 excluded, 1 test file(s).", $this->output->text());
+		self::assertStringContainsString("Tier C:", $this->output->text());
+	}
+
+	/**
+	 * One coverage capture, no engine. The question is about the shape of the
+	 * suite, and running the gate would answer a different and much more expensive
+	 * one.
+	 *
+	 * @return void
+	 */
+	public function testDoctorRunsNoMutantsAndWritesNoStore(): void {
+		$this->mule(["doctor"]);
+
+		self::assertFalse($this->filesystem->exists("/p/.mule/verified.json"));
+		self::assertFalse($this->filesystem->exists("/p/.mule/cache/outcome.json"));
+	}
+
+	public function testSomethingDoctorCannotAnswerExitsTwo(): void {
+		unset($this->filesystem->files["/p/composer.lock"]);
+
+		self::assertSame(2, $this->mule(["doctor"]));
+		self::assertStringContainsString("mule needs composer.lock", $this->output->text());
+	}
+
+	public function testTheHelpMentionsDoctor(): void {
+		$this->mule(["--help"]);
+
+		self::assertStringContainsString("mule doctor", $this->output->text());
 	}
 }

@@ -96,6 +96,7 @@ builds the same command line and writes the same store bytes.
 | `composer test:differential` | the pipeline against Infection's own verdicts |
 | `composer test:mutate` | the mutation gate: Infection at MSI 100 %, `--with-timeouts` |
 | `herd coverage bin/mule` | mule gating itself, through its own cache |
+| `herd coverage bin/mule doctor` | whether a cache would pay for itself here. It says no, correctly |
 
 **mule gates itself, and it is Tier C about it.** Measured: 32 gated files, 1,093
 mutants, 0 unproven — the same figure a direct `infection` run reports, which is
@@ -149,12 +150,14 @@ src/
   Cache/          Key, Toolchain, Verdict, Lapse, Footprint, Snapshot, Standing,
                   Store, StoreFormat
   Config/         Configuration — mule.json, and the whole vocabulary a consumer has
-  Console/        Application, Composition, Assembly, Summary
+  Console/        Application, Composition, Assembly, Summary, Prognosis
   Coverage/       Capture, Split, Shard, Merge, Timings, Report, TestResults,
                   Soundness, Reach — the shard pipeline (M2–M4, M19) and G3
   Engine/         Declaration, Outcome, Gate — what mule asks Infection and what
                   it refuses to accept back (G1, G2, G5, G8)
   External/       the ports and their wrappers; the only code not unit tested
+  Doctor/         Spread, Tier, Diagnosis, Examination — would a cache pay for
+                  itself here? One capture, no store, no mutants (§8)
   Runner/         Universe, Coverage, Engine, Commands, Shards, Measured, Run,
                   Finding — one run, start to finish
   Failure.php     the one exception type

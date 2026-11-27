@@ -84,8 +84,20 @@ mule is a 36-file library, so it is honest about this: it gates itself at 100 %
 MSI and gains nothing from its own cache except the "nothing has changed" answer
 above. A project whose full gate takes under a minute does not need this tool.
 
-[`docs/keying.md`](docs/keying.md) §8 describes the tier detection that will
-report this for you. It is specified and not yet built.
+**`vendor/bin/mule doctor` measures this for you**, from one coverage capture —
+no store written, no mutants run. On mule itself it says:
+
+```
+Tier C: the median edit re-proves 35 of 39 file(s) — 89 %, which on a project
+this size is arithmetic rather than a property of your tests.
+
+You do not need this tool. A project of 39 files has a gate short enough that a
+cache has nothing to save, and installing one would add a failure mode and buy
+no time.
+```
+
+Run it before you commit to this. The figures lead and the tier letter follows,
+because every threshold behind it is a judgement rather than a finding.
 
 ---
 
@@ -98,6 +110,7 @@ composer require --dev kristos80/mule
 ```bash
 vendor/bin/mule            # prove whatever is owed, and nothing else
 vendor/bin/mule --whole    # re-prove everything, ignoring the store's verdicts
+vendor/bin/mule doctor     # would a verdict cache pay for itself here?
 vendor/bin/mule --help
 ```
 

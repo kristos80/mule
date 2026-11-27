@@ -197,4 +197,35 @@ final class SoundnessTest extends TestCase {
 			)["tests/Helper.php"]->meets,
 		);
 	}
+
+	/**
+	 * **The sharp edge `exclude` has.** An excluded file is left out of every
+	 * footprint and its digest is tracked nowhere, so editing it invalidates
+	 * nothing — correct for an interface and wrong for a wrapper the tests go
+	 * through. The report knows which is which.
+	 *
+	 * @return void
+	 */
+	public function testItNamesEveryExcludedFileTheTestsRunAnyway(): void {
+		$capture = $this->capture([
+			"Gen.php" => [1 => [0 => 1]],
+			"Also.php" => [2 => [0 => 1]],
+			"Iface.php" => [3 => []],
+		]);
+
+		self::assertSame(
+			["src/Also.php", "src/Gen.php"],
+			$this->soundness()->attributed($capture, ["src/Also.php", "src/Gen.php", "src/Iface.php"]),
+		);
+	}
+
+	/**
+	 * A file the report has no entry for at all is the ordinary case, and the one
+	 * `exclude` is for.
+	 *
+	 * @return void
+	 */
+	public function testAnExcludedFileNothingRunsIsNotNamed(): void {
+		self::assertSame([], $this->soundness()->attributed($this->capture(), ["src/Gen.php"]));
+	}
 }

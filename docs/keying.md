@@ -1167,10 +1167,22 @@ something to engineer around.
   altogether — and the owed list is a comparison of fresh keys against banked
   verdicts. One consequence is an improvement: a file that has appeared now makes
   the *capture* whole but the mutation run filtered to what actually moved.
-- **`doctor` is not built.** §8's tier detection and the invalidation distribution
-  are specified and unimplemented. What `mule` prints today is three of the four
-  states — proven, not proven with the reason for each, excluded — because the
-  other two are narrowing-only and so cannot occur.
+- **`doctor`'s thresholds are judgements, not findings.** 25 % for dense, 40 % for
+  a hot spot, 100 files for small. They were chosen to put the two projects this
+  document measures on the sides their figures argue for, and nothing more — so
+  `Console\Prognosis` prints the numbers first and the letter after, and a reader
+  who can see both can disagree with the line.
+- **`doctor` does not weight by mutant count.** §8 says the invalidation figure
+  should be "weighted by each file's real mutant count to turn files into seconds",
+  and it is not: counting mutants means running the engine, which is the expensive
+  question `doctor` exists to answer without. The store holds the counts once a run
+  has happened, so a later version could weight from it — at which point the figure
+  stops being answerable on a project that has never run the gate, which is the
+  project that most needs the answer.
+- **Two hygiene checks §5 and M18 call for are not built.** Whether PHPUnit's
+  `cacheDirectory` is tracked, and whether mule finds itself among the project's
+  autoloaders (M18). Both are reporting rather than correctness, and neither has a
+  measured failure behind it yet.
 - **The saving has not been re-measured end to end through the command.** The
   figures in §2 and §5 were taken by hand from the same mechanics the pipeline now
   uses, and mule's own run reproduces Infection's verdict exactly — but a cold-vs-warm

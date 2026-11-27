@@ -243,43 +243,68 @@ stops being gated without anybody choosing that.
 
 ## 5a. What `doctor` tells you
 
+**Run it before you commit to this.** One coverage capture, no store written and
+no mutants run, and it answers the only question that matters first: would a
+verdict cache pay for itself on *this* project?
+
 ```
 vendor/bin/mule doctor
 ```
 
-Builds the picture from one coverage capture. Writes no store, mutates nothing.
+```
+39 gated file(s), 17 excluded, 30 test file(s).
 
-- **Tier A — cache as you are.** Median invalidation low enough that the dynamic
-  coverage closure is all mule needs. The application is Tier A today.
-- **Tier B — Tier A with hot spots.** Names the files whose footprint spoils
-  their own caching, so you can decide whether to narrow, split them, or accept
-  the cost.
-- **Tier C — caching will not pay here**, with the reason, because the two reasons
-  call for opposite responses.
+Tier C: the median edit re-proves 35 of 39 file(s) — 89 %, which on a project
+this size is arithmetic rather than a property of your tests.
 
-  **C-small** — the project is dense by arithmetic and the full gate is already
-  fast. Nothing is wrong with your tests:
+The files whose edits reach furthest:
+  src/Cache/Footprint.php — 35 file(s), 89 %
+  src/Cache/Key.php — 35 file(s), 89 %
 
-  ```
-  mule: median invalidation 81% (29 of 36 files per edit).
-  mule: cause: 29 source files, ~5 executed per test — 17% of the project each.
-  mule: full gate measured at 51s. Expected saving ~0%.
-  mule: you do not need this tool yet. Re-run doctor when the project grows.
-  ```
+The widest test footprints:
+  tests/Unit/Console/ApplicationTest.php — runs 33 file(s)
+  tests/Unit/Runner/RunTest.php — runs 31 file(s)
 
-  **C-wide** — a large project whose single tests execute a large share of it.
-  Here the footprints are worth changing, and `doctor` names them:
+You do not need this tool. A project of 39 files has a gate short enough that a
+cache has nothing to save, and installing one would add a failure mode and buy
+no time.
+```
 
-  ```
-  mule: median invalidation 64% (388 of 610 files per edit).
-  mule: cause: these tests each execute more than 10% of the project:
-          tests/Feature/CheckoutTest.php (71)
-  ```
+That is mule's own output about mule, and it is the advice two earlier attempts
+at this tool needed: a 36-file library is dense **by arithmetic**, not because
+its tests are badly shaped, and its full gate is under a minute.
 
-  The answer to C-wide is to narrow (§4) or to change those tests. **It is not to
-  loosen a rule.** Two earlier attempts at this tool produced a perfectly sound
-  cache on a C-small project and saved nothing — which was the right result,
-  reached for the wrong reason and then explained by blaming the architecture.
+**The figures lead and the letter follows.** Every threshold behind the tier is a
+judgement rather than a finding, so a project at 26 % is not categorically
+different from one at 24 % — read the numbers and disagree with the line if you
+want to.
+
+- **Tier A** — the median edit reaches a small share of the project. A verdict
+  cache will pay for itself.
+- **Tier B** — Tier A with hot spots: a few files reaching 40 % of the project or
+  more, usually a shared base class or a value object nearly everything
+  constructs. Most edits are cheap; an edit to one of those costs close to a full
+  run. `doctor` names them.
+- **Tier C** — nothing cacheable as it stands, *and which kind it is matters more
+  than the letter*:
+  - **a small project** is dense by arithmetic. The advice is "you do not need
+    this tool", not "restructure your tests".
+  - **a large project with wide footprints** has something worth changing, and
+    the widest footprints are where to start. A test that executes a large share
+    of the project puts every file it touches into every other one's closure.
+
+It also reports two things worth knowing before a single mutant runs:
+
+- **gated files the suite does not reach**, because mule will call every one of
+  them unproven — and an uncovered line whose statements happen to be unmutable
+  produces no mutant at all, so a mutation score would not have told you.
+- **excluded files your tests run anyway.** `exclude` means "not mule's to answer
+  for", so an excluded file's digest is tracked nowhere and editing it invalidates
+  nothing. That is right for an interface and wrong for a wrapper your tests go
+  through — and the coverage report knows which is which.
+
+`doctor` exits 0 unless it could not answer. A suite whose shape is unhelpful is
+not a broken build; it is a reason not to install this.
 
 ---
 

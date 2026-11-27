@@ -10,8 +10,8 @@ use Kristos80\Mule\Project;
 use function implode;
 
 /**
- * Whether a merged report describes the files as they are on disk, and how much
- * of them it reaches.
+ * Whether a merged report describes the files as they are on disk, how much of
+ * them it reaches, and which files it describes that nobody asked it to.
  *
  * **G3, and the one thing the mutation gate cannot see.** An uncovered line whose
  * statements happen to be unmutable produces no mutant at all — so the engine
@@ -63,6 +63,37 @@ final readonly class Soundness {
 		}
 
 		return $reach;
+	}
+
+	/**
+	 * The excluded files the report nonetheless attributes coverage to.
+	 *
+	 * **A sharp edge worth reporting rather than smoothing.** `exclude` means "not
+	 * mule's to answer for", so an excluded file is left out of every footprint and
+	 * its digest is tracked nowhere — which is correct for an interface and wrong
+	 * for a wrapper the tests go through, whose bytes can change another file's
+	 * verdict. The report knows which is which: if the suite executes it, it
+	 * belongs in `support` as well.
+	 *
+	 * **Read off the capture rather than off the footprints**, because the
+	 * footprints have already had excluded files taken out of them — which is the
+	 * whole thing being checked for.
+	 *
+	 * @param Capture $merged
+	 * @param list<string> $excluded
+	 * @return list<string>
+	 */
+	public function attributed(Capture $merged, array $excluded): array {
+		$recorded = $merged->coverage->lineCoverage();
+		$attributed = [];
+
+		foreach($excluded as $path) {
+			if($this->executed($recorded[$this->within($path)] ?? []) > 0) {
+				$attributed[] = $path;
+			}
+		}
+
+		return $attributed;
 	}
 
 	/**

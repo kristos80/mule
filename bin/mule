@@ -7,6 +7,7 @@ namespace Kristos80\Mule;
 use Composer\Autoload\ClassLoader;
 use Kristos80\Mule\Console\Application;
 use Kristos80\Mule\Console\Composition;
+use Kristos80\Mule\Console\Prognosis;
 use Kristos80\Mule\Console\Summary;
 use Kristos80\Mule\External\ComposerClasses;
 use Kristos80\Mule\External\PhpCoverageReport;
@@ -54,5 +55,6 @@ exit(new Application(
 		new PhpEnvironment(),
 	),
 	new Summary(),
+	new Prognosis(),
 	new StreamOutput(STDOUT),
 )(array_slice($argv, 1)));

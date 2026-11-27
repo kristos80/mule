@@ -9,6 +9,7 @@ use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Coverage\Report;
 use Kristos80\Mule\Coverage\Soundness;
 use Kristos80\Mule\Engine\Declaration;
+use Kristos80\Mule\Doctor\Examination;
 use Kristos80\Mule\Engine\Gate;
 use Kristos80\Mule\External\ClassesInterface;
 use Kristos80\Mule\External\CoverageReportInterface;
@@ -93,21 +94,23 @@ final readonly class Composition {
 		$commands = new Commands($configuration, $this->environment->interpreter(), $this->environment->ini());
 		$shards = new Shards($this->filesystem, $project->absolute(self::CACHE));
 		$universe = new Universe($this->filesystem, $project, $configuration);
+		$coverage = new Coverage(
+			$this->filesystem,
+			$this->processes,
+			$this->classes,
+			$commands,
+			$shards,
+			$configuration,
+			$project,
+			self::CACHE,
+		);
+		$soundness = new Soundness($this->lines, $project, $configuration);
 
 		return new Assembly(
 			new Run(
 				$universe,
-				new Coverage(
-					$this->filesystem,
-					$this->processes,
-					$this->classes,
-					$commands,
-					$shards,
-					$configuration,
-					$project,
-					self::CACHE,
-				),
-				new Soundness($this->lines, $project, $configuration),
+				$coverage,
+				$soundness,
 				new Engine(
 					$this->filesystem,
 					$this->processes,
@@ -121,6 +124,7 @@ final readonly class Composition {
 				new Gate(),
 				$this->toolchain($project, $configuration, $declaration, $universe->support()),
 			),
+			new Examination($universe, $coverage, $soundness),
 			$universe,
 		);
 	}
