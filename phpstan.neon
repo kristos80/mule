@@ -1,0 +1,11 @@
+includes:
+	- vendor/tomasvotruba/cognitive-complexity/config/extension.neon
+
+parameters:
+	level: 10
+	paths:
+		- src
+	treatPhpDocTypesAsCertain: false
+	cognitive_complexity:
+		class: 40
+		function: 9

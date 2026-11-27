@@ -1,0 +1,7 @@
+/vendor/
+/.phpunit.cache/
+/.infection/
+/.mule/
+/.cov/
+.DS_Store
+.idea

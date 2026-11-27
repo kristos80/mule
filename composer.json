@@ -1,0 +1,54 @@
+{
+	"name": "kristos80/mule",
+	"description": "A content-hashed verdict cache for PHP mutation testing: mutate only the files whose score can no longer be trusted.",
+	"type": "library",
+	"license": "MIT",
+	"keywords": [
+		"mutation testing",
+		"infection",
+		"cache",
+		"ci"
+	],
+	"require": {
+		"php": "^8.4",
+		"ext-dom": "*",
+		"ext-json": "*",
+		"infection/infection": "^0.35.12",
+		"phpunit/phpunit": "^13.4.8"
+	},
+	"require-dev": {
+		"phpstan/phpstan": "^2.3",
+		"tomasvotruba/cognitive-complexity": "^1.3"
+	},
+	"autoload": {
+		"psr-4": {
+			"Kristos80\\Mule\\": "src"
+		}
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"Kristos80\\Mule\\Tests\\": "tests"
+		}
+	},
+	"bin": [
+		"bin/mule"
+	],
+	"scripts": {
+		"analyse": "phpstan analyse --memory-limit=2G --no-progress",
+		"test": "./vendor/bin/phpunit",
+		"test:coverage": "herd coverage ./vendor/bin/phpunit --coverage-text",
+		"test:report": "herd coverage ./vendor/bin/phpunit --no-output --coverage-xml=.cov/coverage-xml --log-junit=.cov/junit.xml",
+		"test:mutate": [
+			"@test:report",
+			"php -d auto_prepend_file= ./vendor/bin/infection --coverage=.cov --skip-initial-tests --with-timeouts --min-msi=100 --min-covered-msi=100 --threads=max --no-progress -n"
+		]
+	},
+	"config": {
+		"allow-plugins": {
+			"infection/extension-installer": true
+		},
+		"process-timeout": 0,
+		"sort-packages": true
+	},
+	"minimum-stability": "stable"
+}
