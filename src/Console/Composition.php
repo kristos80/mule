@@ -112,6 +112,7 @@ final readonly class Composition {
 
 		return new Assembly(
 			new Run(
+				$configuration,
 				$universe,
 				$coverage,
 				$soundness,

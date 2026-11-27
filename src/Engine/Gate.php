@@ -60,6 +60,7 @@ final readonly class Gate {
 	 * @param non-empty-string $toolchain
 	 * @param array<string, Footprint> $tests What each test file was seen to run.
 	 * @param array<string, Reach> $reach How much of each file the suite runs.
+	 * @param list<string> $mutantFree The keyed files declared to have nothing a mutator could change.
 	 * @return Snapshot
 	 */
 	public function proven(
@@ -68,9 +69,11 @@ final readonly class Gate {
 		string $toolchain,
 		array $tests,
 		array $reach,
+		array $mutantFree = [],
 	): Snapshot {
 		$this->assertNothingUnverified($outcome);
-		$this->assertEverythingExamined($outcome, $keys, $reach);
+		$this->assertEverythingExamined($outcome, $keys, $reach, $mutantFree);
+		$this->assertStillMutantFree($outcome, $mutantFree);
 
 		$verdicts = [];
 		$unproven = [];
@@ -186,18 +189,28 @@ final readonly class Gate {
 	 * **Every offender at once.** One run should hand over the whole list: a guard
 	 * that stops at the first turns populating `exclude` into one run per file.
 	 *
+	 * **A file declared `mutant-free` is exempt**, because that declaration is the
+	 * decision this guard asks for — and `assertStillMutantFree()` checks it from
+	 * the other side.
+	 *
 	 * @param Outcome $outcome
 	 * @param array<string, non-empty-string> $keys
 	 * @param array<string, Reach> $reach
+	 * @param list<string> $mutantFree
 	 * @return void
 	 */
-	private function assertEverythingExamined(Outcome $outcome, array $keys, array $reach): void {
+	private function assertEverythingExamined(
+		Outcome $outcome,
+		array $keys,
+		array $reach,
+		array $mutantFree,
+	): void {
 		$silent = [];
 
 		foreach(array_keys($keys) as $path) {
 			$this->assertMeasured($reach, $path);
 
-			if($reach[$path]->executable > 0 && $reach[$path]->meets && $outcome->mutants($path) === 0) {
+			if($this->unexplained($outcome, $reach[$path], $path, $mutantFree)) {
 				$silent[] = $path;
 			}
 		}
@@ -207,8 +220,57 @@ final readonly class Gate {
 				"The engine filed no mutants against " . count($silent) . " file(s) it was asked to"
 				. " re-prove, each of which has lines it could have mutated. Either their coverage"
 				. " is stale — a file whose covered lines have moved generates nothing and"
-				. " disappears from the report — or they have nothing to mutate, in which case name"
-				. " them in \"exclude\". Nothing was written.\n  " . implode("\n  ", $silent),
+				. " disappears from the report — or they have nothing a mutator could change, in"
+				. " which case name them in \"mutant-free\", where they stay gated and mule tells"
+				. " you if that ever changes. Nothing was written.\n  " . implode("\n  ", $silent),
+			);
+		}
+	}
+
+	/**
+	 * @param Outcome $outcome
+	 * @param Reach $reach
+	 * @param string $path
+	 * @param list<string> $mutantFree
+	 * @return bool
+	 */
+	private function unexplained(Outcome $outcome, Reach $reach, string $path, array $mutantFree): bool {
+		if(in_array($path, $mutantFree, TRUE)) {
+			return FALSE;
+		}
+
+		return $reach->executable > 0 && $reach->meets && $outcome->mutants($path) === 0;
+	}
+
+	/**
+	 * **The other half of `mutant-free`, and the reason it is a declaration rather
+	 * than an exclusion.** The list is resolved against the files actually keyed
+	 * before it gets here (`Runner\Run`), so a directory entry is checked as the
+	 * files under it rather than as a path the engine has never heard of.
+	 * A value object of nothing but promoted properties
+	 * produces no mutants today; the day it grows a method it produces some, and a
+	 * file taken out of the gate would never have said so. So the claim is checked
+	 * every run, and a file that stops being inert is named.
+	 *
+	 * @param Outcome $outcome
+	 * @param list<string> $mutantFree
+	 * @return void
+	 */
+	private function assertStillMutantFree(Outcome $outcome, array $mutantFree): void {
+		$grown = [];
+
+		foreach($mutantFree as $path) {
+			if($outcome->mutants($path) > 0) {
+				$grown[] = "{$path} ({$outcome->mutants($path)})";
+			}
+		}
+
+		if($grown !== []) {
+			throw new Failure(
+				count($grown) . " file(s) named in \"mutant-free\" now have mutants, so the claim"
+				. " that there is nothing in them to verify has stopped being true. Take them out"
+				. " of the list and let the gate prove them. Nothing was written.\n  "
+				. implode("\n  ", $grown),
 			);
 		}
 	}

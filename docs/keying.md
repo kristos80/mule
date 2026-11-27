@@ -677,6 +677,7 @@ silently stops being gated:
 |---|---|---|
 | `cacheable` | has a verdict under a key that still holds | yes |
 | `excluded` | named in `mule.json` `exclude`; not mutated, not required to be covered | n/a |
+| `mutant-free` | named in `mule.json` `mutant-free`; gated, covered and mutated like any other file, and *asserted* to produce no mutants | yes, with `mutants: 0` |
 | `unowned` | mutable, narrowing on, no owner test found (GN3) | never |
 | `refused` | mutable, excluded from caching by a GN2 construct, with the construct and line | never, re-run every time |
 
@@ -901,7 +902,8 @@ document each slipped past an earlier draft of this list — which is the argume
 for the differential fixture below rather than for a longer list.
 
 **G1 — Zero mutants.** For every file mule asked the engine to re-prove **that has
-executable lines**, the JSON log must contain at least one mutant. A file producing
+executable lines and is not declared `mutant-free`**, the JSON log must contain at
+least one mutant. A file producing
 none fails, and the message names every offender at once rather than the first.
 
 **The line count is the parser's, not the report's**, which is what keeps the guard
@@ -912,7 +914,23 @@ has its lines on disk, so it still fails. Measured on the application: **187 of 
 613 source files are interfaces or enums**, and requiring each to be named in
 `exclude` would have been bureaucracy rather than a decision anybody made — while
 an earlier version that stopped at the first offender would have turned populating
-`exclude` into one run per file. Infection's aggregate cannot catch this: MSI averages over
+`exclude` into one run per file.
+
+**A value object is the other 127.** Measured on the same application: 127 files
+are `final readonly class` with nothing but a promoted constructor — one executable
+line, no mutants, "pure data, no behaviour" in their own docblocks. Those have a
+line, so the parser cannot excuse them, and naming them in `exclude` would take
+them **out of the gate for ever**: the day `Order.php` grows a method, no mutant of
+it would ever be checked again. That is the failure this whole document exists to
+prevent, arrived at by following mule's own advice.
+
+So `mutant-free` is a *declaration rather than an exclusion*. A file named there is
+keyed, invalidated, covered to the floor and handed to the engine exactly like any
+other — and the gate requires the engine to file **nothing** against it. The claim
+is checked from both sides every run: zero mutants is accepted, and one mutant is a
+failure naming the file and its count. A directory entry is resolved against the
+files actually keyed before the gate sees it, so `src/Domain` is checked as its
+files rather than as a path the engine has never heard of. Infection's aggregate cannot catch this: MSI averages over
 mutants that were generated, so a file producing none does not lower it —
 measured, a stale file sat beside a healthy one and the run reported
 `Mutation Code Coverage: 100%`, MSI 75 %, exit 0, with the stale file absent from
@@ -1238,6 +1256,26 @@ something to engineer around.
   resolve together. What the bump cost is in the header above — identical mutant
   counts, identical log shape, the differential unchanged — plus M20, which is a
   new refusal in 0.35 and a correct one.
+
+- **G1 may be redundant now, and the argument is worth writing down rather than
+  acting on.** With G3 and the coverage floor in place, consider what "zero
+  mutants" can mean. Infection generates mutants from the *current* file's AST,
+  filtered by the lines the report calls covered, and reports mutants on uncovered
+  lines in its `uncovered` section. So: a file absent from the report entirely has
+  `executed = 0` and is caught by the floor, not by G1; a file whose every
+  executable line is covered and which yields nothing has nothing mutable on any of
+  them; and a partially covered file still gets `uncovered` mutants for anything
+  mutable it does not run. On that reasoning G1 cannot fire for a cause the other
+  guards miss.
+
+  **It has not been retired, because the reasoning is not a measurement.** G1 has a
+  measured failure behind it — a stale file beside a healthy one, `Mutation Code
+  Coverage: 100%`, MSI 75 %, exit 0, the file absent from the report — and that was
+  measured *before* G3 and the floor existed. Retiring a guard on an argument is
+  exactly the move this document refuses. What would settle it: reproduce that
+  original scenario with G3 and the floor switched on, and show which of them
+  catches it. Until then G1 stays, and `mutant-free` is what keeps it from becoming
+  bureaucracy.
 
 - **`doctor`'s thresholds are judgements, not findings.** 25 % for dense, 40 % for
   a hot spot, 100 files for small. They were chosen to put the two projects this

@@ -8,8 +8,12 @@ use Kristos80\Mule\Cache\Key;
 use Kristos80\Mule\Cache\Snapshot;
 use Kristos80\Mule\Cache\Standing;
 use Kristos80\Mule\Cache\Store;
+use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Coverage\Soundness;
+use Kristos80\Mule\Coverage\Reach;
 use Kristos80\Mule\Engine\Gate;
+use Kristos80\Mule\Engine\Outcome;
+use Kristos80\Mule\Failure;
 
 /**
  * One run, start to finish.
@@ -33,6 +37,7 @@ use Kristos80\Mule\Engine\Gate;
 final readonly class Run {
 
 	/**
+	 * @param Configuration $configuration
 	 * @param Universe $universe
 	 * @param Coverage $coverage
 	 * @param Soundness $soundness
@@ -42,6 +47,7 @@ final readonly class Run {
 	 * @param non-empty-string $toolchain
 	 */
 	public function __construct(
+		private Configuration $configuration,
 		private Universe $universe,
 		private Coverage $coverage,
 		private Soundness $soundness,
@@ -92,9 +98,7 @@ final readonly class Run {
 		$banked = $this->unmoved($owed, $measured);
 
 		return Finding::proven(
-			$this->store->bank(
-				$this->gate->proven($outcome, $banked, $this->toolchain, $measured->tests, $reach),
-			),
+			$this->store->bank($this->gated($outcome, $banked, $measured, $reach)),
 			$standing,
 			$banked,
 			array_keys(array_diff_key($owed, $banked)),
@@ -168,6 +172,69 @@ final readonly class Run {
 		}
 
 		return $live;
+	}
+
+	/**
+	 * What the gate makes of the run — and, if it refuses, the measurement kept
+	 * anyway.
+	 *
+	 * **A refused run has still done the expensive half.** The coverage pass is
+	 * most of the wall clock on a real project, and a gate failure throws away no
+	 * verdicts — there were none to throw — but it would throw away the record of
+	 * what each test executes, without which the next run cannot answer the cheap
+	 * question and captures everything again. Measured on a 613-file application:
+	 * 32.7 s to capture and 26.9 s to split, paid again on every attempt at getting
+	 * `exclude` right.
+	 *
+	 * Banking the record claims nothing. It is what a real capture saw, and it is
+	 * recorded whether or not the verdicts were acceptable.
+	 *
+	 * @param Outcome $outcome
+	 * @param array<string, non-empty-string> $banked
+	 * @param Measured $measured
+	 * @param array<string, Reach> $reach
+	 * @return Snapshot
+	 */
+	private function gated(Outcome $outcome, array $banked, Measured $measured, array $reach): Snapshot {
+		try {
+			return $this->gate->proven(
+				$outcome,
+				$banked,
+				$this->toolchain,
+				$measured->tests,
+				$reach,
+				$this->declaredMutantFree(array_keys($banked)),
+			);
+		} catch(Failure $refused) {
+			$this->recorded($measured);
+
+			throw $refused;
+		}
+	}
+
+	/**
+	 * Of the files being banked, those somebody has declared have nothing a mutator
+	 * could change.
+	 *
+	 * **Resolved here rather than in the gate, so a directory entry means what it
+	 * says.** `mutant-free` accepts a directory, and a gate handed the raw entries
+	 * would ask the engine how many mutants it filed against `src/Domain` — which
+	 * is always none, so the claim could never be caught going stale. Resolving
+	 * against the keyed files turns one entry into the files it covers.
+	 *
+	 * @param list<string> $paths
+	 * @return list<string>
+	 */
+	private function declaredMutantFree(array $paths): array {
+		$declared = [];
+
+		foreach($paths as $path) {
+			if($this->configuration->assertsMutantFree($path)) {
+				$declared[] = $path;
+			}
+		}
+
+		return $declared;
 	}
 
 	/**

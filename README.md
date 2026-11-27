@@ -172,11 +172,18 @@ Every key is optional. A project with `src/`, `tests/` and full coverage needs n
 Nothing machine-local is allowed in it: an absolute path or a `..` fails the run,
 because the store is committed and every path in it is project-relative.
 
-**`exclude` and `support` are not interchangeable.** An excluded file is one mule
-is not answerable for, so its digest is tracked nowhere and editing it invalidates
-nothing. A `support` file's bytes go into the toolchain digest, so editing one
-invalidates the whole store. Ask whether the file's bytes can change *another*
-file's verdict: if not, `exclude` it; if so, keep it somewhere `support` names.
+**Three lists, three different claims**, and two of them look interchangeable:
+
+- **`exclude`** — not mule's to answer for. Not mutated, not required to be
+  covered, and its digest is tracked nowhere, so editing it invalidates nothing.
+  Thin I/O wrappers.
+- **`mutant-free`** — "nothing in here a mutator could change, and tell me if that
+  stops being true". Still gated: keyed, invalidated, covered, handed to the engine
+  — the gate just requires nothing to come back. A value object of promoted
+  properties is the case, and on a 613-file application 127 files are. Putting them
+  in `exclude` would take them out of the gate for ever.
+- **`support`** — bytes that can change a verdict where coverage cannot see them:
+  fakes, fixtures, a base test case. A change invalidates the whole store.
 
 ---
 

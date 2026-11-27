@@ -10,6 +10,7 @@ use Kristos80\Mule\Config\Configuration;
 use Kristos80\Mule\Coverage\Capture;
 use Kristos80\Mule\Coverage\Report;
 use Kristos80\Mule\Coverage\Soundness;
+use Kristos80\Mule\Failure;
 use Kristos80\Mule\Engine\Declaration;
 use Kristos80\Mule\Engine\Gate;
 use Kristos80\Mule\Project;
@@ -299,6 +300,7 @@ final class RunTest extends TestCase {
 		$commands = new Commands($configuration, "/usr/bin/php", "");
 
 		return new Run(
+			$configuration,
 			new Universe($this->filesystem, $project, $configuration),
 			new Coverage(
 				$this->filesystem,
@@ -880,5 +882,107 @@ final class RunTest extends TestCase {
 
 		self::assertTrue($finding->measured);
 		self::assertSame(["src/Hub.php"], $finding->store->tests["tests/Unit/CccTest.php"]->touches);
+	}
+
+	/**
+	 * **A value object of nothing but promoted properties produces no mutants**,
+	 * and naming it in `exclude` would take it out of the gate for ever — so the
+	 * day it grows a method, no mutant of it is ever checked again. Measured on a
+	 * 613-file application: 127 files are like that.
+	 *
+	 * @return void
+	 */
+	public function testAFileDeclaredMutantFreeIsProvenRatherThanRefused(): void {
+		$this->onlyFiling = ["src/A.php", "src/Hub.php"];
+
+		$finding = ($this->mule(settings: ["mutant-free" => ["src/B.php"]]))();
+
+		self::assertTrue($finding->holds());
+		self::assertSame(["src/A.php", "src/B.php", "src/Hub.php"], array_keys($finding->store->verdicts));
+		self::assertSame(0, $finding->store->verdicts["src/B.php"]->mutants);
+	}
+
+	/**
+	 * **It stays gated, which is the whole difference from `exclude`.** Its digest
+	 * is tracked, so editing it re-proves it and whatever shares a test with it.
+	 *
+	 * @return void
+	 */
+	public function testAMutantFreeFileIsStillInvalidatedByItsOwnBytes(): void {
+		$this->onlyFiling = ["src/A.php", "src/Hub.php"];
+		$mule = $this->mule(settings: ["mutant-free" => ["src/B.php"]]);
+		$mule();
+		$this->filesystem->files["/p/src/B.php"] = "<?php // b, differently";
+
+		self::assertContains("src/B.php", $mule()->standing->outstanding);
+	}
+
+	/**
+	 * And the day it stops being inert, mule says so rather than staying quiet.
+	 *
+	 * @return void
+	 */
+	public function testAMutantFreeFileThatGrowsMutantsIsReported(): void {
+		$this->expectExceptionMessage(
+			'1 file(s) named in "mutant-free" now have mutants, so the claim that there is nothing'
+			. " in them to verify has stopped being true. Take them out of the list and let the gate"
+			. " prove them. Nothing was written.\n  src/B.php (1)",
+		);
+
+		($this->mule(settings: ["mutant-free" => ["src/B.php"]]))();
+	}
+
+	/**
+	 * **A refused run has still done the expensive half.** The coverage pass is
+	 * most of the wall clock, and without the record of what each test executes the
+	 * next run captures everything again — paid on every attempt at getting the
+	 * configuration right.
+	 *
+	 * @return void
+	 */
+	public function testARefusedRunKeepsWhatItMeasured(): void {
+		$this->onlyFiling = ["src/A.php"];
+
+		try {
+			($this->mule())();
+		} catch(Failure) {
+			// the point is what survives it
+		}
+
+		$this->processes->started = [];
+		$this->onlyFiling = NULL;
+		($this->mule())();
+
+		self::assertSame(
+			[["/usr/bin/php", "-d", "auto_prepend_file=", "vendor/bin/infection",
+				"--configuration=/p/mule.infection.json", "--coverage=/p/.mule/cache/coverage",
+				"--skip-initial-tests", "--with-timeouts", "--threads=max", "--min-msi=100",
+				"--min-covered-msi=100", "--no-progress", "-n",
+				"--filter=src/A.php,src/B.php,src/Hub.php"]],
+			$this->commands(),
+		);
+	}
+
+	/**
+	 * **A directory entry means the files under it, not a path the engine has never
+	 * heard of.** A gate handed the raw entry would ask how many mutants were filed
+	 * against `src/` — always none — so the claim could never be caught going
+	 * stale.
+	 *
+	 * @return void
+	 */
+	public function testADirectoryOfMutantFreeFilesIsCheckedAsItsFiles(): void {
+		$this->expectExceptionMessage('named in "mutant-free" now have mutants');
+
+		($this->mule(settings: ["mutant-free" => ["src"]]))();
+	}
+
+	public function testADirectoryOfGenuinelyMutantFreeFilesIsAccepted(): void {
+		$this->onlyFiling = [];
+
+		$finding = ($this->mule(settings: ["mutant-free" => ["src"]]))();
+
+		self::assertTrue($finding->holds());
+		self::assertSame(["src/A.php", "src/B.php", "src/Hub.php"], array_keys($finding->store->verdicts));
 	}
 }

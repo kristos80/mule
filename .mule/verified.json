@@ -1,192 +1,204 @@
 {
-    "toolchain": "808e37e65281eda4e248dd7b4f98fede9978b5d5d9da05e1c4b17af1a7375489",
+    "toolchain": "17259ec534e92253e8c241db7b039b6b392ab4195ba25d6bca003c1a4b2f4429",
     "verdicts": {
         "src/Cache/Footprint.php": {
-            "key": "65d7788e44f2f1a661586c20c3294a117b90a452190640dc6d41a79a473de624",
+            "key": "a6557a48574784fecc4635730555a15fa1c1bcc5e3c33a9b5b9904eb63a3005b",
             "mutants": 7
         },
         "src/Cache/Key.php": {
-            "key": "97286a282c850a06e2edbaf1c4352ac8b3c3c2711b4508df79b8c3bb51f2d983",
+            "key": "4dac6f03b75bb0c4c2faf7ffc1246e28b80ee23b302b9f68f5ce7dd76a4b4f5b",
             "mutants": 5
         },
         "src/Cache/Lapse.php": {
-            "key": "965b098632d272c88edb29be69d2668d4d3a30e2b2a09be91936eddd2d5bcabc",
+            "key": "1113ab8ca48985edafa9a90e7558c14cd99ce04e3c38e9066e0ff9fcfa56e0bd",
             "mutants": 24
         },
         "src/Cache/Snapshot.php": {
-            "key": "3ff31c0341200994a711f0f98f607c252183805de8cd526cfb33b80b0936b41b",
+            "key": "a31161a3b4d7881d3bb4aabb189a39419689e31da840d9b455d0665d0e1dd966",
             "mutants": 62
         },
         "src/Cache/Standing.php": {
-            "key": "caea9622383b15fc834cc2a26d295812ea50b8e8ea8b089c6ce4588b3f13b5c6",
+            "key": "9976288868af3bd5e2560ba72db38e2565e336b789f54cb8d15addf20b1535c2",
             "mutants": 50
         },
         "src/Cache/Store.php": {
-            "key": "14f61bcfab2e627d23cdcabe53e2da16e8fedc4f9ac0c75348b794e97c4302d8",
+            "key": "c982659710ba8f12835630dc95fd7f1b93e8ac043a79e3259f837e02ea120571",
             "mutants": 9
         },
         "src/Cache/StoreFormat.php": {
-            "key": "35538e3da029305cda4ebb77f0df6ab9e7c8a76c79ecb9b1cb61f371737fdfc7",
+            "key": "65c093b1800f3204affa136f5c94c055469d00baca9eafdd17a4d35cf84cbf3c",
             "mutants": 125
         },
         "src/Cache/Toolchain.php": {
-            "key": "1206f7c8567ec0ce4dc30f651e7dbe9c610a25e17b02ad48983bca612c6087a2",
+            "key": "3738b20f206ec751f1bc23a2e2ddd6e8d6023aa0fa722904a663cb66f37ec942",
             "mutants": 4
         },
         "src/Cache/Verdict.php": {
-            "key": "5e4c4741b10f9d002ce16f2dabfd59a8a4a388955a927a6f91c4a26e489f3a7f",
+            "key": "2e66ee8c01db1706cd2593f4cf8d4271ea719e38b7d89064c50c021f9bedc181",
             "mutants": 2
         },
         "src/Config/Configuration.php": {
-            "key": "e9e88acfad785e2777e581c66cf11880b007c2fa5796585cc88068bbf239c570",
-            "mutants": 127
+            "key": "af5339a974fc434be3dc2ad5c7288a2a5b3c972d99a3186fd5a9b339486e1d54",
+            "mutants": 131
         },
         "src/Console/Application.php": {
-            "key": "6f155993c51663d73d3e40937bebbe80169890164b18bdee7dd14b99a08458c4",
+            "key": "f57465084ebcc0f64f52945ed9ff8b4e99709c43e06a8725c6b657c0edfcffcf",
             "mutants": 43
         },
+        "src/Console/Assembly.php": {
+            "key": "d079149862a28368071a8ae883e3a829cb86a81ffbf2d085a6656b09b1d674e6",
+            "mutants": 0
+        },
         "src/Console/Composition.php": {
-            "key": "95b9ce91bfb3932106fd217cf5d025867ac929447c53db0df10dab112a6ba9d1",
+            "key": "df53cde4868978f82636217b0ee286d9bd7d36de227cbffecffc773951e59c2f",
             "mutants": 27
         },
         "src/Console/Prognosis.php": {
-            "key": "1dc917409033234f87276b899a54de758ccfc6899c3d97ce21f4b88f0c705cb2",
+            "key": "fb2dd03a54b2ad39684e8ed0152e034bb53c1d30b2653c27d6c580c18668fa33",
             "mutants": 40
         },
         "src/Console/Summary.php": {
-            "key": "b9bde27c0b371d9db185ab6254a348bf8bff5b150e1efd745cdcdb25277bc580",
+            "key": "4fbf05e42acc334e1836e95d985e1a9769c3421d25113f514dd22cb31eb45920",
             "mutants": 84
         },
         "src/Coverage/Capture.php": {
-            "key": "6309f599fbf7a1a5589b393e3fc77f77c4632576e961c9a9eb3f3c0bea899f08",
+            "key": "052fd319003a0c1654bddead243a59ee6e3b0038822c380345240623b448ffea",
             "mutants": 45
         },
         "src/Coverage/Merge.php": {
-            "key": "04dfdc7c872cec9ca06625e86171d6e1093578110af0882e0829aff4db167c11",
+            "key": "734e523ae26a369b06a0b3bb242541fbf7926f20f80a28c34c334ab026b2609d",
             "mutants": 11
         },
         "src/Coverage/Reach.php": {
-            "key": "c9f38cf789c3696790e8d629200059b591c5c7942b3c5f092489924a2a4ef99b",
+            "key": "379909dd3938c5f5aa046d0c4c9bad817faea1eb733a8aa5246352256e5b8b63",
             "mutants": 11
         },
         "src/Coverage/Report.php": {
-            "key": "b5338ea82b99239778193e6837fbbe14b2b93b75506566b11d3d4fa262c1c511",
+            "key": "418896ccfbd5369978aa581fddd7b885b1910770cbbd8ee39008d3a58180a3d9",
             "mutants": 27
         },
         "src/Coverage/Shard.php": {
-            "key": "274628a28d0ebf09ef3bfe46fd3f1ddccf116a665cd81164f03a3d7683cb5746",
+            "key": "fbd8aa53356fd13a6cb094546e7d5a2c43c16400c82407c74476cc674f3b1142",
             "mutants": 33
         },
         "src/Coverage/ShardFormat.php": {
-            "key": "1ea0bf4a3e4e1cfefd1a9745504b2696e0517242d1f94a842797768275998afb",
+            "key": "666ceebe1f03291f776f7e7571929d09e3566fbe7f01c28235c2db5ffd479044",
             "mutants": 74
         },
         "src/Coverage/Soundness.php": {
-            "key": "e34d8068ff370468b8376cba438a0b62f4b2f552212555e803c743f92f318ff2",
+            "key": "53ff6da6b607d50213754493366addecd370400f30811a3b8bdc054b2ac4ee87",
             "mutants": 35
         },
         "src/Coverage/Split.php": {
-            "key": "ef968bb7a15ee5fe21788c9330c963c865023d72a5994c0d51e675e17ea2934b",
+            "key": "afee0ef33319d94c718207f6cc778ad08a9ad92fc910c80d3be165732d5b2534",
             "mutants": 21
         },
         "src/Coverage/TestResults.php": {
-            "key": "4c218fdca32aad34bbb68b2b3c40c561332baf4c18978071a3e6c9445255c86e",
+            "key": "490761d8a7bbacda19cc0c27972d88f676d18cb9d030b3dd5c9d18ce33d99118",
             "mutants": 20
         },
         "src/Coverage/Timings.php": {
-            "key": "5dae3e21280d062a7d28f904ed16faccdf4442c1b52f366fbacf32e709ce920e",
+            "key": "85d0e99058b2f4987c0c7474aa8f63cd1b3b88d6b3fe230c4a99e6c75a5edd2f",
             "mutants": 43
         },
         "src/Doctor/Diagnosis.php": {
-            "key": "bfaf911c82d6dd65c0bcee291e02873aeb66a581d0132f0cecda5ba5235bed5f",
+            "key": "dc4e67f8904acb1c3f9cd2eecaa3a7f14bd01e32c3357208bb1dba5a210379ec",
             "mutants": 10
         },
+        "src/Doctor/Examination.php": {
+            "key": "0edc2d44bf2336279f77eaf31424d4748995136def35b44cfe33f3f983c554f8",
+            "mutants": 0
+        },
         "src/Doctor/Spread.php": {
-            "key": "8d6a61afd6da774ad297c2557852b08f2268f55d05df389e9305248548b9e6c4",
+            "key": "e4a08c4573048c78236172e0bf4738ea297f621cc11bcb29416e0a28c43a1038",
             "mutants": 34
         },
         "src/Doctor/Tier.php": {
-            "key": "1d7190d2b9d5fc2e6c252b63b246e8c3f13ef3b0a52e67d9b88bb0880c0b2a69",
+            "key": "b380ab7561caa7e3d82a16c5a2310916dd9cd3e5008bd8d3dfcfc12ab0397ad0",
             "mutants": 38
         },
         "src/Engine/Declaration.php": {
-            "key": "0be635e9ad41497371e347d0b48dac3118c54e6cbd11792116ef1dcf0a872bd7",
+            "key": "7b6d06b6f8b8d036082b65031b2556cebdc8172b05731aa45381cb93d0015a08",
             "mutants": 22
         },
         "src/Engine/Gate.php": {
-            "key": "167edc1a59da33d60cfbdd21ea6506a71c988cb0b0fb7b1bccc38856dd7e4ca8",
-            "mutants": 56
+            "key": "0dc0d8355665871ca0111128e77c243607a181c0383d5223c6735906bd4c10a0",
+            "mutants": 77
         },
         "src/Engine/Outcome.php": {
-            "key": "6789c62c7975674f91108022151521001e4a74d53c0fdddc908c206d31b04158",
+            "key": "0c42a27f7e7a7f1a2c9c5dbac6e29fa8d4b4b40a97f7fa64f5238bfe351a5e1c",
             "mutants": 56
         },
         "src/External/ClassesInterface.php": {
-            "key": "b942f72f63a56ae1af76fc3a898ef2eefc7527d8c176912ca5be1b2689a7063d",
+            "key": "97298d1b3db5c4df6ff327eadd682ee45f97d0c75f6cdc21674b2f539dde4503",
             "mutants": 0
         },
         "src/External/CoverageReportInterface.php": {
-            "key": "572e1e59b1b5b7420abeebb61157a941dd2c14e96ec0113a3a0b2c208c635581",
+            "key": "62966de1fe722c063ce6bac9d26836f80eae227e6c60ed00f952fffe7725082b",
             "mutants": 0
         },
         "src/External/EnvironmentInterface.php": {
-            "key": "ac0511c6df7e54369d9669674d7cd7aad5b3a90662cc5e77e4a6b047bed170f9",
+            "key": "9405a2b9d8bc2729c3ee98a5933ea4325cf189a5cb22fb06ebe6031916f39243",
             "mutants": 0
         },
         "src/External/FilesystemInterface.php": {
-            "key": "f01eea151c9f042db4bda67220c0773966179368d7765691e2577938d7a4992f",
+            "key": "0895c8d32edf00d2b6268681a8075b1b1c92c2e678d32e3bc57c1fa4f36b9c58",
             "mutants": 0
         },
         "src/External/LinesInterface.php": {
-            "key": "37799b7c2aaaefd5fe5908c9807efb21c29cd6ceffabed7e4b620ac003a10f0e",
+            "key": "139c2034edfbfd6527d73a46571be7d2d8b95b5ac97ddd974f688a4c39716827",
             "mutants": 0
         },
         "src/External/OutputInterface.php": {
-            "key": "8659aa5680b87166cceb4d790987976ad1de0aa2ca436b335e7ffa87f2189305",
+            "key": "8a98439d7411589ea34ea2b19e05bb9e2f51402f280a6706d0929fa6507472e3",
             "mutants": 0
         },
         "src/External/ProcessesInterface.php": {
-            "key": "29eb3013917b8c6eb47a65e30cb4af1afda253d0545e7c52db37b52c5bccf76f",
+            "key": "1880ca5a70a6c8176e48d88d999af4b57469ff1b46c39c04c456a858fb3ec743",
             "mutants": 0
         },
         "src/External/ProgressInterface.php": {
-            "key": "799d390fcc9e76aaec5268f0c0a11b0f9dd4aba8eb93d2f1438629589a8281a2",
+            "key": "0373c10cb7b480c08e74515e5922d642b5d031d8607c38cb6c451da5484e0ffa",
             "mutants": 0
         },
         "src/Failure.php": {
-            "key": "321c82640109b0a7a5ad1d361d546fa125069c79dfe8baec08d315d070252a77",
+            "key": "758d4f683057bbfbd69bd1530982c5df208c407f4c002df996e0c421a84b80a3",
             "mutants": 0
         },
         "src/Project.php": {
-            "key": "1a9269b577df0a89143967c96a11a1ca70c2220fb5f261fa4bc06ccefdb67067",
+            "key": "a6433f8de2492273a047038b0ce039cd2259743a157efa80f49b91ae23a590fe",
             "mutants": 5
         },
         "src/Runner/Commands.php": {
-            "key": "5aa1a145e6ca3aac2a2ced3140b98554f99bea666472063aa196d80f25f83ef8",
+            "key": "825051ea47dd862d44e71ded8d43e7dff62b64abea1e240427ca9742115da3bb",
             "mutants": 20
         },
         "src/Runner/Coverage.php": {
-            "key": "3e7e14552699368cfbe4054890872eaa38db4ad1690233d960d6abe6ec164a51",
+            "key": "0ddec707d5009246350ece93d28efbf80c45094ad5e13b4abee115b954b7932c",
             "mutants": 114
         },
         "src/Runner/Engine.php": {
-            "key": "890abe847b419f857a761609d2e5013f71c0aea1825ac7426b4d3e88611f2f6d",
+            "key": "9352883d1fe3ab2fd30ae5430a7b5d0099c6fcdb2c234e103faae015cc1992da",
             "mutants": 24
         },
         "src/Runner/Finding.php": {
-            "key": "879297fe5afb6ce989a6245b02643b1a3f10fca527656cb0744625e76455aedf",
+            "key": "c38006a9bd9f37d110b1c7f5b95a10fad3d0b6044dbddf2f5cfb9ba4e84ec7e1",
             "mutants": 18
         },
+        "src/Runner/Measured.php": {
+            "key": "b1bf74377e39bf64b59c0f9b34316a883d30d74af5484de017aab8c11159a4fe",
+            "mutants": 0
+        },
         "src/Runner/Run.php": {
-            "key": "b483ca80de06746b576d0ff986c8a21399c9ffd7e1dc5a9bfce52633f8928da7",
-            "mutants": 38
+            "key": "cc1b94bb14ee31a5ec6cc096cb5419b884e6f8890526effdcd182d1f0373c50c",
+            "mutants": 41
         },
         "src/Runner/Shards.php": {
-            "key": "09f457f4ac115c860c44b133071a782b48355a90ffc9b3a8c6443663b9e15373",
+            "key": "7bdaeca6c76614256cc0f21f38657ff45ad2e92c71e8596b1b5e856d7c4d2e78",
             "mutants": 25
         },
         "src/Runner/Universe.php": {
-            "key": "db8b8020429bc53a8fa34a15e5aa4027811a5a3458b519f81184bff9f5f61324",
+            "key": "cedc4cfa65d8ad69d34899a2992ccfbc476ff2509a5c2a2e27720c263d0b6ba3",
             "mutants": 30
         }
     },
@@ -253,7 +265,7 @@
             ]
         },
         "tests/Unit/Config/ConfigurationTest.php": {
-            "sig": "0f4c5e9c369721a5c36ed287ebdd8f413898dfdcc7299f22619f045eed08d887",
+            "sig": "4e4491624078cf084bdc2705b04728b49746122422b58f12ed14107652edf5ad",
             "touches": [
                 "src/Config/Configuration.php"
             ]
@@ -272,6 +284,7 @@
                 "src/Cache/Verdict.php",
                 "src/Config/Configuration.php",
                 "src/Console/Application.php",
+                "src/Console/Assembly.php",
                 "src/Console/Composition.php",
                 "src/Console/Prognosis.php",
                 "src/Console/Summary.php",
@@ -284,6 +297,7 @@
                 "src/Coverage/TestResults.php",
                 "src/Coverage/Timings.php",
                 "src/Doctor/Diagnosis.php",
+                "src/Doctor/Examination.php",
                 "src/Doctor/Spread.php",
                 "src/Doctor/Tier.php",
                 "src/Engine/Declaration.php",
@@ -294,6 +308,7 @@
                 "src/Runner/Coverage.php",
                 "src/Runner/Engine.php",
                 "src/Runner/Finding.php",
+                "src/Runner/Measured.php",
                 "src/Runner/Run.php",
                 "src/Runner/Shards.php",
                 "src/Runner/Universe.php"
@@ -305,9 +320,11 @@
                 "src/Cache/Store.php",
                 "src/Cache/Toolchain.php",
                 "src/Config/Configuration.php",
+                "src/Console/Assembly.php",
                 "src/Console/Composition.php",
                 "src/Coverage/Report.php",
                 "src/Coverage/Soundness.php",
+                "src/Doctor/Examination.php",
                 "src/Engine/Declaration.php",
                 "src/Project.php",
                 "src/Runner/Commands.php",
@@ -438,11 +455,13 @@
                 "src/Coverage/TestResults.php",
                 "src/Coverage/Timings.php",
                 "src/Doctor/Diagnosis.php",
+                "src/Doctor/Examination.php",
                 "src/Doctor/Spread.php",
                 "src/Doctor/Tier.php",
                 "src/Project.php",
                 "src/Runner/Commands.php",
                 "src/Runner/Coverage.php",
+                "src/Runner/Measured.php",
                 "src/Runner/Shards.php",
                 "src/Runner/Universe.php"
             ]
@@ -470,7 +489,7 @@
             ]
         },
         "tests/Unit/Engine/GateTest.php": {
-            "sig": "d0385e9c84918531712e11503e45834f93d560c7a94398766b054c1e8fe0c6ed",
+            "sig": "5119530a795e585ddd4229c6684c0586203e0259c8fcbed295336098a6d129dc",
             "touches": [
                 "src/Cache/Footprint.php",
                 "src/Cache/Lapse.php",
@@ -515,6 +534,7 @@
                 "src/Project.php",
                 "src/Runner/Commands.php",
                 "src/Runner/Coverage.php",
+                "src/Runner/Measured.php",
                 "src/Runner/Shards.php"
             ]
         },
@@ -531,11 +551,12 @@
                 "src/Engine/Outcome.php",
                 "src/Project.php",
                 "src/Runner/Commands.php",
-                "src/Runner/Engine.php"
+                "src/Runner/Engine.php",
+                "src/Runner/Measured.php"
             ]
         },
         "tests/Unit/Runner/RunTest.php": {
-            "sig": "41e1062edbba094ec2f7a75c8e33e4e5789655029d1b4269746647c03889f414",
+            "sig": "0f23412bbccaf636f35932a6f526ee5985be5624b38f46b2002413a26fedeaf1",
             "touches": [
                 "src/Cache/Footprint.php",
                 "src/Cache/Key.php",
@@ -565,6 +586,7 @@
                 "src/Runner/Coverage.php",
                 "src/Runner/Engine.php",
                 "src/Runner/Finding.php",
+                "src/Runner/Measured.php",
                 "src/Runner/Run.php",
                 "src/Runner/Shards.php",
                 "src/Runner/Universe.php"

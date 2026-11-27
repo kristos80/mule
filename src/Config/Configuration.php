@@ -28,6 +28,7 @@ final readonly class Configuration {
 		"tests",
 		"support",
 		"exclude",
+		"mutant-free",
 		"mutators",
 		"min-coverage",
 		"threads",
@@ -47,6 +48,7 @@ final readonly class Configuration {
 	 * @param string $tests The unit-test root, project-relative.
 	 * @param list<string> $support Other directories whose bytes can change a verdict.
 	 * @param list<string> $exclude Files neither mutated nor required to be proven.
+	 * @param list<string> $mutantFree Files asserted to have nothing a mutator could change.
 	 * @param array<string, bool> $mutators The gate, in Infection's mutator vocabulary.
 	 * @param int $minCoverage The line-coverage floor.
 	 * @param string $threads What to hand the engine's `--threads`.
@@ -56,6 +58,7 @@ final readonly class Configuration {
 		public string $tests,
 		public array $support,
 		public array $exclude,
+		public array $mutantFree,
 		public array $mutators,
 		public int $minCoverage,
 		public string $threads,
@@ -77,6 +80,7 @@ final readonly class Configuration {
 			self::directory($decoded, "tests", "tests"),
 			self::paths($decoded["support"] ?? [], "support"),
 			self::paths($decoded["exclude"] ?? [], "exclude"),
+			self::paths($decoded["mutant-free"] ?? [], "mutant-free"),
 			self::mutators($decoded["mutators"] ?? ["@default" => TRUE]),
 			self::count($decoded["min-coverage"] ?? 100, "min-coverage"),
 			self::threads($decoded["threads"] ?? "max"),
@@ -101,16 +105,44 @@ final readonly class Configuration {
 	 * Whether a project-relative path is one mule neither mutates nor requires to
 	 * be proven.
 	 *
-	 * **A named directory excludes everything under it**, because "this part is
-	 * not mine to gate" is the usual thing somebody means, and spelling out every
-	 * file in it is a list that goes stale the next time one is added.
-	 *
 	 * @param string $path
 	 * @return bool
 	 */
 	public function excludes(string $path): bool {
-		foreach($this->exclude as $excluded) {
-			if($path === $excluded || str_starts_with($path, "{$excluded}/")) {
+		return self::names($this->exclude, $path);
+	}
+
+	/**
+	 * Whether a path is one somebody has asserted has nothing a mutator could
+	 * change.
+	 *
+	 * **Gated, unlike `exclude`, and that is the whole point.** A value object of
+	 * nothing but promoted properties produces no mutants, and naming 127 of them
+	 * in `exclude` would take them out of the gate for ever — so the day one grows
+	 * a method, no mutant of it is ever checked again. A file named here is keyed,
+	 * covered to the floor and handed to the engine exactly like any other; the
+	 * gate simply requires the engine to file *nothing* against it, and says so
+	 * loudly when that stops being true.
+	 *
+	 * @param string $path
+	 * @return bool
+	 */
+	public function assertsMutantFree(string $path): bool {
+		return self::names($this->mutantFree, $path);
+	}
+
+	/**
+	 * **A named directory covers everything under it**, because "this part is not
+	 * mine to gate" is the usual thing somebody means, and spelling out every file
+	 * in it is a list that goes stale the next time one is added.
+	 *
+	 * @param list<string> $named
+	 * @param string $path
+	 * @return bool
+	 */
+	private static function names(array $named, string $path): bool {
+		foreach($named as $one) {
+			if($path === $one || str_starts_with($path, "{$one}/")) {
 				return TRUE;
 			}
 		}
@@ -254,7 +286,9 @@ final readonly class Configuration {
 	 * @return void
 	 */
 	private static function assertNothingMachineLocal(self $configuration): void {
-		foreach([...$configuration->roots(), ...$configuration->exclude] as $path) {
+		$named = [...$configuration->roots(), ...$configuration->exclude, ...$configuration->mutantFree];
+
+		foreach($named as $path) {
 			if(str_starts_with($path, "/") || str_contains($path, "..")) {
 				throw new Failure(
 					"mule.json names \"{$path}\", which is not inside the project. The store is"

@@ -5,8 +5,6 @@
 		"tests/Support"
 	],
 	"exclude": [
-		"src/Console/Assembly.php",
-		"src/Doctor/Examination.php",
 		"src/External/ComposerClasses.php",
 		"src/External/PhpCoverageReport.php",
 		"src/External/PhpEnvironment.php",
@@ -14,7 +12,11 @@
 		"src/External/PhpLines.php",
 		"src/External/ShellProcesses.php",
 		"src/External/StreamOutput.php",
-		"src/External/StreamProgress.php",
+		"src/External/StreamProgress.php"
+	],
+	"mutant-free": [
+		"src/Console/Assembly.php",
+		"src/Doctor/Examination.php",
 		"src/Runner/Measured.php"
 	],
 	"mutators": {

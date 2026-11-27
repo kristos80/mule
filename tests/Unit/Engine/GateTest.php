@@ -187,7 +187,8 @@ final class GateTest extends TestCase {
 			"The engine filed no mutants against 1 file(s) it was asked to re-prove, each of which"
 			. " has lines it could have mutated. Either their coverage is stale — a file whose"
 			. " covered lines have moved generates nothing and disappears from the report — or they"
-			. ' have nothing to mutate, in which case name them in "exclude". Nothing was written.'
+			. ' have nothing a mutator could change, in which case name them in "mutant-free",'
+			. " where they stay gated and mule tells you if that ever changes. Nothing was written."
 			. "\n  src/Missing.php",
 		);
 
@@ -436,6 +437,67 @@ final class GateTest extends TestCase {
 		self::assertSame(
 			"the suite reaches 0 of 20 line(s)",
 			$snapshot->unproven["src/Bare.php"]->because(),
+		);
+	}
+
+	/**
+	 * A file declared `mutant-free` is exempt from G1, because that declaration is
+	 * the decision the guard asks for.
+	 *
+	 * @return void
+	 */
+	public function testADeclaredMutantFreeFileIsNotAZeroMutantFault(): void {
+		$snapshot = new Gate()->proven(
+			$this->outcome(),
+			["src/A.php" => "key-a", "src/Value.php" => "key-v"],
+			"chain",
+			[],
+			$this->reached(["src/A.php", "src/Value.php"]),
+			["src/Value.php"],
+		);
+
+		self::assertSame(["src/A.php", "src/Value.php"], array_keys($snapshot->verdicts));
+		self::assertSame(0, $snapshot->verdicts["src/Value.php"]->mutants);
+	}
+
+	/**
+	 * **The other half of the declaration.** A value object produces no mutants
+	 * today; the day it grows a method it produces some, and a file taken out of
+	 * the gate would never have said so.
+	 *
+	 * @return void
+	 */
+	public function testAFileThatStopsBeingMutantFreeIsNamedWithItsCount(): void {
+		$this->expectExceptionMessage(
+			'1 file(s) named in "mutant-free" now have mutants, so the claim that there is nothing'
+			. " in them to verify has stopped being true. Take them out of the list and let the gate"
+			. " prove them. Nothing was written.\n  src/A.php (1)",
+		);
+
+		new Gate()->proven(
+			$this->outcome(),
+			["src/A.php" => "key-a"],
+			"chain",
+			[],
+			$this->reached(["src/A.php"]),
+			["src/A.php"],
+		);
+	}
+
+	public function testEveryFileThatStopsBeingMutantFreeIsNamed(): void {
+		$outcome = $this->outcome(sections: [
+			"killed" => ["/p/src/A.php", "/p/src/B.php", "/p/src/B.php"],
+		]);
+
+		$this->expectExceptionMessage("\n  src/A.php (1)\n  src/B.php (2)");
+
+		new Gate()->proven(
+			$outcome,
+			["src/A.php" => "key-a", "src/B.php" => "key-b"],
+			"chain",
+			[],
+			$this->reached(["src/A.php", "src/B.php"]),
+			["src/A.php", "src/B.php"],
 		);
 	}
 }

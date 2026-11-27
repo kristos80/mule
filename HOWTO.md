@@ -450,6 +450,43 @@ change another file's verdict?*
 A test double or a fixture is the easy case: it is not under `source` at all, so
 `support` is the only place for it.
 
+**Three lists, three different claims.** This is the part worth getting right,
+because two of them look interchangeable and are not:
+
+| list | mutated? | covered to the floor? | digest tracked? | if that changes |
+|---|---|---|---|---|
+| `exclude` | no | no | **no** | nothing happens, ever |
+| `mutant-free` | yes | yes | yes | mule fails and names the file |
+| `support` | n/a — not under `source` | n/a | yes, all-or-nothing | the whole store invalidates |
+
+- **`exclude`** is "not mine to answer for": a thin I/O wrapper you test another
+  way, a file needing a live backend. It is out of the gate completely, and that
+  includes its bytes — editing it invalidates nothing.
+- **`mutant-free`** is "there is nothing in here a mutator could change, and tell
+  me if that stops being true". A `final readonly class` with nothing but a
+  promoted constructor is the case. It stays gated: keyed, invalidated, covered,
+  handed to the engine — the gate just requires the engine to file nothing against
+  it. The day it grows a method, mule says so.
+- **`support`** is "its bytes can change a verdict and coverage cannot see it":
+  fakes, fixtures, a base test case.
+
+**Reach for `mutant-free` over `exclude` whenever the file is real code.** On a
+613-file application, 127 files are pure data carriers. Putting them in `exclude`
+would have taken `Order.php` out of the gate for ever — and the day it grew a
+method, no mutant of it would be checked again. That is the failure mule exists to
+prevent, arrived at by following its own advice.
+
+```json
+{
+  "exclude": ["src/Infrastructure/Storage/PdoConnection.php"],
+  "mutant-free": ["src/Domain/Order/Address.php", "src/Domain/Order/Order.php"]
+}
+```
+
+A directory works too, and is checked as the files under it rather than as a name:
+`"mutant-free": ["src/Domain/Analytics"]` fails the moment anything in there grows
+a mutant.
+
 **You do not need to list your interfaces.** A file with no executable lines has
 nothing a mutator could change, and mule asks the parser rather than guessing — so
 interfaces, and enums of nothing but cases, are proven with `mutants: 0` and need
@@ -460,4 +497,10 @@ about.
 with every offender named at once. That is not pedantry: a file whose coverage has
 gone stale produces no mutants either, disappears from the report, and a run
 without this guard exits 0 having proven nothing about it. One run hands you the
-whole list to paste in here.
+whole list to paste into `mutant-free`.
+
+**A run the gate refuses still keeps what it measured.** The coverage pass is most
+of the wall clock — 32.7 s to capture and 26.9 s to split on that 613-file
+application — and it would be paid again on every attempt at getting these lists
+right. It is not: the record of what each test executes is banked whether or not
+the verdicts were acceptable, so the next attempt goes straight to the engine.

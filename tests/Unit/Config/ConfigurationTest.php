@@ -16,6 +16,7 @@ final class ConfigurationTest extends TestCase {
 		self::assertSame("tests", $configuration->tests);
 		self::assertSame([], $configuration->support);
 		self::assertSame([], $configuration->exclude);
+		self::assertSame([], $configuration->mutantFree);
 		self::assertSame(["@default" => TRUE], $configuration->mutators);
 		self::assertSame(100, $configuration->minCoverage);
 		self::assertSame("max", $configuration->threads);
@@ -229,7 +230,7 @@ final class ConfigurationTest extends TestCase {
 	public function testAKeyMuleDoesNotKnowIsRefused(): void {
 		$this->expectExceptionMessage(
 			'mule.json gives "min_coverage", which mule does not know. The keys are source, tests,'
-			. ' support, exclude, mutators, min-coverage, threads.',
+			. ' support, exclude, mutant-free, mutators, min-coverage, threads.',
 		);
 
 		Configuration::of(["min_coverage" => 90]);
@@ -245,5 +246,51 @@ final class ConfigurationTest extends TestCase {
 			"min-coverage" => 90,
 			"threads" => 2,
 		])->minCoverage);
+	}
+
+	/**
+	 * **`mutant-free` is a claim mule checks, not an exclusion.** A file named here
+	 * is keyed, covered to the floor and handed to the engine like any other — the
+	 * gate simply requires the engine to file nothing against it.
+	 *
+	 * @return void
+	 */
+	public function testWhatCountsAsDeclaredMutantFree(): void {
+		$configuration = Configuration::of(["mutant-free" => ["src/Domain", "src/Value.php"]]);
+
+		self::assertTrue($configuration->assertsMutantFree("src/Value.php"));
+		self::assertTrue($configuration->assertsMutantFree("src/Domain/Order/Address.php"));
+		self::assertFalse($configuration->assertsMutantFree("src/DomainThing.php"));
+		self::assertFalse($configuration->assertsMutantFree("src/Other.php"));
+	}
+
+	/**
+	 * It is not an exclusion, so an excluded file is not mutant-free and vice
+	 * versa: the two lists mean different things and are read separately.
+	 *
+	 * @return void
+	 */
+	public function testTheTwoListsAreNotTheSameList(): void {
+		$configuration = Configuration::of([
+			"exclude" => ["src/Wrapper.php"],
+			"mutant-free" => ["src/Value.php"],
+		]);
+
+		self::assertTrue($configuration->excludes("src/Wrapper.php"));
+		self::assertFalse($configuration->assertsMutantFree("src/Wrapper.php"));
+		self::assertTrue($configuration->assertsMutantFree("src/Value.php"));
+		self::assertFalse($configuration->excludes("src/Value.php"));
+	}
+
+	public function testAMutantFreeEntryThatIsNotAPath(): void {
+		$this->expectExceptionMessage('mule.json has a "mutant-free" entry that is not a path.');
+
+		Configuration::of(["mutant-free" => [7]]);
+	}
+
+	public function testAnEscapingMutantFreeEntryIsRefused(): void {
+		$this->expectExceptionMessage('mule.json names "/elsewhere/Value.php", which is not inside');
+
+		Configuration::of(["mutant-free" => ["/elsewhere/Value.php"]]);
 	}
 }
