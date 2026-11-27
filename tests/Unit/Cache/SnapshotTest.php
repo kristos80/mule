@@ -120,14 +120,8 @@ final class SnapshotTest extends TestCase {
 		self::assertFalse($this->snapshot()->vouchesFor("src/A.php", "key-of-src/A.php"));
 	}
 
-	public function testNamesWhatItCannotVouchFor(): void {
-		$snapshot = $this->snapshot(["src/A.php" => 4, "src/B.php" => 2]);
-
-		self::assertSame(["src/B.php", "src/C.php"], $snapshot->outstanding([
-			"src/A.php" => "key-of-src/A.php",
-			"src/B.php" => "moved",
-			"src/C.php" => "key-of-src/C.php",
-		]));
+	public function testDoesNotVouchForAFileWhoseKeyHasMoved(): void {
+		self::assertFalse($this->snapshot(["src/A.php" => 4])->vouchesFor("src/A.php", "moved"));
 	}
 
 	public function testCountsTheMutantsItHasProven(): void {

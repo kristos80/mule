@@ -83,6 +83,20 @@ final class RunTest extends TestCase {
 	 */
 	private array $executable = ["/p/src/A.php" => [3], "/p/src/B.php" => [4], "/p/src/Hub.php" => [5]];
 
+	/**
+	 * Test classes that execute no instrumented source at all (M16) — a pure enum
+	 * test, or one that only asserts about a fixture.
+	 *
+	 * @var list<string>
+	 */
+	private array $silent = [];
+
+	/**
+	 * Whether `AaaTest` has also started covering `B.php` — attribution changing
+	 * ownership rather than appearing or disappearing.
+	 */
+	private bool $shared = FALSE;
+
 	protected function setUp(): void {
 		$this->filesystem = new InMemoryFilesystem(
 			files: [
@@ -129,9 +143,10 @@ final class RunTest extends TestCase {
 	private function capturing(array $command): void {
 		$last = $command[count($command) - 1];
 		$only = str_ends_with($last, "Test.php") ? [$last === "tests/Unit/AaaTest.php" ? "Aaa" : "Bbb"] : ["Aaa", "Bbb"];
+		$covering = array_values(array_diff($only, $this->silent));
 
-		$this->filesystem->payloads[self::PAYLOAD] = $this->payload($only);
-		$this->filesystem->files[self::JUNIT] = $this->junit($only);
+		$this->filesystem->payloads[self::PAYLOAD] = $this->payload($covering);
+		$this->filesystem->files[self::JUNIT] = $this->junit($covering);
 	}
 
 	/**
@@ -211,6 +226,10 @@ final class RunTest extends TestCase {
 			$results["{$class}Test::testOne"] = ["size" => "unknown", "status" => "success", "time" => 0.5];
 			$lines[$class === "Aaa" ? "A.php" : "B.php"][$class === "Aaa" ? 3 : 4][$index] = 1;
 			$lines["Hub.php"][5][$index] = 1;
+
+			if($class === "Aaa" && $this->shared) {
+				$lines["B.php"][4][$index] = 1;
+			}
 		}
 
 		$coverage->setTestIds($ids);
@@ -677,5 +696,107 @@ final class RunTest extends TestCase {
 		self::assertSame([], $finding->abandoned);
 		self::assertSame([], $finding->proved());
 		self::assertInstanceOf(Finding::class, $finding);
+	}
+
+	/**
+	 * **M16 is a real case, and a cold run must still record the test.** A test
+	 * class that executes no instrumented source is absent from `testIds()`, so
+	 * splitting produces nothing for it — but a test file on disk that no part of
+	 * the store mentions reads as having appeared, which makes every run from then
+	 * on a cold one.
+	 *
+	 * @return void
+	 */
+	public function testATestThatCoversNothingDoesNotForceAColdRunForEver(): void {
+		$this->silent = ["Aaa"];
+		($this->mule())();
+		$this->processes->started = [];
+
+		$finding = ($this->mule())();
+
+		self::assertTrue($finding->standing->usable);
+		self::assertSame("the store describes this tree", $finding->standing->because);
+		self::assertArrayHasKey("tests/Unit/AaaTest.php", $finding->store->tests);
+		self::assertSame([], $finding->store->tests["tests/Unit/AaaTest.php"]);
+	}
+
+	/**
+	 * **A file can acquire a covering test without changing itself.** Editing
+	 * `AaaTest` so that it also runs `B.php` moves `B.php`'s closure — it now
+	 * depends on `A.php` through the test the two share — while `B.php`'s own bytes
+	 * and its recorded covering tests are both untouched.
+	 *
+	 * The invariant: a run with no edits between it and the one before must find
+	 * nothing owed. If the run that noticed the new ownership banked no new key for
+	 * `B.php`, the *next* run re-proves it for no reason — and in between, `B.php`
+	 * carries a verdict keyed on fewer tests than cover it.
+	 *
+	 * @return void
+	 */
+	public function testAFileThatAcquiresACoveringTestIsReKeyedAtOnce(): void {
+		($this->mule())();
+		$this->shared = TRUE;
+		$this->filesystem->files["/p/tests/Unit/AaaTest.php"] = "<?php // aaa, now touching B too";
+		($this->mule())();
+		$this->processes->started = [];
+
+		$finding = ($this->mule())();
+
+		self::assertSame([], $finding->standing->outstanding);
+		self::assertFalse($finding->measured);
+		self::assertSame([], $this->commands());
+	}
+
+	/**
+	 * **A test file that appears and covers nothing costs one capture, not one
+	 * mutation run.** The store had never heard of it, so the run cannot be partial
+	 * — but once measured it turns out to move no key at all, and there is nothing
+	 * to ask the engine. Recording it is what stops the next run going wide for the
+	 * same reason.
+	 *
+	 * @return void
+	 */
+	public function testATestFileThatAppearsAndCoversNothingAsksTheEngineNothing(): void {
+		($this->mule())();
+		$this->filesystem->files["/p/tests/Unit/CccTest.php"] = "<?php // ccc, asserts about a fixture";
+		$this->processes->started = [];
+
+		$finding = ($this->mule())();
+
+		self::assertFalse($finding->standing->usable);
+		self::assertCount(1, $this->commands());
+		self::assertSame([], $finding->examined);
+		self::assertTrue($finding->holds());
+		self::assertSame([], $finding->store->tests["tests/Unit/CccTest.php"]);
+	}
+
+	public function testAndTheRunAfterThatIsCheapAgain(): void {
+		($this->mule())();
+		$this->filesystem->files["/p/tests/Unit/CccTest.php"] = "<?php // ccc";
+		($this->mule())();
+		$this->processes->started = [];
+
+		self::assertFalse(($this->mule())()->measured);
+		self::assertSame([], $this->commands());
+	}
+
+	/**
+	 * **A file nobody has heard of makes the *capture* whole, not the mutation
+	 * run.** What cannot be worked out from digests is the new file's coverage; once
+	 * a coverage pass has happened, what moved is exactly knowable, and re-proving
+	 * the files that did not move would be work nobody asked for.
+	 *
+	 * @return void
+	 */
+	public function testANewSourceFileIsProvenWithoutReProvingTheRest(): void {
+		($this->mule())();
+		$this->filesystem->files["/p/src/C.php"] = "<?php // c";
+		$this->executable["/p/src/C.php"] = [];
+		$this->processes->started = [];
+
+		($this->mule())();
+
+		self::assertNotContains("tests/Unit/AaaTest.php", $this->commands()[0]);
+		self::assertContains("--filter=src/C.php", $this->commands()[1]);
 	}
 }

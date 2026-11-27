@@ -172,9 +172,9 @@ final class StoreTest extends TestCase {
 		$store->bank($this->snapshot(["src/A.php" => 4]));
 
 		// edited: the key moves, so the store no longer vouches
-		self::assertSame(["src/A.php"], $store->read("chain")->outstanding(["src/A.php" => "edited"]));
+		self::assertFalse($store->read("chain")->vouchesFor("src/A.php", "edited"));
 
 		// reverted: the same bytes key the same way, and the verdict holds
-		self::assertSame([], $store->read("chain")->outstanding(["src/A.php" => "key-of-src/A.php"]));
+		self::assertTrue($store->read("chain")->vouchesFor("src/A.php", "key-of-src/A.php"));
 	}
 }

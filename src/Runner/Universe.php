@@ -103,6 +103,30 @@ final readonly class Universe {
 	}
 
 	/**
+	 * Every test file on disk.
+	 *
+	 * **A cold run needs the list, not just what the coverage report attributes.**
+	 * A test class that executes no instrumented source is absent from
+	 * `testIds()` (M16), so splitting produces nothing for it — and a test file no
+	 * part of the store mentions reads as having appeared, which makes every run
+	 * from then on a cold one. Seeding the record from the tree is what stops a
+	 * pure enum test costing a full re-prove for ever.
+	 *
+	 * @return list<string>
+	 */
+	public function tests(): array {
+		$tests = [];
+
+		foreach($this->under($this->configuration->tests) as $path) {
+			if(!$this->configuration->excludes($path)) {
+				$tests[] = $path;
+			}
+		}
+
+		return $tests;
+	}
+
+	/**
 	 * The source files somebody decided mule is not answerable for.
 	 *
 	 * **Counted and reported rather than merely skipped.** A file that is not

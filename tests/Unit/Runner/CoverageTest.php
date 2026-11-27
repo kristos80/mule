@@ -14,6 +14,7 @@ use Kristos80\Mule\Tests\Support\ScriptedProcesses;
 use Kristos80\Mule\Tests\Support\StubClasses;
 use PHPUnit\Framework\TestCase;
 use SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData;
+use function count;
 use function hash;
 use function str_ends_with;
 use function substr;
@@ -28,6 +29,19 @@ final class CoverageTest extends TestCase {
 
 	private ScriptedProcesses $processes;
 
+	/**
+	 * Test classes that execute no instrumented source at all (M16).
+	 *
+	 * @var list<string>
+	 */
+	private array $silent = [];
+
+	/**
+	 * Whether a capture of one test file comes back with two test classes in it —
+	 * somebody having added a second class to a file that already had one.
+	 */
+	private bool $twoInOne = FALSE;
+
 	protected function setUp(): void {
 		$this->filesystem = new InMemoryFilesystem(
 			files: [
@@ -39,7 +53,34 @@ final class CoverageTest extends TestCase {
 			],
 			directories: ["/p/src", "/p/tests/Unit"],
 		);
-		$this->processes = new ScriptedProcesses();
+		$this->processes = new ScriptedProcesses($this->answered(...));
+	}
+
+	/**
+	 * PHPUnit leaves a capture and a JUnit log. Which test file it was asked for is
+	 * read off the command, so two captures in one warm run can answer differently.
+	 *
+	 * @param list<string> $command
+	 * @return array{status: int, output: string}
+	 */
+	private function answered(array $command): array {
+		$last = $command[count($command) - 1];
+		$only = str_ends_with($last, "Test.php") && !$this->twoInOne
+			? [$last === "tests/Unit/AaaTest.php" ? "Aaa" : "Bbb"]
+			: ["Aaa", "Bbb"];
+
+		$this->willCapture(array_values(array_diff($only, $this->silent)));
+
+		return ["status" => 0, "output" => ""];
+	}
+
+	/**
+	 * Every test file on disk, as `Runner\Universe` would hand it over.
+	 *
+	 * @return list<string>
+	 */
+	private function known(): array {
+		return ["tests/Unit/AaaTest.php", "tests/Unit/BbbTest.php"];
 	}
 
 	/**
@@ -184,8 +225,7 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testAColdRunStartsOneProcessForTheWholeSuite(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
+		$this->coverage()->whole($this->known());
 
 		self::assertSame(
 			[["/usr/bin/php", "vendor/bin/phpunit", "--no-output", "--coverage-php=" . self::PAYLOAD,
@@ -195,8 +235,7 @@ final class CoverageTest extends TestCase {
 	}
 
 	public function testItRunsFromTheProjectRoot(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
+		$this->coverage()->whole($this->known());
 
 		self::assertSame("/p/", $this->processes->started[0]["directory"]);
 	}
@@ -212,9 +251,7 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testItRecordsWhatEachTestRan(): void {
-		$this->willCapture();
-
-		self::assertSame($this->recorded(), $this->coverage()->whole()->tests);
+		self::assertSame($this->recorded(), $this->coverage()->whole($this->known())->tests);
 	}
 
 	/**
@@ -225,11 +262,14 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testAFootprintNamesEachFileOnce(): void {
-		$this->willCapture(["Aaa"]);
+		$this->silent = ["Bbb"];
 
 		self::assertSame(
-			["tests/Unit/AaaTest.php" => ["src/A.php", "src/Hub.php"]],
-			$this->coverage()->whole()->tests,
+			[
+				"tests/Unit/AaaTest.php" => ["src/A.php", "src/Hub.php"],
+				"tests/Unit/BbbTest.php" => [],
+			],
+			$this->coverage()->whole($this->known())->tests,
 		);
 	}
 
@@ -241,20 +281,17 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testAnExcludedFileIsNotInAFootprint(): void {
-		$this->willCapture();
-
 		self::assertSame(
 			[
 				"tests/Unit/AaaTest.php" => ["src/A.php"],
 				"tests/Unit/BbbTest.php" => ["src/B.php"],
 			],
-			$this->coverage(settings: ["exclude" => ["src/Hub.php"]])->whole()->tests,
+			$this->coverage(settings: ["exclude" => ["src/Hub.php"]])->whole($this->known())->tests,
 		);
 	}
 
 	public function testAColdRunWritesOneShardPerTestFile(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
+		$this->coverage()->whole($this->known());
 
 		self::assertTrue($this->filesystem->exists("/p/.mule/cache/tests_Unit_AaaTest.php.json"));
 		self::assertTrue($this->filesystem->exists("/p/.mule/cache/tests_Unit_BbbTest.php.json"));
@@ -268,8 +305,7 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testAShardRecordsEverythingItWasMeasuredAgainst(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
+		$this->coverage()->whole($this->known());
 		$shards = new Shards($this->filesystem, "/p/.mule/cache");
 
 		self::assertTrue($shards->read("tests/Unit/AaaTest.php")->matches($this->digests()));
@@ -288,15 +324,13 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testAColdRunMakesTheCacheIgnoreItself(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
+		$this->coverage()->whole($this->known());
 
 		self::assertSame("*\n", $this->filesystem->read("/p/.mule/cache/.gitignore"));
 	}
 
 	public function testAWarmRunMakesTheCacheIgnoreItself(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
+		$this->coverage()->whole($this->known());
 		$this->filesystem->remove("/p/.mule/cache/.gitignore");
 
 		$this->coverage()->refresh($this->recorded(), $this->digests());
@@ -312,9 +346,7 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testAColdRunBanksTheReferenceTimings(): void {
-		$this->willCapture();
-
-		self::assertSame([], $this->coverage()->whole()->timings->missing(["AaaTest", "BbbTest"]));
+		self::assertSame([], $this->coverage()->whole($this->known())->timings->missing(["AaaTest", "BbbTest"]));
 		self::assertTrue($this->filesystem->exists("/p/.mule/cache/timings.xml"));
 	}
 
@@ -336,7 +368,7 @@ final class CoverageTest extends TestCase {
 			. "\nAaaTest::testOne failed",
 		);
 
-		$this->coverage()->whole();
+		$this->coverage()->whole($this->known());
 	}
 
 	/**
@@ -347,15 +379,13 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testACoveringTestNothingCanPlace(): void {
-		$this->willCapture();
-
 		$this->expectExceptionMessage(
 			"The project's autoloader cannot place the covering test AaaTest, so mule cannot find its"
 			. " file — and a test it cannot find is a test whose edits would stop invalidating"
 			. " anything.",
 		);
 
-		$this->coverage(["BbbTest" => "/p/tests/Unit/BbbTest.php"])->whole();
+		$this->coverage(["BbbTest" => "/p/tests/Unit/BbbTest.php"])->whole($this->known());
 	}
 
 	/**
@@ -367,10 +397,8 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testAWarmRunCapturesOnlyWhatIsDirty(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
+		$this->coverage()->whole($this->known());
 		$this->processes->started = [];
-		$this->filesystem->payloads[self::PAYLOAD] = $this->payload(["Aaa"]);
 
 		$this->coverage()->refresh($this->recorded(), $this->digests("/p/src/A.php"));
 
@@ -382,8 +410,7 @@ final class CoverageTest extends TestCase {
 	}
 
 	public function testAWarmRunWithNothingDirtyStartsNoProcess(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
+		$this->coverage()->whole($this->known());
 		$this->processes->started = [];
 
 		$this->coverage()->refresh($this->recorded(), $this->digests());
@@ -398,11 +425,9 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testATestFileWithNoShardIsDirty(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
+		$this->coverage()->whole($this->known());
 		$this->filesystem->remove("/p/.mule/cache/tests_Unit_BbbTest.php.json");
 		$this->processes->started = [];
-		$this->filesystem->payloads[self::PAYLOAD] = $this->payload(["Bbb"]);
 
 		$this->coverage()->refresh($this->recorded(), $this->digests());
 
@@ -417,9 +442,7 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testAWarmRunReassemblesEverythingItKnows(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
-		$this->filesystem->payloads[self::PAYLOAD] = $this->payload(["Aaa"]);
+		$this->coverage()->whole($this->known());
 
 		$measured = $this->coverage()->refresh($this->recorded(), $this->digests("/p/src/A.php"));
 
@@ -427,10 +450,8 @@ final class CoverageTest extends TestCase {
 	}
 
 	public function testAWarmRunRewritesTheShardItReMeasured(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
+		$this->coverage()->whole($this->known());
 		$this->filesystem->files["/p/src/A.php"] = "<?php // a, differently";
-		$this->filesystem->payloads[self::PAYLOAD] = $this->payload(["Aaa"]);
 
 		$this->coverage()->refresh($this->recorded(), $this->digests());
 
@@ -442,9 +463,7 @@ final class CoverageTest extends TestCase {
 	}
 
 	public function testAWarmRunKeepsWhatTheStoreSaidAboutTheRest(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
-		$this->filesystem->payloads[self::PAYLOAD] = $this->payload(["Aaa"]);
+		$this->coverage()->whole($this->known());
 
 		$measured = $this->coverage()->refresh($this->recorded(), $this->digests("/p/src/A.php"));
 
@@ -459,9 +478,7 @@ final class CoverageTest extends TestCase {
 	 * @return void
 	 */
 	public function testAWarmRunReadsTheBankedTimings(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
-		$this->filesystem->payloads[self::PAYLOAD] = $this->payload(["Aaa"]);
+		$this->coverage()->whole($this->known());
 		$this->filesystem->files[self::JUNIT] = $this->junit(["Aaa"]);
 
 		$measured = $this->coverage()->refresh($this->recorded(), $this->digests("/p/src/A.php"));
@@ -478,22 +495,109 @@ final class CoverageTest extends TestCase {
 	 *
 	 * @return void
 	 */
-	public function testATestThatRunsNoSourceAtAll(): void {
-		$this->willCapture();
-		$this->coverage()->whole();
+	public function testWhatComesAfterASilentTestIsStillReMeasured(): void {
+		$this->coverage()->whole($this->known());
 		$this->processes->started = [];
-		$this->filesystem->payloads[self::PAYLOAD] = $this->payload([]);
+		$this->silent = ["Aaa"];
 
 		$measured = $this->coverage()->refresh($this->recorded(), $this->digests("/p/src/Hub.php"));
 
 		self::assertSame([], $measured->tests["tests/Unit/AaaTest.php"]);
-		self::assertSame([], $measured->tests["tests/Unit/BbbTest.php"]);
+		self::assertSame(["src/B.php", "src/Hub.php"], $measured->tests["tests/Unit/BbbTest.php"]);
 		self::assertCount(2, $this->commands());
 	}
 
+	/**
+	 * **A warm run needs the reference capture the cold one banked.** Test times
+	 * have to come from a single capture (M12, M13), so a cache without them cannot
+	 * produce a report at all and the only remedy is a whole run — said here rather
+	 * than left to a missing-file message from two layers down.
+	 *
+	 * @return void
+	 */
 	public function testAWarmRunWithAnEmptyCache(): void {
+		$this->expectExceptionMessage(
+			"The cache holds no reference timings, so there is nothing to time the engine's mutants"
+			. " against. Test times have to come from one capture rather than from the shards, so the"
+			. " remedy is a whole run: mule --whole.",
+		);
+
+		$this->coverage()->refresh($this->recorded(), $this->digests());
+	}
+
+	/**
+	 * And a project where nothing is covered at all has nothing to reassemble: every
+	 * test is re-measured, every one attributes nothing, and every shard is
+	 * forgotten.
+	 *
+	 * @return void
+	 */
+	public function testAWarmRunWhereEveryTestHasStoppedCoveringAnything(): void {
+		$this->coverage()->whole($this->known());
+		$this->silent = ["Aaa", "Bbb"];
+
 		$this->expectExceptionMessage("The shard cache holds nothing, so there is no coverage to reassemble.");
 
-		$this->coverage()->refresh([], []);
+		$this->coverage()->refresh($this->recorded(), $this->digests("/p/src/Hub.php"));
+	}
+
+	/**
+	 * **A test that stops covering anything must not leave its old shard behind.**
+	 * The digest moves, the shard is correctly read as dirty, the fresh capture
+	 * attributes nothing — and then the merge reads the obsolete shard off disk
+	 * anyway, so the report mule hands the engine claims coverage from a test that
+	 * no longer provides it.
+	 *
+	 * @return void
+	 */
+	public function testATestThatStopsCoveringAnythingLeavesNoEvidenceBehind(): void {
+		$this->coverage()->whole($this->known());
+		$this->silent = ["Aaa"];
+
+		$measured = $this->coverage()->refresh($this->recorded(), $this->digests("/p/tests/Unit/AaaTest.php"));
+
+		self::assertSame(["BbbTest"], $measured->capture->testClasses());
+		self::assertFalse($this->filesystem->exists("/p/.mule/cache/tests_Unit_AaaTest.php.json"));
+	}
+
+	/**
+	 * **Two test classes in one file is refused rather than half-cached.** The
+	 * shard cache is keyed by test file and the capture is split by test class, so
+	 * the second class would overwrite the first — and the next warm run would
+	 * merge only one of them, leaving whatever the other covered looking unreached.
+	 *
+	 * @return void
+	 */
+	public function testTwoTestClassesInOneFileIsRefused(): void {
+		$this->expectExceptionMessage(
+			"tests/Unit/AaaTest.php declares more than one test class — AaaTest and BbbTest. mule"
+			. " caches coverage one shard per test file, so a second class in the same file would"
+			. " overwrite the first. Give each test class its own file.",
+		);
+
+		$this->coverage([
+			"AaaTest" => "/p/tests/Unit/AaaTest.php",
+			"BbbTest" => "/p/tests/Unit/AaaTest.php",
+		])->whole($this->known());
+	}
+
+	/**
+	 * And refused on the warm path too, because that is where the layout usually
+	 * appears: a file that already had one test class acquires a second, so only
+	 * its own digest moves and no cold run is triggered to notice.
+	 *
+	 * @return void
+	 */
+	public function testASecondTestClassAddedToAnExistingFileIsRefused(): void {
+		$this->coverage()->whole($this->known());
+		$this->twoInOne = TRUE;
+
+		$this->expectExceptionMessage(
+			"tests/Unit/AaaTest.php declares more than one test class — AaaTest and BbbTest. mule"
+			. " caches coverage one shard per test file, so a second class in the same file would"
+			. " overwrite the first. Give each test class its own file.",
+		);
+
+		$this->coverage()->refresh($this->recorded(), $this->digests("/p/tests/Unit/AaaTest.php"));
 	}
 }

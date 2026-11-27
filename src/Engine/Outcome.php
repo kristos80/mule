@@ -71,13 +71,6 @@ final readonly class Outcome {
 	}
 
 	/**
-	 * @return list<string>
-	 */
-	public function files(): array {
-		return array_keys($this->byFile);
-	}
-
-	/**
 	 * How many mutants of one kind the engine filed against a file.
 	 *
 	 * @param string $file

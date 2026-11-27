@@ -1112,6 +1112,21 @@ something to engineer around.
   unimplemented rather than optional.
 - **`"signature": "code"` is deferred**, not designed. §3 states the conditions it
   would have to meet; nothing has been built or measured against them.
+- **Four lifecycle defects were found at the boundaries between the components,
+  not in any one of them**, and the pattern is worth recording because it will
+  recur: each was a case where coverage attribution *moved* rather than merely
+  changed. A test that stops covering anything left its shard on disk for the
+  merge to read back; a deleted test file's shard was merged, so Infection ran
+  mutants against a test that is not there and a failing run scored as a kill; a
+  test that covers nothing was absent from the store, so it read as having
+  appeared on every run from then on; and a file that *acquired* a covering test
+  was not re-keyed by the run that noticed, because the owed list was computed
+  from the store's picture rather than from the fresh one. The fix for the last
+  one generalises: **what is owed is decided after measuring, never before.**
+  `Standing` answers only the cheap question — may this run skip measuring
+  altogether — and the owed list is a comparison of fresh keys against banked
+  verdicts. One consequence is an improvement: a file that has appeared now makes
+  the *capture* whole but the mutation run filtered to what actually moved.
 - **`doctor` is not built.** §8's tier detection, the invalidation distribution and
   the four-state report are specified and unimplemented. What `mule` prints today
   is three of the four states — proven, not proven, excluded — because the other

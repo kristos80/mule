@@ -66,10 +66,6 @@ final class ShardTest extends TestCase {
 		self::assertSame(["AaaTest::testOne", "AaaTest::testTwo"], $this->shard()->testIds);
 	}
 
-	public function testReportsWhatItCovers(): void {
-		self::assertSame(["/src/A.php", "/src/B.php"], $this->shard()->covers());
-	}
-
 	public function testRehydratesIntoACaptureMergeCanTake(): void {
 		$capture = $this->shard()->capture($this->split(), "/elsewhere");
 

@@ -55,17 +55,32 @@ final readonly class Coverage {
 	/**
 	 * The whole suite, in one process, split into shards afterwards.
 	 *
+	 * **The record starts from the tree rather than from the report.** A test class
+	 * that executes no instrumented source is absent from `testIds()` (M16), so the
+	 * split produces nothing for it — and a test file the store never mentions
+	 * reads as having appeared, which makes every run from then on a cold one.
+	 * Seeding it with every test file means such a test is recorded as covering
+	 * nothing, which is what it does.
+	 *
+	 * @param list<string> $known Every test file on disk.
 	 * @return Measured
 	 */
-	public function whole(): Measured {
+	public function whole(array $known): Measured {
 		$this->shards->prepare();
 
 		$capture = $this->capture();
 		$timings = Timings::from($this->filesystem->read($this->junit()));
-		$tests = [];
+		$tests = array_fill_keys($known, []);
+		$claimed = [];
 
 		foreach(new Split($capture)->byTestClass() as $class => $shard) {
 			$test = $this->fileOf($class);
+
+			if(isset($claimed[$test])) {
+				$this->refuseTwoClasses($test, $claimed[$test], $class);
+			}
+
+			$claimed[$test] = $class;
 			$touches = $this->touched($shard);
 
 			$this->shards->write($test, Shard::of($class, $shard, $this->digestsFor($test, $touches)));
@@ -87,6 +102,7 @@ final readonly class Coverage {
 	 */
 	public function refresh(array $recorded, array $digests): Measured {
 		$this->shards->prepare();
+		$this->assertTimed();
 
 		$tests = $recorded;
 
@@ -95,9 +111,18 @@ final readonly class Coverage {
 			$classes = $capture->testClasses();
 
 			if($classes === []) {
+				// **Forgotten, not merely recorded as empty.** Nothing overwrote the
+				// shard, so leaving it would let the merge read it back and claim
+				// coverage from a test that no longer provides any.
+				$this->shards->forget($test);
+
 				$tests[$test] = [];
 
 				continue;
+			}
+
+			if(isset($classes[1])) {
+				$this->refuseTwoClasses($test, $classes[0], $classes[1]);
 			}
 
 			$shard = new Split($capture)->byTestClass()[$classes[0]];
@@ -109,6 +134,26 @@ final readonly class Coverage {
 		}
 
 		return new Measured($this->merged(array_keys($recorded)), $this->shards->readTimings(), $tests);
+	}
+
+	/**
+	 * **A warm run needs the reference capture the cold one banked.** Test times
+	 * must come from a single capture, because summing them across shards inflates
+	 * them and the engine then silently discards mutants that look slow (M12, M13)
+	 * — so a cache without them cannot produce a report, and the only remedy is a
+	 * fresh whole run. Said here rather than left to a missing-file message from
+	 * two layers down.
+	 *
+	 * @return void
+	 */
+	private function assertTimed(): void {
+		if(!$this->shards->hasTimings()) {
+			throw new Failure(
+				"The cache holds no reference timings, so there is nothing to time the engine's"
+				. " mutants against. Test times have to come from one capture rather than from"
+				. " the shards, so the remedy is a whole run: mule --whole.",
+			);
+		}
 	}
 
 	/**
@@ -253,6 +298,27 @@ final readonly class Coverage {
 		}
 
 		return $digests;
+	}
+
+	/**
+	 * **One test class per test file, and mule says so rather than caching half of
+	 * it.** The cache is keyed by test file and the capture is split by test class,
+	 * so a second class in the same file overwrites the first — and the next warm
+	 * run would merge one of them, leaving whatever the other covered looking
+	 * unreached. Representing a file as a set of class-level shards is a second
+	 * cache format; refusing the layout is a sentence.
+	 *
+	 * @param string $test
+	 * @param string $first
+	 * @param string $second
+	 * @return never
+	 */
+	private function refuseTwoClasses(string $test, string $first, string $second): never {
+		throw new Failure(
+			"{$test} declares more than one test class — {$first} and {$second}. mule caches"
+			. " coverage one shard per test file, so a second class in the same file would"
+			. " overwrite the first. Give each test class its own file.",
+		);
 	}
 
 	/**

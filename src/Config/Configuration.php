@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Config;
 
 use Kristos80\Mule\Failure;
+use function implode;
 
 /**
  * `mule.json`, and the whole vocabulary a consumer has.
@@ -18,6 +19,28 @@ use Kristos80\Mule\Failure;
  * coverage driver is done by wrapping the command, never written down.
  */
 final readonly class Configuration {
+
+	/**
+	 * Everything a consumer may write.
+	 */
+	private const array KEYS = [
+		"source",
+		"tests",
+		"support",
+		"exclude",
+		"mutators",
+		"min-coverage",
+		"threads",
+	];
+
+	/**
+	 * The modes `docs/keying.md` specifies and v1 does not implement.
+	 *
+	 * **Refused rather than ignored**, which is the whole point of naming them: a
+	 * key that is read past is a key somebody sets, watches a green build, and
+	 * believes did something.
+	 */
+	private const array DEFERRED = ["narrow", "signature"];
 
 	/**
 	 * @param string $source The source root, project-relative.
@@ -47,6 +70,8 @@ final readonly class Configuration {
 			throw new Failure("mule.json must be an object, " . get_debug_type($decoded) . " given.");
 		}
 
+		self::assertNothingUnknown($decoded);
+
 		$configuration = new self(
 			self::directory($decoded, "source", "src"),
 			self::directory($decoded, "tests", "tests"),
@@ -63,11 +88,12 @@ final readonly class Configuration {
 	}
 
 	/**
-	 * Every directory whose bytes mule has to watch.
+	 * Every directory a consumer named, which is every directory that has to be
+	 * inside the project.
 	 *
 	 * @return list<string>
 	 */
-	public function roots(): array {
+	private function roots(): array {
 		return [$this->source, $this->tests, ...$this->support];
 	}
 
@@ -188,6 +214,34 @@ final readonly class Configuration {
 		}
 
 		throw new Failure("mule.json gives \"threads\" as something other than \"max\" or a count.");
+	}
+
+	/**
+	 * **A key mule does not know fails rather than being read past.** A typo in
+	 * `min-coverage` is a floor nobody set, and the only sign of it is a gate that
+	 * quietly asks for less than somebody wrote down.
+	 *
+	 * @param array<array-key, mixed> $decoded
+	 * @return void
+	 */
+	private static function assertNothingUnknown(array $decoded): void {
+		foreach(array_keys($decoded) as $key) {
+			if(in_array($key, self::DEFERRED, TRUE)) {
+				throw new Failure(
+					"mule.json sets \"{$key}\", which this version does not implement. It is specified"
+					. " in docs/keying.md §6 and nothing has been built or measured against it, so it"
+					. " is refused rather than ignored — a key that is read past is a key you would"
+					. " believe did something.",
+				);
+			}
+
+			if(!in_array($key, self::KEYS, TRUE)) {
+				throw new Failure(
+					"mule.json gives \"{$key}\", which mule does not know. The keys are "
+					. implode(", ", self::KEYS) . ".",
+				);
+			}
+		}
 	}
 
 	/**

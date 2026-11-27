@@ -95,9 +95,12 @@ final readonly class Snapshot {
 	 * Everything a verdict for a file rests on besides itself: the union of what
 	 * its covering tests execute.
 	 *
-	 * The same rule `Coverage\Attribution` applies to a fresh report, answered
-	 * from the store instead — which is what lets a run decide it has nothing to
-	 * do without generating one.
+	 * **One rule, two sources.** `Runner\Run` builds a snapshot out of a fresh
+	 * coverage pass and asks it the same question; this one answers from the store.
+	 * That is deliberate and load-bearing: a run that keyed a file differently from
+	 * the way the store re-keys it would bank verdicts no later run could ever
+	 * match, and the cache would simply never hit — silently, with every run still
+	 * correct and still as slow as the first.
 	 *
 	 * @param string $file
 	 * @return list<string>
@@ -219,25 +222,6 @@ final readonly class Snapshot {
 	 */
 	public function vouchesFor(string $path, string $key): bool {
 		return isset($this->verdicts[$path]) && $this->verdicts[$path]->holds($key);
-	}
-
-	/**
-	 * Of the paths given with their current keys, those this snapshot cannot
-	 * vouch for — because it never proved them, or because they have moved.
-	 *
-	 * @param array<string, non-empty-string> $keys Path to the key it has now.
-	 * @return list<string>
-	 */
-	public function outstanding(array $keys): array {
-		$outstanding = [];
-
-		foreach($keys as $path => $key) {
-			if(!$this->vouchesFor($path, $key)) {
-				$outstanding[] = $path;
-			}
-		}
-
-		return $outstanding;
 	}
 
 	/**

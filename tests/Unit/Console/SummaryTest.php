@@ -123,7 +123,7 @@ final class SummaryTest extends TestCase {
 			. "  not proven  1 file(s)\n"
 			. "  excluded    1 file(s), not gated at all\n"
 			. "\n"
-			. "Not proven:\n"
+			. "Not proven, and was not before this run either:\n"
 			. "  src/B.php\n"
 			. "\n"
 			. "Not banked, edited while the engine ran:\n"
@@ -151,11 +151,29 @@ final class SummaryTest extends TestCase {
 		);
 	}
 
-	public function testAnUnprovenProjectNamesEveryFile(): void {
+	/**
+	 * **What this run broke and what it inherited are different messages.** "You
+	 * have just broken this" is something somebody acts on; "this has been broken
+	 * since before you started" is a backlog, and one list for both makes the first
+	 * invisible inside the second.
+	 *
+	 * @return void
+	 */
+	public function testWhatThisRunFoundIsSeparateFromWhatItInherited(): void {
 		$store = $this->store(["src/B.php", "src/C.php"]);
-		$text = $this->text(Finding::settled($store, $this->standing($store)));
 
-		self::assertStringContainsString("Not proven:\n  src/B.php\n  src/C.php", $text);
+		$text = $this->text(Finding::proven(
+			$store,
+			$this->standing($store, ["src/A.php", "src/B.php", "src/C.php"]),
+			["src/A.php" => "key-a", "src/B.php" => "key-b"],
+			[],
+		));
+
+		self::assertStringContainsString("Not proven, found by this run:\n  src/B.php\n", $text);
+		self::assertStringContainsString(
+			"Not proven, and was not before this run either:\n  src/C.php\n",
+			$text,
+		);
 		self::assertStringContainsString("NOT PROVEN: 2 file(s) have mutants nothing killed.", $text);
 	}
 
@@ -163,7 +181,22 @@ final class SummaryTest extends TestCase {
 		$store = $this->store();
 
 		self::assertStringNotContainsString(
-			"Not proven:",
+			"Not proven",
+			$this->text(Finding::settled($store, $this->standing($store))),
+		);
+	}
+
+	/**
+	 * A run that measured nothing found nothing, so everything unproven is
+	 * inherited.
+	 *
+	 * @return void
+	 */
+	public function testARunThatMeasuredNothingInheritsEveryEscape(): void {
+		$store = $this->store(["src/B.php"]);
+
+		self::assertStringContainsString(
+			"Not proven, and was not before this run either:\n  src/B.php",
 			$this->text(Finding::settled($store, $this->standing($store))),
 		);
 	}

@@ -2,132 +2,128 @@
     "toolchain": "9e363adac7c0c683050c39f139cfc71922ec7caac6406a6063522f90f4523f67",
     "verdicts": {
         "src/Cache/Key.php": {
-            "key": "5076a7c30202cdc9e5cc1135f16c01216af9e5fbaa46658a200abaf1c0a9d787",
+            "key": "2bc310034302ad4b5e18598681539312115c022e7e35d8f31ffdacaf96174c6a",
             "mutants": 5
         },
         "src/Cache/Snapshot.php": {
-            "key": "c5fe36c6320ff6bc8518a8481d2815151817d887e5abe183407104f259247308",
-            "mutants": 58
+            "key": "aebb3c8a73d017a563e821fa0e9c96435e29d62bdbbdd540046d1b2f57ce757d",
+            "mutants": 54
         },
         "src/Cache/Standing.php": {
-            "key": "33455a78fb70530c1a2582be50a7e8414ba63843915c0362f3b81db19e84eab5",
+            "key": "41032481f1c368fa18fcc169c9b2669129e35bda79f6cc409b91336a91ec259d",
             "mutants": 49
         },
         "src/Cache/Store.php": {
-            "key": "a5200076b1a039cdccfc01079afc7f429b9b9f148185e45e4c20becaabec03e9",
+            "key": "6501e0771d39dc74ba33e043c9995281624c26b56e0ebd7222e0a7565ad850a0",
             "mutants": 9
         },
         "src/Cache/StoreFormat.php": {
-            "key": "d707e8b84d73274ac1e089eca55375752ce125e84980da43caeff287356b24cc",
+            "key": "6a29de4e9d145a62fa4b91c8960e384fa2c6428d4bbbdd7575fd44128f13f747",
             "mutants": 92
         },
         "src/Cache/Toolchain.php": {
-            "key": "ec6d65d36e49329cfb3c2719dd8a0768e7cf02f7e2d3a5a3d74f8ba6b0411e54",
+            "key": "52a7cafee0f86383d398bb2957d85cdab44c62ee3ab4747b254cc66147b2e31f",
             "mutants": 4
         },
         "src/Cache/Verdict.php": {
-            "key": "038831b5e76140f4cafd08270d21aae32a319f3e10c5bd8cdf71ee1360b53ba7",
+            "key": "97025c652c794101c3bc65568db90f01f1c344396e032006aad760e07bf7ffcc",
             "mutants": 2
         },
         "src/Config/Configuration.php": {
-            "key": "1868462c80de4203528058f4c86df9cf86092d0e7c10ec9fc61c3270b89683aa",
-            "mutants": 109
+            "key": "251dada049669249ce76cfc142588938cbb3c3a9e2ec40d909e938de4afe2d46",
+            "mutants": 127
         },
         "src/Console/Application.php": {
-            "key": "b84187bdb095403a450cff1446a5c7ee414585f1f4e04476bb59f1b60f88a2cd",
+            "key": "d7cbcba806db045799d08a8e78e447ec90d07ccd3f048bcf7196a5ef9c9bcd81",
             "mutants": 30
         },
         "src/Console/Composition.php": {
-            "key": "85a9e41ede40306c24dfb44b5abef18fbb434c897a8ead9b50655f3c0142ef39",
+            "key": "033ea26e65c46d1372e992c7d6d774d33fa2b9e203122faf59cd0f1389cb4e27",
             "mutants": 27
         },
         "src/Console/Summary.php": {
-            "key": "197de42acf439161f8ce0023fdfd31eda45e4834a0db45f0f8cca3000a500013",
-            "mutants": 68
-        },
-        "src/Coverage/Attribution.php": {
-            "key": "23d8ea6cf287681eb653531e0232f64aac35047f5e4023e1128c13edeba6ad36",
-            "mutants": 20
+            "key": "7cbdca9a9d564cfb52264444aa62d217790dde682e24a42779f21b564ea15ace",
+            "mutants": 71
         },
         "src/Coverage/Capture.php": {
-            "key": "cfe010b2bd5a04a19a286b04c6e2f32dbfd3e89068b96823cbd5d7faf84ffd7d",
-            "mutants": 46
+            "key": "3e5710da253800bbcc0d6c4bc94569cc693283129d43545298d49121c0ee2e1e",
+            "mutants": 45
         },
         "src/Coverage/Merge.php": {
-            "key": "b472f56374a2d0054b492056b9fc8abbefcf5880a9c29736a3a5814057c2c69f",
+            "key": "1a108d03d047ec74b4c2d2d1a3b6c2938feb817e645bcf2fdffc96071834aa0c",
             "mutants": 11
         },
         "src/Coverage/Report.php": {
-            "key": "86aad9356cdb205e3fe9c73f1f4dedd0327060c96eb6e7b31b9fcedd147d7558",
+            "key": "765707d63e1d6e7fc69d51f7b015cd0ff0b2a2b09fd2f2f7df16f03816eb5db3",
             "mutants": 27
         },
         "src/Coverage/Shard.php": {
-            "key": "6cd53567e2383ea742fa5611d9e66f77a9e976809e40cf50bf25642ed879a878",
-            "mutants": 35
+            "key": "0404a56f6af660ad420c28b793358ce9cc92e75ac60c15d2ec5efd8e089f68d7",
+            "mutants": 33
         },
         "src/Coverage/ShardFormat.php": {
-            "key": "4e15fa011d18ed4da2a146589f1e86556237e32e1b3b1d3d26c1261eb42bc5ce",
+            "key": "557d1b54cae4b7ac6344fe414933f9e21cd82ee6018839caa27ff6fd0be5c921",
             "mutants": 74
         },
         "src/Coverage/Soundness.php": {
-            "key": "72da2d50b61a5ff0a0be4fe5369b6603763fb46ddd8f954c118d40111d810484",
+            "key": "580d872efd760c8bf48d9a79bdacb30afb4a26ab9873ca3a91244b8936adb555",
             "mutants": 38
         },
         "src/Coverage/Split.php": {
-            "key": "8286a08eaf480612b5aab4240d4f8dd2822b4911d879340e794914154293da33",
+            "key": "def3fd1853797ac76cbcf1ece8f32ce8453eef32000b26c699049f9b56d84410",
             "mutants": 21
         },
         "src/Coverage/TestResults.php": {
-            "key": "34eb3765cf25053343effeb8096390441019b2eea1466273ffb232f24a17dd1f",
+            "key": "52539035b3546b023236af9b914a0d41869140cd5621cb6cb3a2e6a622469200",
             "mutants": 20
         },
         "src/Coverage/Timings.php": {
-            "key": "aa17883d4fff7b13808db508ab33b42a4653cbb411fb41c0c7d19f0844173ddb",
+            "key": "d352e0ebcb04a5c1af0bc5d6693218773610576f6f405b3becf2326f748488fa",
             "mutants": 43
         },
         "src/Engine/Declaration.php": {
-            "key": "c043b5741434ec9c45842baa85b781a716acbe7670f5dd0036c77f41001c820b",
+            "key": "590e5f6de270f1c3e360eba39cf0ec06fe745e27ff3102105ce33ae4726dd242",
             "mutants": 22
         },
         "src/Engine/Gate.php": {
-            "key": "8cf829610b052c9085158496ebc1c4ce5b3f10e06f7e3649b95e8b1992ff3afe",
+            "key": "0ca427c1e2b894b87ac719e49c43baef1b7faaf5de214b536a63d6c55134d64f",
             "mutants": 29
         },
         "src/Engine/Outcome.php": {
-            "key": "a8e902f3f0642b308993585bb37226b400f7e65f34fcc8ca6ecfb568a276e663",
-            "mutants": 58
+            "key": "a7dcdcea02c750263fcec47db7bcfd3f534627c97b182a9101755b85ab58d8da",
+            "mutants": 56
         },
         "src/Project.php": {
-            "key": "4cecad01a3b8d56e78422a4b806070cab4772902236c0087dcb7eeb6812e67c4",
+            "key": "c7f2ddb7c411a9e8bfdbb6f44a28a2803be37dcae84baf80d30375fa0847b6b2",
             "mutants": 5
         },
         "src/Runner/Commands.php": {
-            "key": "f2080c1509f4155d89131bf6763415b4bf059cfe3554fdfbe2bbb620f270935e",
+            "key": "b836ad19dad90bdf9f34a248276212d1d7c00dd87424a6ab0aac8569b3ba7206",
             "mutants": 20
         },
         "src/Runner/Coverage.php": {
-            "key": "07ba2317db7a7c0205f99f19bef27527583d97a543579238358aefbeab7ff80b",
-            "mutants": 60
+            "key": "8f27f21de4bf2e10fc7932c434ef7611bf689d9e56c1ac56642a51f1e1988c8a",
+            "mutants": 82
         },
         "src/Runner/Engine.php": {
-            "key": "f94c7edc49656fe71722a9f1f08636ad06b63f2488f318d17bec16ead40e1b7b",
+            "key": "3ed5a2c7b47643de90a9fbc18508e993decfccf7be5c438577d93762f95d3ffe",
             "mutants": 15
         },
         "src/Runner/Finding.php": {
-            "key": "a7bd2deb853545c8c7c0e7d2a1a1c6d488c4bdc284dfe3a984b4940136f8e36f",
+            "key": "b8b4f985c717ab95ef1477ef9ef50ba55c7765a502cc4204bd1f807972b7ec52",
             "mutants": 18
         },
         "src/Runner/Run.php": {
-            "key": "22019b75e95b78b4c8777c4ef3711beed8cf7552a1bcc09660722b29692d61c9",
-            "mutants": 31
+            "key": "5befd6944918492dfd42a9a64d053e161b4c514225f687b13d8c3d533dd23d3c",
+            "mutants": 36
         },
         "src/Runner/Shards.php": {
-            "key": "445200a1e647f1dcd6e780245a26f34df974995a287a29a2ae90162e98c95df1",
-            "mutants": 23
+            "key": "72148c5f27af4185ffc9f5d7fcbe90ca8f0002e4355fca93053f9fb212c33e2c",
+            "mutants": 25
         },
         "src/Runner/Universe.php": {
-            "key": "492504f9dca07361b6c49f69d752df7b26e2462c2c7520ebc3574e4050a1cbb9",
-            "mutants": 24
+            "key": "4de19ef6476e616e5a90ed5a88715eeabaeed5c2ec6c585d0196d3e83050189f",
+            "mutants": 28
         }
     },
     "unproven": [],
@@ -222,11 +218,6 @@
             "src/Cache/Verdict.php",
             "src/Console/Summary.php",
             "src/Runner/Finding.php"
-        ],
-        "tests/Unit/Coverage/AttributionTest.php": [
-            "src/Coverage/Attribution.php",
-            "src/Coverage/Capture.php",
-            "src/Coverage/TestResults.php"
         ],
         "tests/Unit/Coverage/CaptureTest.php": [
             "src/Coverage/Capture.php",

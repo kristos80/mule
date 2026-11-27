@@ -37,15 +37,17 @@ final class ConfigurationTest extends TestCase {
 		Configuration::of(["tests" => ""]);
 	}
 
-	public function testEveryDirectoryWhoseBytesMatterIsARoot(): void {
-		self::assertSame(
-			["src", "spec", "fixtures", "support"],
-			Configuration::of([
-				"source" => "src",
-				"tests" => "spec",
-				"support" => ["support", "fixtures"],
-			])->roots(),
-		);
+	/**
+	 * Every directory a consumer names has to be inside the project, support
+	 * directories included — and that is checked over all of them at once rather
+	 * than at each use.
+	 *
+	 * @return void
+	 */
+	public function testEveryDirectoryNamedIsCheckedForBeingInsideTheProject(): void {
+		$this->expectExceptionMessage('mule.json names "/shared/fixtures", which is not inside');
+
+		Configuration::of(["source" => "src", "tests" => "spec", "support" => ["/shared/fixtures"]]);
 	}
 
 	public function testPathsAreSorted(): void {
@@ -191,5 +193,57 @@ final class ConfigurationTest extends TestCase {
 		$this->expectException(Failure::class);
 
 		Configuration::of(["support" => ["../fixtures"]]);
+	}
+
+	/**
+	 * **Refused rather than ignored, which is the whole point of naming them.** A
+	 * key that is read past is a key somebody sets, watches a green build, and
+	 * believes did something — and narrowing in particular is a mode `keying.md`
+	 * specifies and nothing has been built or measured against.
+	 *
+	 * @return void
+	 */
+	public function testNarrowingIsRefusedRatherThanIgnored(): void {
+		$this->expectExceptionMessage(
+			'mule.json sets "narrow", which this version does not implement. It is specified in'
+			. ' docs/keying.md §6 and nothing has been built or measured against it, so it is refused'
+			. ' rather than ignored — a key that is read past is a key you would believe did'
+			. ' something.',
+		);
+
+		Configuration::of(["narrow" => TRUE]);
+	}
+
+	public function testACommentStrippedSignatureIsRefusedToo(): void {
+		$this->expectExceptionMessage('mule.json sets "signature", which this version does not implement.');
+
+		Configuration::of(["signature" => "code"]);
+	}
+
+	/**
+	 * A typo in `min-coverage` is a floor nobody set, and the only sign of it is a
+	 * gate that quietly asks for less than somebody wrote down.
+	 *
+	 * @return void
+	 */
+	public function testAKeyMuleDoesNotKnowIsRefused(): void {
+		$this->expectExceptionMessage(
+			'mule.json gives "min_coverage", which mule does not know. The keys are source, tests,'
+			. ' support, exclude, mutators, min-coverage, threads.',
+		);
+
+		Configuration::of(["min_coverage" => 90]);
+	}
+
+	public function testEveryKeyItDoesKnowIsAccepted(): void {
+		self::assertSame(90, Configuration::of([
+			"source" => "app",
+			"tests" => "spec",
+			"support" => ["fixtures"],
+			"exclude" => ["app/Generated.php"],
+			"mutators" => ["@default" => TRUE],
+			"min-coverage" => 90,
+			"threads" => 2,
+		])->minCoverage);
 	}
 }

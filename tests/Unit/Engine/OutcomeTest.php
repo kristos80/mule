@@ -57,12 +57,16 @@ final class OutcomeTest extends TestCase {
 		self::assertSame(0, $this->outcome()->mutants("src/Never.php"));
 	}
 
-	public function testNamesTheFilesItHeardAbout(): void {
-		self::assertSame(["src/Aaa.php", "src/Zzz.php"], $this->outcome()->files());
-	}
-
+	/**
+	 * The log spells a file the way the engine found it; the store spells it
+	 * relative to the project, and a verdict filed under the wrong spelling is a
+	 * verdict for nothing.
+	 *
+	 * @return void
+	 */
 	public function testTranslatesTheLoggedPathsIntoTheStoresSpelling(): void {
-		self::assertSame(["src/Aaa.php", "src/Zzz.php"], $this->outcome()->files());
+		self::assertSame(["src/Aaa.php", "src/Zzz.php"], array_keys($this->outcome()->byFile));
+		self::assertSame(0, $this->outcome()->mutants("/p/src/Aaa.php"));
 	}
 
 	/**

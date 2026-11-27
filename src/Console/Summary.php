@@ -32,7 +32,8 @@ final readonly class Summary {
 			...$this->what($finding),
 			"",
 			...$this->counts($finding, $excluded),
-			...$this->listed("Not proven", $finding->store->unproven),
+			...$this->listed("Not proven, found by this run", $finding->escaped()),
+			...$this->listed("Not proven, and was not before this run either", $this->inherited($finding)),
 			...$this->listed("Not banked, edited while the engine ran", $finding->abandoned),
 			"",
 			$finding->holds()
@@ -80,8 +81,25 @@ final readonly class Summary {
 	}
 
 	/**
+	 * The files that were already unproven before this run looked at anything.
+	 *
+	 * **Separated from what this run found, because they call for different
+	 * things.** "You have just broken this" is a message somebody acts on; "this
+	 * has been broken since before you started" is a backlog. One list for both
+	 * makes the first invisible inside the second.
+	 *
+	 * @param Finding $finding
+	 * @return array<string>
+	 */
+	private function inherited(Finding $finding): array {
+		// Not reindexed: the keys reach nothing but a `foreach`, and the gate
+		// proved an `array_values` here to be an operation with no result behind it.
+		return array_diff($finding->store->unproven, $finding->escaped());
+	}
+
+	/**
 	 * @param string $heading
-	 * @param list<string> $paths
+	 * @param array<string> $paths Keys are not read, only the names.
 	 * @return list<string>
 	 */
 	private function listed(string $heading, array $paths): array {

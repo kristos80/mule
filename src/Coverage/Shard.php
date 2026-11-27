@@ -83,15 +83,6 @@ final readonly class Shard {
 	}
 
 	/**
-	 * Every source file this shard recorded coverage for.
-	 *
-	 * @return list<string>
-	 */
-	public function covers(): array {
-		return array_keys($this->lines);
-	}
-
-	/**
 	 * Whether this shard still describes the tree, given what the files hash
 	 * now.
 	 *

@@ -125,7 +125,7 @@ final class EngineTest extends TestCase {
 	 * @return void
 	 */
 	public function testPathsComeBackInTheStoresSpelling(): void {
-		self::assertSame(["src/A.php"], $this->engine()->over($this->measured(), [])->files());
+		self::assertSame(["src/A.php"], array_keys($this->engine()->over($this->measured(), [])->byFile));
 	}
 
 	/**

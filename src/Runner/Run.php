@@ -66,16 +66,28 @@ final readonly class Run {
 			return Finding::settled($stored, $standing);
 		}
 
-		$measured = $partial ? $this->coverage->refresh($live, $digests) : $this->coverage->whole();
+		$measured = $partial
+			? $this->coverage->refresh($live, $digests)
+			: $this->coverage->whole($this->universe->tests());
 
-		$owed = $this->keys($partial ? $standing->outstanding : $gated, $measured, $digests);
+		// **What is owed is decided after measuring, never before.** The question
+		// Standing answers is "may this run skip measuring altogether", and it has
+		// to answer it from the store — which is the picture as it was. Once a
+		// coverage pass has happened the picture is exact, and a file's key can be
+		// compared against the verdict the store holds for it.
+		$keys = $this->keys($gated, $measured, $digests);
+		$owed = $whole ? $keys : $this->unvouched($keys, $stored);
+
+		if($owed === []) {
+			return Finding::proven($this->recorded($measured), $standing, [], []);
+		}
 
 		// **Before the engine, because G3 is about the report it is being handed.**
 		// A shard describing a version of a file that is gone makes every mutant
 		// the engine then runs a mutant of the wrong lines, and that is cheaper to
 		// refuse than to explain afterwards.
 		$uncovered = $this->soundness->uncovered($measured->capture, array_keys($owed));
-		$outcome = $this->engine->over($measured, $partial ? array_keys($owed) : []);
+		$outcome = $this->engine->over($measured, $whole ? [] : array_keys($owed));
 		$banked = $this->unmoved($owed, $measured);
 
 		return Finding::proven(
@@ -86,6 +98,48 @@ final readonly class Run {
 			$banked,
 			array_keys(array_diff_key($owed, $banked)),
 		);
+	}
+
+	/**
+	 * Of the keys a run computed, those the store cannot vouch for.
+	 *
+	 * **This is where a file that acquired a covering test gets noticed.** Editing
+	 * one test so that it also runs `B.php` moves `B.php`'s closure — it now
+	 * depends on everything that test runs — while `B.php`'s own bytes and the
+	 * store's record of what covers it are both untouched. Asked before the
+	 * coverage pass, nothing about `B.php` has moved; asked after it, its key has.
+	 *
+	 * @param array<string, non-empty-string> $keys
+	 * @param Snapshot $stored
+	 * @return array<string, non-empty-string>
+	 */
+	private function unvouched(array $keys, Snapshot $stored): array {
+		$unvouched = [];
+
+		foreach($keys as $path => $key) {
+			if(!$stored->vouchesFor($path, $key)) {
+				$unvouched[$path] = $key;
+			}
+		}
+
+		return $unvouched;
+	}
+
+	/**
+	 * The store with this run's record of what each test executes written over it,
+	 * and no verdict touched.
+	 *
+	 * **For the run that measured and found nothing owed.** A test file that has
+	 * appeared and covers nothing is the case: the store had never heard of it, so
+	 * the run could not be partial, and once measured it turns out to change no
+	 * key. Recording it anyway is what stops the next run going wide for the same
+	 * reason.
+	 *
+	 * @param Measured $measured
+	 * @return Snapshot
+	 */
+	private function recorded(Measured $measured): Snapshot {
+		return $this->store->bank(new Snapshot([], [], $measured->tests, $this->toolchain));
 	}
 
 	/**

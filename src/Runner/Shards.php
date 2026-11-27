@@ -85,6 +85,23 @@ final readonly class Shards {
 	}
 
 	/**
+	 * Takes a shard away.
+	 *
+	 * **What this exists for is a test that has stopped covering anything.** Its
+	 * own digest moved, so the shard reads as dirty and the test is re-measured —
+	 * and the fresh capture attributes nothing, so nothing overwrites it. Left on
+	 * disk it is read back by the merge, which hands the engine a report claiming
+	 * coverage from a test that no longer provides it: exactly the stale evidence
+	 * the cache exists to prevent.
+	 *
+	 * @param string $test
+	 * @return void
+	 */
+	public function forget(string $test): void {
+		$this->filesystem->remove($this->at($test));
+	}
+
+	/**
 	 * The shards for the test files named, skipping any the cache does not hold.
 	 *
 	 * A test file with no shard is the covers-nothing case (M16): a class that

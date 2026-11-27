@@ -338,7 +338,15 @@ it if it is tracked. mule will not move it for you.
 
 `"narrow": true` is **rejected with an error** rather than ignored, and so is
 `"signature": "code"`. Neither is built (§4), and refusing them is how nobody comes
-to depend on a mode that does not exist.
+to depend on a mode that does not exist. So is a key mule does not recognise at
+all: `min_coverage` for `min-coverage` is a floor nobody set, and the only sign of
+it would be a gate quietly asking for less than you wrote down.
+
+**One test class per test file.** The shard cache is keyed by test file and a
+coverage report is split by test class, so a second class in the same file would
+overwrite the first — and the next warm run would merge one of them, leaving
+whatever the other covered looking unreached. mule refuses the layout with a
+message naming both classes rather than caching half of it.
 
 `exclude` names files that are neither mutated nor required to have coverage —
 thin I/O wrappers you test another way, interfaces, and value objects with no
