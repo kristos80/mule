@@ -219,9 +219,17 @@ All nine, with the measurements: [`docs/keying.md`](docs/keying.md) §7.
 
 ## Requirements
 
-PHP 8.4+. PHPUnit 13 and Infection 0.32 are pinned dependencies rather than
+PHP 8.4+. PHPUnit 13.1 and Infection 0.32.7 are pinned dependencies rather than
 things you install alongside: what a verdict means depends on them, so they are in
 the cache key and mule has to know exactly which ones it got.
+
+> [!IMPORTANT]
+> **The PHPUnit pin is `~13.1.14`, and that ceiling is a consequence rather than a
+> choice.** Infection 0.32.7 accepts `sebastian/diff` up to `^8`; PHPUnit 13.2 and
+> up require `^9`. So mule cannot currently be installed alongside PHPUnit ≥ 13.2,
+> which includes any project on **Pest 5**. Infection 0.35 lifts the restriction
+> and bumping it is on the list — it costs re-verifying the nineteen mechanics
+> `docs/keying.md` establishes against 0.32.7.
 
 A coverage driver — Xdebug or PCOV — for the capture. The mutation run needs none,
 and is deliberately not given one.

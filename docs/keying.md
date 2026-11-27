@@ -1167,6 +1167,33 @@ something to engineer around.
   altogether — and the owed list is a comparison of fresh keys against banked
   verdicts. One consequence is an improvement: a file that has appeared now makes
   the *capture* whole but the mutation run filtered to what actually moved.
+- **The pinned toolchain has a ceiling nobody chose, and it blocks the intended
+  consumer.** Measured by trying to install v5 into the 613-file application:
+
+  | package | requires `sebastian/diff` |
+  |---|---|
+  | Infection 0.32.7 | `^4 \|\| ^5 \|\| ^6 \|\| ^7 \|\| ^8` |
+  | PHPUnit 13.1.14 | `^8.3.0` |
+  | PHPUnit **13.2.0 and up** | `^9.0` |
+
+  So pinning Infection `0.32.7` caps PHPUnit at **13.1.x**, and the declared
+  `^13.1.14` admitted 13.2–13.5, none of which can resolve. The constraint is
+  `~13.1.14` now, which fails with one legible line instead of a conflict tree —
+  but the ceiling is real and it is not where anybody wanted it.
+
+  Two consequences for the application: it runs **Pest 5**, which requires PHPUnit
+  `^13.4`, and mule starts `vendor/bin/phpunit` by name. So v5 cannot be installed
+  there as either project stands, and the end-to-end saving figure (§2, §5) is
+  still a hand measurement for that reason rather than for want of trying.
+
+  **Infection 0.35.12 accepts `sebastian/diff ^9.0`**, so bumping it lifts the
+  ceiling. What that costs is re-verification: M1–M19 and G1–G9 were all
+  established against 0.32.7 — the JSON log's shape, the `uncovered` key name
+  (M6), `killedByStaticAnalysis` (M15), the MSI arithmetic (M14), the skipped-mutant
+  behaviour (M12). The differential fixture (§7) is the instrument for that,
+  because it compares the pipeline against the engine's own verdicts mutant by
+  mutant; it is not a substitute for re-reading the log format.
+
 - **`doctor`'s thresholds are judgements, not findings.** 25 % for dense, 40 % for
   a hot spot, 100 files for small. They were chosen to put the two projects this
   document measures on the sides their figures argue for, and nothing more — so

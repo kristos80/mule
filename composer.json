@@ -21,7 +21,7 @@
         "ext-xmlwriter": "*",
         "infection/infection": "0.32.7",
         "phpunit/php-code-coverage": "^14.5.2",
-        "phpunit/phpunit": "^13.1.14"
+        "phpunit/phpunit": "~13.1.14"
     },
     "require-dev": {
         "phpstan/phpstan": "^2.3",
