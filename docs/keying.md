@@ -1181,10 +1181,15 @@ something to engineer around.
   `~13.1.14` now, which fails with one legible line instead of a conflict tree —
   but the ceiling is real and it is not where anybody wanted it.
 
-  Two consequences for the application: it runs **Pest 5**, which requires PHPUnit
-  `^13.4`, and mule starts `vendor/bin/phpunit` by name. So v5 cannot be installed
-  there as either project stands, and the end-to-end saving figure (§2, §5) is
-  still a hand measurement for that reason rather than for want of trying.
+  The consequence for the application: it installs **Pest 5** as its runner, and
+  Pest requires PHPUnit `^13.4` — so the two cannot share a `composer.json` and
+  the end-to-end saving figure (§2, §5) is still a hand measurement for that
+  reason rather than for want of trying.
+
+  **The test *style* is not the problem**, and an earlier draft of this paragraph
+  said it was. Checked: the application's tests are plain `PHPUnit\Framework\TestCase`
+  classes and it has a `phpunit.xml`, so `vendor/bin/phpunit` runs them and mule
+  needs no Pest adapter. The single blocker is the `sebastian/diff` ceiling above.
 
   **Infection 0.35.12 accepts `sebastian/diff ^9.0`**, so bumping it lifts the
   ceiling. What that costs is re-verification: M1–M19 and G1–G9 were all

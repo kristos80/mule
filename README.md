@@ -227,9 +227,13 @@ the cache key and mule has to know exactly which ones it got.
 > **The PHPUnit pin is `~13.1.14`, and that ceiling is a consequence rather than a
 > choice.** Infection 0.32.7 accepts `sebastian/diff` up to `^8`; PHPUnit 13.2 and
 > up require `^9`. So mule cannot currently be installed alongside PHPUnit ≥ 13.2,
-> which includes any project on **Pest 5**. Infection 0.35 lifts the restriction
-> and bumping it is on the list — it costs re-verifying the nineteen mechanics
-> `docs/keying.md` establishes against 0.32.7.
+> which includes any project whose runner is **Pest 5**. Infection 0.35 lifts the
+> restriction and bumping it is on the list — it costs re-verifying the nineteen
+> mechanics `docs/keying.md` establishes against 0.32.7.
+>
+> This is about the *constraint*, not the test style: plain
+> `PHPUnit\Framework\TestCase` classes are what mule runs, and a project whose
+> tests are those needs no adapter.
 
 A coverage driver — Xdebug or PCOV — for the capture. The mutation run needs none,
 and is deliberately not given one.
