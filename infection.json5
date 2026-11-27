@@ -12,6 +12,7 @@
 			"External/PhpFilesystem.php",
 			"External/PhpLines.php",
 			"External/ShellProcesses.php",
+			"External/StreamProgress.php",
 			"External/StreamOutput.php"
 		]
 	},

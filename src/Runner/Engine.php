@@ -8,8 +8,10 @@ use Kristos80\Mule\Engine\Declaration;
 use Kristos80\Mule\Engine\Outcome;
 use Kristos80\Mule\External\FilesystemInterface;
 use Kristos80\Mule\External\ProcessesInterface;
+use Kristos80\Mule\External\ProgressInterface;
 use Kristos80\Mule\Failure;
 use Kristos80\Mule\Project;
+use function count;
 use function implode;
 use function json_decode;
 use const JSON_THROW_ON_ERROR;
@@ -37,6 +39,7 @@ final readonly class Engine {
 	 * @param Report $report
 	 * @param Declaration $declaration
 	 * @param Project $project
+	 * @param ProgressInterface $progress
 	 * @param string $scratch Project-relative; the declaration resolves its own paths against the project root (M11).
 	 */
 	public function __construct(
@@ -46,6 +49,7 @@ final readonly class Engine {
 		private Report $report,
 		private Declaration $declaration,
 		private Project $project,
+		private ProgressInterface $progress,
 		private string $scratch,
 	) {}
 
@@ -64,11 +68,21 @@ final readonly class Engine {
 		// died on startup would otherwise read yesterday's verdicts and bank them
 		// against today's keys.
 		$this->filesystem->remove($log);
+
+		$this->progress->begin("Rendering the report the engine reads");
 		$this->report->write($measured->capture, $measured->timings, $coverage);
 		$this->filesystem->write($declaration, $this->declaration->rendered());
 
+		$this->progress->begin(
+			"Mutating " . ($files === [] ? "every gated file" : count($files) . " file(s)"),
+		);
+
 		$command = $this->commands->mutate($declaration, $coverage, $files);
-		$completed = $this->processes->run($command, $this->project->absolute(""));
+		$completed = $this->processes->run(
+			$command,
+			$this->project->absolute(""),
+			waiting: $this->progress->tick(...),
+		);
 
 		if(!$this->filesystem->exists($log)) {
 			throw new Failure(

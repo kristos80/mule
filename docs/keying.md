@@ -336,6 +336,15 @@ and the project's last, so the loader that answers about the project's tests is
 the project's. And `doctor` should say so when it finds mule among the project's
 own dependencies while running from outside it.
 
+**M21 — `proc_close()` answers `-1` once `proc_get_status()` has reaped the
+child.** The first status call that reports `running: false` also collects the exit
+code, after which `proc_close()` has nothing left to report. So a wrapper that
+polls — which mule's does, so that something can say it is alive during the minutes
+it spends blocked — must take the code from `proc_get_status()['exitcode']` and
+ignore what `proc_close()` returns. A loop that trusted `proc_close()` would read
+**every successful run as a failure**, and the first thing that would notice is G6
+refusing a suite that passed. `tests/Integration/ProcessTest.php` holds it down.
+
 **M20 — Infection refuses to run under `auto_prepend_file`.** From 0.35:
 `PreloadedSourceFound` aborts the run before the first mutant, because a preloaded
 file executes before the mutant interceptor can be installed — so the engine

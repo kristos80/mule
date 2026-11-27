@@ -1,157 +1,193 @@
 {
-    "toolchain": "79689f1190bd950b156024aabd3a483cee7c0b3fb2950814fdc785a1f58314f6",
+    "toolchain": "808e37e65281eda4e248dd7b4f98fede9978b5d5d9da05e1c4b17af1a7375489",
     "verdicts": {
         "src/Cache/Footprint.php": {
-            "key": "f9634f1611272bb1ee6ab8a0f6fb8b0defae8f2abb9c1b1a53647ab9d84bc872",
+            "key": "65d7788e44f2f1a661586c20c3294a117b90a452190640dc6d41a79a473de624",
             "mutants": 7
         },
         "src/Cache/Key.php": {
-            "key": "e7ad050edcaa1557b3c4d8d2256ccf9da81c7c33e212d36970b4c29fa584baf7",
+            "key": "97286a282c850a06e2edbaf1c4352ac8b3c3c2711b4508df79b8c3bb51f2d983",
             "mutants": 5
         },
         "src/Cache/Lapse.php": {
-            "key": "6029739d1e0a56752ca64690bb129897ff0149994b7d79571883691c5ac79a75",
+            "key": "965b098632d272c88edb29be69d2668d4d3a30e2b2a09be91936eddd2d5bcabc",
             "mutants": 24
         },
         "src/Cache/Snapshot.php": {
-            "key": "5d3cffa59e1d79f5b5df87d1839dd467ecb152bbefaa1c6bc2d5269087deb057",
+            "key": "3ff31c0341200994a711f0f98f607c252183805de8cd526cfb33b80b0936b41b",
             "mutants": 62
         },
         "src/Cache/Standing.php": {
-            "key": "f938776fa356521ded875020d089e730acf0ae5e19663c4fbaf7f5b840fbcaf3",
+            "key": "caea9622383b15fc834cc2a26d295812ea50b8e8ea8b089c6ce4588b3f13b5c6",
             "mutants": 50
         },
         "src/Cache/Store.php": {
-            "key": "8b31c4c41bfb5a7286036dc4f8f24a3f1054f49ff1aa1739886c7d3d44ae7128",
+            "key": "14f61bcfab2e627d23cdcabe53e2da16e8fedc4f9ac0c75348b794e97c4302d8",
             "mutants": 9
         },
         "src/Cache/StoreFormat.php": {
-            "key": "38539a1ac50d00fb9c20dda0558c31b2754f9a365ef6b7ea3cd5c6bbb123ddf4",
+            "key": "35538e3da029305cda4ebb77f0df6ab9e7c8a76c79ecb9b1cb61f371737fdfc7",
             "mutants": 125
         },
         "src/Cache/Toolchain.php": {
-            "key": "a1d9dfec331c9e39dcd721649170ff36545eaf199dc05d0d4914bdc0e1b417f3",
+            "key": "1206f7c8567ec0ce4dc30f651e7dbe9c610a25e17b02ad48983bca612c6087a2",
             "mutants": 4
         },
         "src/Cache/Verdict.php": {
-            "key": "05f73da912ca77d18894eb20c5b9a8973787bc697338303007406e260138147e",
+            "key": "5e4c4741b10f9d002ce16f2dabfd59a8a4a388955a927a6f91c4a26e489f3a7f",
             "mutants": 2
         },
         "src/Config/Configuration.php": {
-            "key": "3ff7dc1c68e1c5193d867f27a169044018ce9fa54bee5bb394a0dcd9cef82bd2",
+            "key": "e9e88acfad785e2777e581c66cf11880b007c2fa5796585cc88068bbf239c570",
             "mutants": 127
         },
         "src/Console/Application.php": {
-            "key": "4dcbc6c439913722b94ab02df76acc97608d699bef7ab0949935e5ed4af0a872",
-            "mutants": 37
+            "key": "6f155993c51663d73d3e40937bebbe80169890164b18bdee7dd14b99a08458c4",
+            "mutants": 43
         },
         "src/Console/Composition.php": {
-            "key": "b18ebb37b01ff04cead2d2c3203485d06a344f1dcd764bbe0ce341138291528b",
+            "key": "95b9ce91bfb3932106fd217cf5d025867ac929447c53db0df10dab112a6ba9d1",
             "mutants": 27
         },
         "src/Console/Prognosis.php": {
-            "key": "30809427924aba735c9b4dedb2d8d62d60358eee15c94482fb8c9362112d6ce6",
+            "key": "1dc917409033234f87276b899a54de758ccfc6899c3d97ce21f4b88f0c705cb2",
             "mutants": 40
         },
         "src/Console/Summary.php": {
-            "key": "bb72c0b0e09e5e04e702c76ebdfc5422620fcfba669dd4b768208f5c68a7fceb",
+            "key": "b9bde27c0b371d9db185ab6254a348bf8bff5b150e1efd745cdcdb25277bc580",
             "mutants": 84
         },
         "src/Coverage/Capture.php": {
-            "key": "c6a01b9a417f66409422c0575e230084567e4f2a1a12c35618f95f8ce6f8c5dd",
+            "key": "6309f599fbf7a1a5589b393e3fc77f77c4632576e961c9a9eb3f3c0bea899f08",
             "mutants": 45
         },
         "src/Coverage/Merge.php": {
-            "key": "1a5ae0f6ed0b92728b6d63f7f6f9c9989acb36d1c9233064eaf9ff2d31624ea3",
+            "key": "04dfdc7c872cec9ca06625e86171d6e1093578110af0882e0829aff4db167c11",
             "mutants": 11
         },
         "src/Coverage/Reach.php": {
-            "key": "5cc8d4e605ad84e401deb54c3d037fcf21fec5745bf36958e56a5d3f835c34e5",
+            "key": "c9f38cf789c3696790e8d629200059b591c5c7942b3c5f092489924a2a4ef99b",
             "mutants": 11
         },
         "src/Coverage/Report.php": {
-            "key": "d5ccc420e4f4638b35612f67f475a2cbe7f2dca23c664889af246af12050fb21",
+            "key": "b5338ea82b99239778193e6837fbbe14b2b93b75506566b11d3d4fa262c1c511",
             "mutants": 27
         },
         "src/Coverage/Shard.php": {
-            "key": "aa8a0015708a8e74b15e6f3053e8bdd1d97409cba99ecc98bc029c5acb80a64c",
+            "key": "274628a28d0ebf09ef3bfe46fd3f1ddccf116a665cd81164f03a3d7683cb5746",
             "mutants": 33
         },
         "src/Coverage/ShardFormat.php": {
-            "key": "32a3b8505dacc3959389bc103440959e5b71f69d36c184eb776e7f9b572c1c1d",
+            "key": "1ea0bf4a3e4e1cfefd1a9745504b2696e0517242d1f94a842797768275998afb",
             "mutants": 74
         },
         "src/Coverage/Soundness.php": {
-            "key": "f44e359d635ef332516349fe38c97e30f4dc18cd626e4c3afb3edd31a620ed65",
+            "key": "e34d8068ff370468b8376cba438a0b62f4b2f552212555e803c743f92f318ff2",
             "mutants": 35
         },
         "src/Coverage/Split.php": {
-            "key": "5c194bd311d37c1c248e9fe406797072cab7c864fd8e5e40154bb575d9880da6",
+            "key": "ef968bb7a15ee5fe21788c9330c963c865023d72a5994c0d51e675e17ea2934b",
             "mutants": 21
         },
         "src/Coverage/TestResults.php": {
-            "key": "1cf36067844d53dc542604e8301be9d4e09e64cc7726aafe59873082135e3c0f",
+            "key": "4c218fdca32aad34bbb68b2b3c40c561332baf4c18978071a3e6c9445255c86e",
             "mutants": 20
         },
         "src/Coverage/Timings.php": {
-            "key": "1b8887550fd145d50d896aeb3c0866857e3433c0fb0db44e3052f76551c7e6c5",
+            "key": "5dae3e21280d062a7d28f904ed16faccdf4442c1b52f366fbacf32e709ce920e",
             "mutants": 43
         },
         "src/Doctor/Diagnosis.php": {
-            "key": "ceff191fca1b709fa91201583ef323f2b7922e03cb9992edf08b72db077e8c17",
+            "key": "bfaf911c82d6dd65c0bcee291e02873aeb66a581d0132f0cecda5ba5235bed5f",
             "mutants": 10
         },
         "src/Doctor/Spread.php": {
-            "key": "b169bd0c99edc4f87f32afb3700197792376538b2fb36711385efd1eebd5100f",
+            "key": "8d6a61afd6da774ad297c2557852b08f2268f55d05df389e9305248548b9e6c4",
             "mutants": 34
         },
         "src/Doctor/Tier.php": {
-            "key": "f28b2f53d877796a6f9e3e548b03f53389e7c6b8f16e3049fd385d724bd7ba26",
+            "key": "1d7190d2b9d5fc2e6c252b63b246e8c3f13ef3b0a52e67d9b88bb0880c0b2a69",
             "mutants": 38
         },
         "src/Engine/Declaration.php": {
-            "key": "676c0066af5535bd6e86601cce9d55c1259aab85bffc2a787c6d394d57968a8f",
+            "key": "0be635e9ad41497371e347d0b48dac3118c54e6cbd11792116ef1dcf0a872bd7",
             "mutants": 22
         },
         "src/Engine/Gate.php": {
-            "key": "fcdd01d5568b094bd4728d4699650ac48f89d67da422e2ff644bcad9e17956ec",
-            "mutants": 39
-        },
-        "src/Engine/Outcome.php": {
-            "key": "c1c7b4d9206ecbf4c3eb45cf754c59e02bec9d7fb47129c4760edaed734c0d48",
+            "key": "167edc1a59da33d60cfbdd21ea6506a71c988cb0b0fb7b1bccc38856dd7e4ca8",
             "mutants": 56
         },
+        "src/Engine/Outcome.php": {
+            "key": "6789c62c7975674f91108022151521001e4a74d53c0fdddc908c206d31b04158",
+            "mutants": 56
+        },
+        "src/External/ClassesInterface.php": {
+            "key": "b942f72f63a56ae1af76fc3a898ef2eefc7527d8c176912ca5be1b2689a7063d",
+            "mutants": 0
+        },
+        "src/External/CoverageReportInterface.php": {
+            "key": "572e1e59b1b5b7420abeebb61157a941dd2c14e96ec0113a3a0b2c208c635581",
+            "mutants": 0
+        },
+        "src/External/EnvironmentInterface.php": {
+            "key": "ac0511c6df7e54369d9669674d7cd7aad5b3a90662cc5e77e4a6b047bed170f9",
+            "mutants": 0
+        },
+        "src/External/FilesystemInterface.php": {
+            "key": "f01eea151c9f042db4bda67220c0773966179368d7765691e2577938d7a4992f",
+            "mutants": 0
+        },
+        "src/External/LinesInterface.php": {
+            "key": "37799b7c2aaaefd5fe5908c9807efb21c29cd6ceffabed7e4b620ac003a10f0e",
+            "mutants": 0
+        },
+        "src/External/OutputInterface.php": {
+            "key": "8659aa5680b87166cceb4d790987976ad1de0aa2ca436b335e7ffa87f2189305",
+            "mutants": 0
+        },
+        "src/External/ProcessesInterface.php": {
+            "key": "29eb3013917b8c6eb47a65e30cb4af1afda253d0545e7c52db37b52c5bccf76f",
+            "mutants": 0
+        },
+        "src/External/ProgressInterface.php": {
+            "key": "799d390fcc9e76aaec5268f0c0a11b0f9dd4aba8eb93d2f1438629589a8281a2",
+            "mutants": 0
+        },
+        "src/Failure.php": {
+            "key": "321c82640109b0a7a5ad1d361d546fa125069c79dfe8baec08d315d070252a77",
+            "mutants": 0
+        },
         "src/Project.php": {
-            "key": "95c61bead1138bf09e239d3e235738b83012887f7ee5459297a18209420cb11f",
+            "key": "1a9269b577df0a89143967c96a11a1ca70c2220fb5f261fa4bc06ccefdb67067",
             "mutants": 5
         },
         "src/Runner/Commands.php": {
-            "key": "16f21c7ff94e50578ed612af8e13daa4362d8bc9809b96e724b83b4a19e1d201",
+            "key": "5aa1a145e6ca3aac2a2ced3140b98554f99bea666472063aa196d80f25f83ef8",
             "mutants": 20
         },
         "src/Runner/Coverage.php": {
-            "key": "2766570eb95d0f6db52eda3a63e27660404e07dc8a33ba7f90da2b972a983a3c",
-            "mutants": 83
+            "key": "3e7e14552699368cfbe4054890872eaa38db4ad1690233d960d6abe6ec164a51",
+            "mutants": 114
         },
         "src/Runner/Engine.php": {
-            "key": "ad0414447e58ce25e1ac40db52fd1b6003f8c415e25323ae8b36cc11fa1566be",
-            "mutants": 15
+            "key": "890abe847b419f857a761609d2e5013f71c0aea1825ac7426b4d3e88611f2f6d",
+            "mutants": 24
         },
         "src/Runner/Finding.php": {
-            "key": "327481eae9d5173bf9b004841fa1737c964c15d359ab24ba926d707861cb85dc",
+            "key": "879297fe5afb6ce989a6245b02643b1a3f10fca527656cb0744625e76455aedf",
             "mutants": 18
         },
         "src/Runner/Run.php": {
-            "key": "aeec8b9e2f78bd1215d792dd6e4b2b656496752d4892b1d16e9d4882e97b4567",
+            "key": "b483ca80de06746b576d0ff986c8a21399c9ffd7e1dc5a9bfce52633f8928da7",
             "mutants": 38
         },
         "src/Runner/Shards.php": {
-            "key": "dcf699bda0091db525f9f39799da435ed89bc8284c0464b30b47b362fc8e7d77",
+            "key": "09f457f4ac115c860c44b133071a782b48355a90ffc9b3a8c6443663b9e15373",
             "mutants": 25
         },
         "src/Runner/Universe.php": {
-            "key": "839fd77ad4a27d20b7007a41ebf71913f4c9190ceef474bfdfeeb06f541b3ba1",
-            "mutants": 28
+            "key": "db8b8020429bc53a8fa34a15e5aa4027811a5a3458b519f81184bff9f5f61324",
+            "mutants": 30
         }
     },
     "unproven": [],
@@ -223,7 +259,7 @@
             ]
         },
         "tests/Unit/Console/ApplicationTest.php": {
-            "sig": "368669d8e564b691a8e93d39e9c1cccdc8d6bf8243307e241a0ed3e1038a269a",
+            "sig": "f111497c557d784f85834f371afa3e44dc226876b5de4a4431700b4f2124e5b7",
             "touches": [
                 "src/Cache/Footprint.php",
                 "src/Cache/Key.php",
@@ -264,7 +300,7 @@
             ]
         },
         "tests/Unit/Console/CompositionTest.php": {
-            "sig": "0b5ad4f1e7c17432c49408725181dbda57326fd3151c5028f3ae7fdfae68a79e",
+            "sig": "b1aaca702b21ca0116e87688999654e9290d053801aa4c67ae7bc0541538f460",
             "touches": [
                 "src/Cache/Store.php",
                 "src/Cache/Toolchain.php",
@@ -390,7 +426,7 @@
             ]
         },
         "tests/Unit/Doctor/ExaminationTest.php": {
-            "sig": "be938ecf90966b2c5d63acb0f3e0ed09e2697a5e349ee24572152f5bc3621f77",
+            "sig": "350483d72acfbae39099ec233ec108205e8d509d3d473bfd65278a648228cf49",
             "touches": [
                 "src/Cache/Footprint.php",
                 "src/Config/Configuration.php",
@@ -434,7 +470,7 @@
             ]
         },
         "tests/Unit/Engine/GateTest.php": {
-            "sig": "e40545c959b20c3a44b059a6be28863ece9a19b11fb48b56cd1687cd7d8c8934",
+            "sig": "d0385e9c84918531712e11503e45834f93d560c7a94398766b054c1e8fe0c6ed",
             "touches": [
                 "src/Cache/Footprint.php",
                 "src/Cache/Lapse.php",
@@ -465,7 +501,7 @@
             ]
         },
         "tests/Unit/Runner/CoverageTest.php": {
-            "sig": "8cfee347939050ca757a50a7f6afe056a1c54fac511b8b0a8cb69ad0369c46e9",
+            "sig": "f2bc1913c62dedab6b9fc1861b3b30f4f87c1de8bd7989107e0abf1b277327bb",
             "touches": [
                 "src/Cache/Footprint.php",
                 "src/Config/Configuration.php",
@@ -483,7 +519,7 @@
             ]
         },
         "tests/Unit/Runner/EngineTest.php": {
-            "sig": "43f09a0f697d0ace66a7b0b511cd99c22d98c808a7644f61d1600d84fbd5369c",
+            "sig": "dd425d048c1c567bdecb67f0cd746464ec7948bf09e9591d048473518f83052e",
             "touches": [
                 "src/Cache/Footprint.php",
                 "src/Config/Configuration.php",
@@ -499,7 +535,7 @@
             ]
         },
         "tests/Unit/Runner/RunTest.php": {
-            "sig": "a4b69d7dd8f4801f6851aa0f26e1070ab006276c53f172ade51dd595c8d80569",
+            "sig": "41e1062edbba094ec2f7a75c8e33e4e5789655029d1b4269746647c03889f414",
             "touches": [
                 "src/Cache/Footprint.php",
                 "src/Cache/Key.php",
@@ -546,7 +582,7 @@
             ]
         },
         "tests/Unit/Runner/UniverseTest.php": {
-            "sig": "6b030b47f37b4dc40e7ae004cd592a2c9ba2b876b1469f019c87d938aa2b5e25",
+            "sig": "202cf801d5345ca1fd5e76c16a0348f82c79441718ea873a40a6a0032c7d205c",
             "touches": [
                 "src/Cache/Toolchain.php",
                 "src/Config/Configuration.php",

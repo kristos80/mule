@@ -7,21 +7,14 @@
 	"exclude": [
 		"src/Console/Assembly.php",
 		"src/Doctor/Examination.php",
-		"src/External/ClassesInterface.php",
 		"src/External/ComposerClasses.php",
-		"src/External/CoverageReportInterface.php",
-		"src/External/EnvironmentInterface.php",
-		"src/External/FilesystemInterface.php",
-		"src/External/LinesInterface.php",
-		"src/External/OutputInterface.php",
 		"src/External/PhpCoverageReport.php",
 		"src/External/PhpEnvironment.php",
 		"src/External/PhpFilesystem.php",
 		"src/External/PhpLines.php",
-		"src/External/ProcessesInterface.php",
 		"src/External/ShellProcesses.php",
 		"src/External/StreamOutput.php",
-		"src/Failure.php",
+		"src/External/StreamProgress.php",
 		"src/Runner/Measured.php"
 	],
 	"mutators": {

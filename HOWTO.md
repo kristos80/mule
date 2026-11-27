@@ -211,6 +211,27 @@ the dependency edges then come from:
 
 ## 5. What a run tells you
 
+**Progress goes to stderr, the report to stdout.** mule's work is three long waits
+— a coverage capture, the reassembly, the engine — and on a real project the last
+one is minutes. A terminal gets a spinner with the elapsed time:
+
+```
+⠹ Capturing coverage for 334 test file(s) (18.4s)
+```
+
+and when the stage finishes, how long it took:
+
+```
+Capturing coverage for 334 test file(s) — 31.4s
+Reassembling 334 shard(s) — 4.1s
+Mutating 11 file(s) — 16.2s
+```
+
+A log gets one plain line per stage and no carriage returns, because a spinner in
+CI output is noise. And because progress is on stderr, `mule > report.txt` gives
+you the report alone.
+
+
 ```
 34 file(s) were owed; 34 were handed to the engine.
 

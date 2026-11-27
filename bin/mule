@@ -15,6 +15,7 @@ use Kristos80\Mule\External\PhpEnvironment;
 use Kristos80\Mule\External\PhpFilesystem;
 use Kristos80\Mule\External\PhpLines;
 use Kristos80\Mule\External\ShellProcesses;
+use Kristos80\Mule\External\StreamProgress;
 use Kristos80\Mule\External\StreamOutput;
 
 /**
@@ -53,8 +54,10 @@ exit(new Application(
 		new PhpCoverageReport(),
 		new PhpLines(),
 		new PhpEnvironment(),
+		$progress = new StreamProgress(STDERR),
 	),
 	new Summary(),
 	new Prognosis(),
+	$progress,
 	new StreamOutput(STDOUT),
 )(array_slice($argv, 1)));

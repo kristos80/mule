@@ -16,6 +16,7 @@ use Kristos80\Mule\Tests\Support\ScriptedProcesses;
 use Kristos80\Mule\Tests\Support\StubClasses;
 use Kristos80\Mule\Tests\Support\StubLines;
 use Kristos80\Mule\Runner\Universe;
+use Kristos80\Mule\Tests\Support\RecordingProgress;
 use PHPUnit\Framework\TestCase;
 use SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData;
 
@@ -96,6 +97,7 @@ final class ExaminationTest extends TestCase {
 				new Shards($this->filesystem, "/p/.mule/cache"),
 				$configuration,
 				$project,
+				new RecordingProgress(),
 				".mule/cache",
 			),
 			new Soundness(

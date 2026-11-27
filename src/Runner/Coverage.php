@@ -13,9 +13,11 @@ use Kristos80\Mule\Coverage\Timings;
 use Kristos80\Mule\External\ClassesInterface;
 use Kristos80\Mule\External\FilesystemInterface;
 use Kristos80\Mule\External\ProcessesInterface;
+use Kristos80\Mule\External\ProgressInterface;
 use Kristos80\Mule\Failure;
 use Kristos80\Mule\Project;
 use SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData;
+use function count;
 use function implode;
 
 /**
@@ -40,6 +42,7 @@ final readonly class Coverage {
 	 * @param Shards $shards
 	 * @param Configuration $configuration
 	 * @param Project $project
+	 * @param ProgressInterface $progress
 	 * @param string $scratch A directory mule may write throwaway captures into, project-relative.
 	 */
 	public function __construct(
@@ -50,6 +53,7 @@ final readonly class Coverage {
 		private Shards $shards,
 		private Configuration $configuration,
 		private Project $project,
+		private ProgressInterface $progress,
 		private string $scratch,
 	) {}
 
@@ -68,6 +72,7 @@ final readonly class Coverage {
 	 */
 	public function whole(array $known): Measured {
 		$this->shards->prepare();
+		$this->progress->begin("Capturing coverage for " . count($known) . " test file(s)");
 
 		$capture = $this->capture();
 		$timings = Timings::from($this->filesystem->read($this->junit()));
@@ -77,6 +82,8 @@ final readonly class Coverage {
 		foreach($known as $test) {
 			$tests[$test] = new Footprint($this->signature($test), []);
 		}
+
+		$this->progress->begin("Splitting into " . count($known) . " shard(s)");
 
 		foreach(new Split($capture)->byTestClass() as $class => $shard) {
 			$test = $this->fileOf($class);
@@ -110,8 +117,13 @@ final readonly class Coverage {
 		$this->assertTimed();
 
 		$tests = $recorded;
+		$dirty = $this->dirty($recorded, $digests);
 
-		foreach($this->dirty($recorded, $digests) as $test) {
+		foreach($dirty as $index => $test) {
+			$this->progress->begin(
+				"Re-measuring " . ($index + 1) . " of " . count($dirty) . ": {$test}",
+			);
+
 			$capture = $this->capture($test);
 			$classes = $capture->testClasses();
 
@@ -137,6 +149,8 @@ final readonly class Coverage {
 
 			$tests[$test] = new Footprint($this->signature($test), $touches);
 		}
+
+		$this->progress->begin("Reassembling " . count($recorded) . " shard(s)");
 
 		return new Measured($this->merged(array_keys($recorded)), $this->shards->readTimings(), $tests);
 	}
@@ -198,7 +212,11 @@ final readonly class Coverage {
 	private function capture(string $only = ""): Capture {
 		$payload = $this->project->absolute("{$this->scratch}/capture.cov");
 		$command = $this->commands->capture($payload, $this->junit(), $only);
-		$completed = $this->processes->run($command, $this->project->absolute(""));
+		$completed = $this->processes->run(
+			$command,
+			$this->project->absolute(""),
+			waiting: $this->progress->tick(...),
+		);
 
 		if($completed["status"] !== 0) {
 			throw new Failure(

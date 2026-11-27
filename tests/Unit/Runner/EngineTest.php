@@ -17,6 +17,7 @@ use Kristos80\Mule\Runner\Measured;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
 use Kristos80\Mule\Tests\Support\RecordingReports;
 use Kristos80\Mule\Tests\Support\ScriptedProcesses;
+use Kristos80\Mule\Tests\Support\RecordingProgress;
 use PHPUnit\Framework\TestCase;
 use SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData;
 use function json_encode;
@@ -32,10 +33,13 @@ final class EngineTest extends TestCase {
 
 	private ScriptedProcesses $processes;
 
+	private RecordingProgress $progress;
+
 	protected function setUp(): void {
 		$this->filesystem = new InMemoryFilesystem();
 		$this->reports = new RecordingReports();
 		$this->processes = new ScriptedProcesses($this->writes($this->verdicts()));
+		$this->progress = new RecordingProgress();
 	}
 
 	/**
@@ -110,6 +114,7 @@ final class EngineTest extends TestCase {
 			new Report($this->filesystem, $this->reports),
 			new Declaration($configuration, ".mule/cache/outcome.json", ".mule/cache/tmp"),
 			$project,
+			$this->progress,
 			".mule/cache",
 		);
 	}
@@ -222,5 +227,28 @@ final class EngineTest extends TestCase {
 		});
 
 		self::assertSame(1, $this->engine()->over($this->measured(), [])->count("src/A.php", "escaped"));
+	}
+
+	/**
+	 * The engine is the longest wait mule has — several minutes on a real project —
+	 * so it is announced with how many files it was asked about, and it reports
+	 * being alive throughout.
+	 *
+	 * @return void
+	 */
+	public function testItSaysWhatItIsMutatingAndKeepsSayingItIsAlive(): void {
+		$this->engine()->over($this->measured(), ["src/A.php", "src/B.php"]);
+
+		self::assertSame(
+			["Rendering the report the engine reads", "Mutating 2 file(s)"],
+			$this->progress->stages,
+		);
+		self::assertGreaterThan(0, $this->progress->ticks);
+	}
+
+	public function testAWholeRunSaysSoRatherThanCountingToTheWholeProject(): void {
+		$this->engine()->over($this->measured(), []);
+
+		self::assertContains("Mutating every gated file", $this->progress->stages);
 	}
 }

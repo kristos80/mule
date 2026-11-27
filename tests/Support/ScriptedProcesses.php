@@ -41,8 +41,20 @@ final class ScriptedProcesses implements ProcessesInterface {
 	 * past it.
 	 */
 	#[Override]
-	public function run(array $command, string $directory, array $environment = []): array {
+	public function run(
+		array $command,
+		string $directory,
+		array $environment = [],
+		?Closure $waiting = NULL,
+	): array {
 		$this->started[] = ["command" => $command, "directory" => $directory];
+
+		// **Called twice, because a real child is polled more than once.** A double
+		// that never called it would let a caller forget to pass one.
+		if($waiting !== NULL) {
+			$waiting();
+			$waiting();
+		}
 
 		return $this->answer === NULL ? ["status" => 0, "output" => ""] : ($this->answer)($command);
 	}

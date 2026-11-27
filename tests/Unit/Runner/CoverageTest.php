@@ -13,6 +13,7 @@ use Kristos80\Mule\Runner\Shards;
 use Kristos80\Mule\Tests\Support\InMemoryFilesystem;
 use Kristos80\Mule\Tests\Support\ScriptedProcesses;
 use Kristos80\Mule\Tests\Support\StubClasses;
+use Kristos80\Mule\Tests\Support\RecordingProgress;
 use PHPUnit\Framework\TestCase;
 use SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData;
 use function count;
@@ -29,6 +30,8 @@ final class CoverageTest extends TestCase {
 	private InMemoryFilesystem $filesystem;
 
 	private ScriptedProcesses $processes;
+
+	private RecordingProgress $progress;
 
 	/**
 	 * Test classes that execute no instrumented source at all (M16).
@@ -55,6 +58,7 @@ final class CoverageTest extends TestCase {
 			directories: ["/p/src", "/p/tests/Unit"],
 		);
 		$this->processes = new ScriptedProcesses($this->answered(...));
+		$this->progress = new RecordingProgress();
 	}
 
 	/**
@@ -209,6 +213,7 @@ final class CoverageTest extends TestCase {
 			new Shards($this->filesystem, "/p/.mule/cache"),
 			$configuration,
 			$project,
+			$this->progress,
 			".mule/cache",
 		);
 	}
@@ -622,5 +627,66 @@ final class CoverageTest extends TestCase {
 		);
 
 		$this->coverage()->refresh($this->recorded(), $this->digests("/p/tests/Unit/AaaTest.php"));
+	}
+
+	/**
+	 * **A run that says nothing is indistinguishable from a run that has hung.** A
+	 * coverage capture is half a minute on a real project, and for all of it mule is
+	 * blocked on a child process — so each wait is announced before it starts, with
+	 * how much work it is.
+	 *
+	 * @return void
+	 */
+	public function testAColdRunSaysWhatItIsAboutToWaitFor(): void {
+		$this->coverage()->whole($this->known());
+
+		self::assertSame(
+			["Capturing coverage for 2 test file(s)", "Splitting into 2 shard(s)"],
+			$this->progress->stages,
+		);
+	}
+
+	/**
+	 * **Liveness comes from inside the wait.** The only thing that can report mule
+	 * is alive while a child runs is the loop reading that child's output, so the
+	 * capture hands it somewhere to report to.
+	 *
+	 * @return void
+	 */
+	public function testItReportsBeingAliveWhileTheChildRuns(): void {
+		$this->coverage()->whole($this->known());
+
+		self::assertGreaterThan(0, $this->progress->ticks);
+	}
+
+	/**
+	 * A warm run names the file it is re-measuring and counts them off, because
+	 * which one is slow is the thing somebody wants to know.
+	 *
+	 * @return void
+	 */
+	public function testAWarmRunCountsOffTheFilesItReMeasures(): void {
+		$this->coverage()->whole($this->known());
+		$this->progress->stages = [];
+
+		$this->coverage()->refresh($this->recorded(), $this->digests("/p/src/Hub.php"));
+
+		self::assertSame(
+			[
+				"Re-measuring 1 of 2: tests/Unit/AaaTest.php",
+				"Re-measuring 2 of 2: tests/Unit/BbbTest.php",
+				"Reassembling 2 shard(s)",
+			],
+			$this->progress->stages,
+		);
+	}
+
+	public function testAWarmRunWithNothingDirtySaysOnlyWhatItDid(): void {
+		$this->coverage()->whole($this->known());
+		$this->progress->stages = [];
+
+		$this->coverage()->refresh($this->recorded(), $this->digests());
+
+		self::assertSame(["Reassembling 2 shard(s)"], $this->progress->stages);
 	}
 }

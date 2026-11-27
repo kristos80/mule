@@ -114,6 +114,10 @@ vendor/bin/mule doctor     # would a verdict cache pay for itself here?
 vendor/bin/mule --help
 ```
 
+While it works it says so — a spinner with the elapsed time on a terminal, one
+plain line per stage in a log. Progress goes to **stderr** and the report to
+**stdout**, so `mule > report.txt` gives you the report alone.
+
 Exit codes: **0** everything gated is proven · **1** something is not · **2** mule
 could not answer the question. Those are three different things, and collapsing
 the last two is how a pipeline comes to treat a broken run as a failing gate.

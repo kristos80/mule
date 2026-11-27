@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace Kristos80\Mule\Console;
 
 use Kristos80\Mule\External\OutputInterface;
+use Kristos80\Mule\External\ProgressInterface;
 use Kristos80\Mule\Failure;
 use function implode;
 
@@ -45,12 +46,14 @@ final readonly class Application {
 	 * @param Composition $composition
 	 * @param Summary $summary
 	 * @param Prognosis $prognosis
+	 * @param ProgressInterface $progress
 	 * @param OutputInterface $output
 	 */
 	public function __construct(
 		private Composition $composition,
 		private Summary $summary,
 		private Prognosis $prognosis,
+		private ProgressInterface $progress,
 		private OutputInterface $output,
 	) {}
 
@@ -91,6 +94,8 @@ final readonly class Application {
 			$finding = ($assembly->run)($whole);
 		} catch(Failure $failure) {
 			return $this->failed($failure->getMessage());
+		} finally {
+			$this->progress->done();
 		}
 
 		foreach($this->summary->lines($finding, $assembly->universe->excluded()) as $line) {
@@ -112,6 +117,10 @@ final readonly class Application {
 			$diagnosis = ($this->composition->assembled()->examination)();
 		} catch(Failure $failure) {
 			return $this->failed($failure->getMessage());
+		} finally {
+			// **Whatever happened, the last stage is closed before anything is
+			// printed.** A spinner left spinning puts the next line on top of it.
+			$this->progress->done();
 		}
 
 		foreach($this->prognosis->lines($diagnosis) as $line) {

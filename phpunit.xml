@@ -36,6 +36,7 @@
 			<file>src/External/PhpFilesystem.php</file>
 			<file>src/External/PhpLines.php</file>
 			<file>src/External/ShellProcesses.php</file>
+			<file>src/External/StreamProgress.php</file>
 			<file>src/External/StreamOutput.php</file>
 		</exclude>
 	</source>

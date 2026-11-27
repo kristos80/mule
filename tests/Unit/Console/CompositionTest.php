@@ -10,6 +10,7 @@ use Kristos80\Mule\Tests\Support\ScriptedProcesses;
 use Kristos80\Mule\Tests\Support\StubClasses;
 use Kristos80\Mule\Tests\Support\StubEnvironment;
 use Kristos80\Mule\Tests\Support\StubLines;
+use Kristos80\Mule\Tests\Support\RecordingProgress;
 use PHPUnit\Framework\TestCase;
 
 final class CompositionTest extends TestCase {
@@ -38,6 +39,7 @@ final class CompositionTest extends TestCase {
 			new RecordingReports(),
 			new StubLines(),
 			new StubEnvironment(),
+			new RecordingProgress(),
 		);
 	}
 

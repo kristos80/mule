@@ -15,6 +15,7 @@ use Kristos80\Mule\Tests\Support\ScriptedProcesses;
 use Kristos80\Mule\Tests\Support\StubClasses;
 use Kristos80\Mule\Tests\Support\StubEnvironment;
 use Kristos80\Mule\Tests\Support\StubLines;
+use Kristos80\Mule\Tests\Support\RecordingProgress;
 use PHPUnit\Framework\TestCase;
 use SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData;
 use function json_encode;
@@ -33,6 +34,8 @@ final class ApplicationTest extends TestCase {
 
 	private RecordingOutput $output;
 
+	private RecordingProgress $progress;
+
 	/**
 	 * Whether the engine should report an escape rather than a kill.
 	 */
@@ -50,6 +53,7 @@ final class ApplicationTest extends TestCase {
 			directories: ["/p/src", "/p/tests/Unit"],
 		);
 		$this->output = new RecordingOutput();
+		$this->progress = new RecordingProgress();
 	}
 
 	/**
@@ -67,9 +71,11 @@ final class ApplicationTest extends TestCase {
 				new RecordingReports(),
 				new StubLines(["/p/src/A.php" => [3]]),
 				new StubEnvironment(),
+				$this->progress,
 			),
 			new Summary(),
 			new Prognosis(),
+			$this->progress,
 			$this->output,
 		)($arguments);
 	}
@@ -331,5 +337,59 @@ final class ApplicationTest extends TestCase {
 		$this->mule(["--help"]);
 
 		self::assertStringContainsString("mule doctor", $this->output->text());
+	}
+
+	/**
+	 * **A spinner left spinning puts the next line on top of itself.** Whatever the
+	 * run did, the last stage is closed before a word of the summary is printed.
+	 *
+	 * @return void
+	 */
+	public function testTheLastStageIsClosedBeforeAnythingIsPrinted(): void {
+		$this->mule();
+
+		self::assertTrue($this->progress->closed);
+	}
+
+	/**
+	 * **And closed when the run fails**, which is the case worth having a `finally`
+	 * for: the failure message is the only thing a person will read, and a half
+	 * written spinner line is what they would read it through.
+	 *
+	 * @return void
+	 */
+	public function testTheLastStageIsClosedWhenTheRunFails(): void {
+		unset($this->filesystem->files["/p/composer.lock"]);
+
+		self::assertSame(2, $this->mule());
+		self::assertTrue($this->progress->closed);
+	}
+
+	public function testDoctorClosesItsLastStageToo(): void {
+		$this->mule(["doctor"]);
+
+		self::assertTrue($this->progress->closed);
+	}
+
+	public function testDoctorClosesItsLastStageWhenItCannotAnswer(): void {
+		unset($this->filesystem->files["/p/composer.lock"]);
+
+		self::assertSame(2, $this->mule(["doctor"]));
+		self::assertTrue($this->progress->closed);
+	}
+
+	/**
+	 * A run that measured nothing announced nothing, so there is no stage to close
+	 * and nothing to overwrite.
+	 *
+	 * @return void
+	 */
+	public function testARunThatMeasuredNothingAnnouncedNothing(): void {
+		$this->mule();
+		$this->progress = new RecordingProgress();
+
+		$this->mule();
+
+		self::assertSame([], $this->progress->stages);
 	}
 }

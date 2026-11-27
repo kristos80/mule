@@ -13,7 +13,7 @@ pinned tools rather than by reading their documentation.
 
 | | |
 |---|---|
-| `docs/keying.md` | **the specification.** M1–M20 verified mechanics, G1–G9 guards, GN1–GN3 narrowing-only, §10 what is *not* established, §11 the v1 scope and build order |
+| `docs/keying.md` | **the specification.** M1–M21 verified mechanics, G1–G9 guards, GN1–GN3 narrowing-only, §10 what is *not* established, §11 the v1 scope and build order |
 | `HOWTO.md` | the contract a consumer accepts: preconditions, and what happens when each is broken |
 | `docs/decisions.md` | why the repository is shaped the way it is. Written for v4; the release machinery, the conventions and the external-layer reasoning still hold. Its cache design is superseded by `docs/keying.md` |
 
@@ -155,7 +155,9 @@ src/
                   Soundness, Reach — the shard pipeline (M2–M4, M19) and G3
   Engine/         Declaration, Outcome, Gate — what mule asks Infection and what
                   it refuses to accept back (G1, G2, G5, G8)
-  External/       the ports and their wrappers; the only code not unit tested
+  External/       the ports and their wrappers; the only code not unit tested.
+                  `ShellProcesses` is the exception that proves the rule — it
+                  polls now, so `tests/Integration/ProcessTest.php` covers it
   Doctor/         Spread, Tier, Diagnosis, Examination — would a cache pay for
                   itself here? One capture, no store, no mutants (§8)
   Runner/         Universe, Coverage, Engine, Commands, Shards, Measured, Run,

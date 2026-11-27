@@ -17,6 +17,7 @@ use Kristos80\Mule\External\EnvironmentInterface;
 use Kristos80\Mule\External\FilesystemInterface;
 use Kristos80\Mule\External\LinesInterface;
 use Kristos80\Mule\External\ProcessesInterface;
+use Kristos80\Mule\External\ProgressInterface;
 use Kristos80\Mule\Failure;
 use Kristos80\Mule\Project;
 use Kristos80\Mule\Runner\Commands;
@@ -74,6 +75,7 @@ final readonly class Composition {
 	 * @param CoverageReportInterface $reports
 	 * @param LinesInterface $lines
 	 * @param EnvironmentInterface $environment
+	 * @param ProgressInterface $progress
 	 */
 	public function __construct(
 		private FilesystemInterface $filesystem,
@@ -82,6 +84,7 @@ final readonly class Composition {
 		private CoverageReportInterface $reports,
 		private LinesInterface $lines,
 		private EnvironmentInterface $environment,
+		private ProgressInterface $progress,
 	) {}
 
 	/**
@@ -102,6 +105,7 @@ final readonly class Composition {
 			$shards,
 			$configuration,
 			$project,
+			$this->progress,
 			self::CACHE,
 		);
 		$soundness = new Soundness($this->lines, $project, $configuration);
@@ -118,6 +122,7 @@ final readonly class Composition {
 					new Report($this->filesystem, $this->reports),
 					$declaration,
 					$project,
+					$this->progress,
 					self::CACHE,
 				),
 				new Store($this->filesystem, $project->absolute(self::STORE)),
